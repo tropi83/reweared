@@ -1,0 +1,37 @@
+[package]
+name = "ai-image-variations"
+version = "0.1.0"
+description = "A local-first visual workspace for AI image creation and variations."
+authors = ["AI Image Variations"]
+edition = "2021"
+rust-version = "1.88"
+
+[lib]
+# The `_lib` suffix is required so the lib name does not clash with the bin name on Windows.
+name = "ai_image_variations_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-http = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# OS credential store for API keys / OAuth tokens (Windows Credential Manager, macOS Keychain, Secret Service).
+keyring = { version = "4", default-features = false }
+url = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+keyring = { version = "4", features = ["v1"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

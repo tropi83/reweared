@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.local
+src-tauri/target
+src-tauri/gen/schemas
+
+# Environment / secrets — NEVER commit credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.keystore
+*.jks
+client_secret*.json
+service-account*.json
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Test artifacts
+coverage
+playwright-report
+test-results

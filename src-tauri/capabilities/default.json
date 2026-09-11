@@ -1,0 +1,67 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Main window: local project storage under the app data directory, file dialogs, and HTTPS access limited to Google endpoints. Every permission here has a justification in SECURITY.md.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-title",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://accounts.google.com/*"
+        },
+        {
+          "url": "https://aistudio.google.com/*"
+        },
+        {
+          "url": "https://console.cloud.google.com/*"
+        }
+      ]
+    },
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive",
+    "fs:allow-appdata-meta-recursive",
+    "fs:allow-mkdir",
+    "fs:allow-read-file",
+    "fs:allow-read-text-file",
+    "fs:allow-write-file",
+    "fs:allow-write-text-file",
+    "fs:allow-remove",
+    "fs:allow-rename",
+    "fs:allow-exists",
+    "fs:allow-read-dir",
+    "fs:allow-stat",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        {
+          "path": "$APPDATA"
+        },
+        {
+          "path": "$APPDATA/**"
+        }
+      ]
+    },
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://generativelanguage.googleapis.com/*"
+        },
+        {
+          "url": "https://oauth2.googleapis.com/*"
+        },
+        {
+          "url": "https://www.googleapis.com/oauth2/*"
+        },
+        {
+          "url": "https://cloudresourcemanager.googleapis.com/*"
+        }
+      ]
+    }
+  ]
+}
