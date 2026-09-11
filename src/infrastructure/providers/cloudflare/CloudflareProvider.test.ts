@@ -266,3 +266,64 @@ describe("input preparation for diffusion models", () => {
     expect(computeGeometry(100, 100, { maxDimension: 512, multipleOf: 64 })).toMatchObject({ width: 64, height: 64 });
   });
 });
+
+describe("private / restricted models (error 5018)", () => {
+  it("maps 403 5018 to MODEL_NOT_IN_PLAN without marking the credential rejected", async () => {
+    const auth = makeAuth();
+    await auth.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
+    __setFetchOverride(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: false,
+            errors: [{ code: 5018, message: "AiError: Ai: This account is not allowed to access @cf/runwayml/stable-diffusion-v1-5-img2img" }],
+          }),
+          {
+            status: 403,
+          },
+        ),
+    );
+    const provider = new CloudflareProvider(auth);
+    await expect(
+      provider.generate(
+        { prompt: "p", model: DEFAULT_CLOUDFLARE_MODEL_ID, sourceImage: { blob: new Blob([PNG]), mimeType: "image/png" } },
+        { signal: new AbortController().signal },
+      ),
+    ).rejects.toMatchObject({ code: "MODEL_NOT_IN_PLAN", retryable: false });
+    expect((await auth.getStatus()).state).toBe("authenticated");
+    expect(mapCloudflareHttpError(403, { errors: [{ code: 10000, message: "Authentication error" }] }, null).code).toBe("INVALID_CREDENTIAL");
+  });
+
+  it("marks catalogue models the account cannot run as unavailable", async () => {
+    const auth = makeAuth();
+    await auth.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
+    __setFetchOverride(async (url) => {
+      expect(url).toContain(`/accounts/${ACCOUNT}/ai/models/search?task=Text-to-Image`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          result: [{ name: "@cf/stabilityai/stable-diffusion-xl-base-1.0" }, { name: "@cf/black-forest-labs/flux-1-schnell" }],
+          result_info: { total_pages: 1 },
+        }),
+        {
+          status: 200,
+        },
+      );
+    });
+    const provider = new CloudflareProvider(auth);
+    const models = await provider.getModels();
+    expect(models.find((m) => m.id === "@cf/stabilityai/stable-diffusion-xl-base-1.0")?.available).toBe(true);
+    expect(models.find((m) => m.id === DEFAULT_CLOUDFLARE_MODEL_ID)?.available).toBe(false);
+    // Cached for the same configuration.
+    __setFetchOverride(async () => new Response("{}", { status: 500 }));
+    expect((await provider.getModels()).find((m) => m.id === DEFAULT_CLOUDFLARE_MODEL_ID)?.available).toBe(false);
+  });
+
+  it("falls back to the full catalogue when listing fails or no configuration exists", async () => {
+    __setFetchOverride(async () => new Response("{}", { status: 500 }));
+    const configured = makeAuth();
+    await configured.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
+    expect((await new CloudflareProvider(configured).getModels()).every((m) => m.available)).toBe(true);
+    expect((await new CloudflareProvider(makeAuth()).getModels()).every((m) => m.available)).toBe(true);
+  });
+});

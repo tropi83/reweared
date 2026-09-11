@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- Cloudflare: 403 `5018`/`3041` ("account not allowed for private model") is reported as a model-access problem, not a bad credential, and the model list is filtered by what the account can actually run (`/ai/models/search`, or `/models` on the Worker).
+
 - Gemini: 429 responses are classified from Google's structured `QuotaFailure`/`RetryInfo` details — daily quota exhaustion is `QUOTA_EXCEEDED` (not retried), a `quotaValue` of 0 is `MODEL_NOT_IN_PLAN`, per-minute throttling stays `RATE_LIMITED` with the delay Google suggests. Previously the doc URL in the message (`…/rate-limits`) made every quota error look like throttling.
 - Gemini: requests no longer send `response_format.mime_type` (the live Interactions API rejected `image/png`); the model's default output format is used.
 - Auth: concurrent first calls could observe a half-loaded credential (the load promise is now memoized).

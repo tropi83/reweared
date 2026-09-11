@@ -22,8 +22,11 @@ export function mapCloudflareHttpError(status: number, body: CloudflareErrorBody
       else code = "INVALID_REQUEST";
       break;
     case 401:
-    case 403:
       code = "INVALID_CREDENTIAL";
+      break;
+    case 403:
+      // 5018 / 3041 "The account is not allowed to access this model" (private model) — the token is fine.
+      code = first?.code === 5018 || first?.code === 3041 || /not allowed to access/.test(lower) ? "MODEL_NOT_IN_PLAN" : "INVALID_CREDENTIAL";
       break;
     case 404:
       // 7003 "Could not route to …, perhaps your object identifier is invalid" = bad account id;
@@ -69,6 +72,8 @@ export function cloudflareMessageFor(code: GenerationErrorCode): string {
       return "Your Workers AI daily allocation is exhausted.";
     case "MODEL_UNAVAILABLE":
       return "This Workers AI model is not available.";
+    case "MODEL_NOT_IN_PLAN":
+      return "Cloudflare does not allow your account to use this model (private/restricted model). Pick another model.";
     case "INVALID_IMAGE":
       return "Cloudflare could not process the source image.";
     case "CONTENT_REJECTED":

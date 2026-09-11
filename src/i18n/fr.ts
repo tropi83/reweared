@@ -279,7 +279,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "error.FREE_TIER_NO_ACCESS":
     "Votre projet Google est en offre gratuite (Free tier), qui n'a aucun quota (limite 0) pour ce modèle image. Associez un compte de facturation à votre projet dans Google AI Studio pour l'utiliser.",
   "error.MODEL_NOT_IN_PLAN":
-    "Ce modèle n'est pas inclus dans votre plan Google (limite 0). Activez la facturation sur votre projet Google Cloud ou choisissez un autre modèle.",
+    "Votre compte n'est pas autorisé à utiliser ce modèle (non inclus dans votre offre, ou modèle privé/restreint). Choisissez un autre modèle ou vérifiez le tableau de bord du fournisseur.",
   "error.NETWORK_ERROR": "Erreur réseau. Vérifiez votre connexion et réessayez.",
   "error.TIMEOUT": "Le fournisseur a mis trop de temps à répondre.",
   "error.PROVIDER_UNAVAILABLE": "Le fournisseur est temporairement indisponible.",

@@ -27,13 +27,64 @@ export class CloudflareProvider implements ImageProvider {
     pricingKey: "cf.pricing",
   };
 
+  private modelCache: { at: number; key: string; models: ModelInfo[] } | null = null;
+
   constructor(
     private readonly auth: CloudflareAuth,
     private readonly usage?: GeminiUsageSink,
   ) {}
 
+  /**
+   * Catalogue merged with the models the account can actually run. Cloudflare answers 403/5018
+   * ("account not allowed for private model") for models it still lists publicly, so the list is
+   * asked from the account (`/ai/models/search` directly, `/models` on the user's Worker) and
+   * catalogue entries missing from it are marked unavailable rather than hidden.
+   */
   async getModels(): Promise<ModelInfo[]> {
-    return CLOUDFLARE_IMAGE_MODELS;
+    const cfg = await this.auth.getConfig();
+    const key = cfg ? `${cfg.mode}:${cfg.accountId ?? cfg.workerUrl ?? ""}` : "none";
+    if (this.modelCache && this.modelCache.key === key && Date.now() - this.modelCache.at < 10 * 60_000) return this.modelCache.models;
+    let accessible: Set<string> | null = null;
+    if (cfg) {
+      try {
+        accessible = await this.listAccessibleModels();
+      } catch (err) {
+        log.warn("model listing unavailable, using catalogue", err);
+      }
+    }
+    const models = CLOUDFLARE_IMAGE_MODELS.map((m) => ({ ...m, available: accessible ? accessible.has(m.id) : true }));
+    this.modelCache = { at: Date.now(), key, models };
+    return models;
+  }
+
+  invalidateModelCache() {
+    this.modelCache = null;
+  }
+
+  private async listAccessibleModels(): Promise<Set<string> | null> {
+    const cfg = await this.auth.getConfig();
+    if (!cfg) return null;
+    const { headers } = await this.auth.resolveEndpoint(CLOUDFLARE_IMAGE_MODELS[0]!.id);
+    const names = new Set<string>();
+    if (cfg.mode === "direct") {
+      for (let page = 1; page <= 5; page++) {
+        const url = `https://api.cloudflare.com/client/v4/accounts/${cfg.accountId}/ai/models/search?task=Text-to-Image&per_page=100&page=${page}`;
+        const response = await httpFetch(url, { headers });
+        if (!response.ok) throw await this.toError(response);
+        const json = (await response.json()) as { result?: Array<{ name?: string }>; result_info?: { total_pages?: number } };
+        for (const m of json.result ?? []) if (m.name) names.add(m.name);
+        if ((json.result_info?.total_pages ?? 1) <= page) break;
+      }
+    } else {
+      if (!cfg.workerUrl) return null;
+      allowHost(new URL(cfg.workerUrl).host);
+      const response = await httpFetch(`${cfg.workerUrl}/models`, { headers });
+      if (response.status === 404) return null; // older Worker template without the route
+      if (!response.ok) throw await this.toError(response);
+      const json = (await response.json()) as { models?: Array<{ name?: string }> };
+      for (const m of json.models ?? []) if (m.name) names.add(m.name);
+    }
+    return names.size > 0 ? names : null;
   }
 
   getAuthStatus(): Promise<AuthStatus> {
@@ -62,6 +113,7 @@ export class CloudflareProvider implements ImageProvider {
       throw new AppError("NETWORK_ERROR", "Could not reach Cloudflare.", { cause: err });
     }
     if (!response.ok) throw await this.toError(response);
+    this.invalidateModelCache();
     return { ...status, state: "authenticated" };
   }
 
@@ -122,6 +174,7 @@ export class CloudflareProvider implements ImageProvider {
     const error = mapCloudflareHttpError(response.status, body, response.headers.get("retry-after"));
     if (model) this.track(model, error.code === "RATE_LIMITED" ? "rate_limited" : error.code === "QUOTA_EXCEEDED" ? "quota" : "error");
     if (error.code === "INVALID_CREDENTIAL") this.auth.markRejected();
+    if (error.code === "MODEL_NOT_IN_PLAN") this.invalidateModelCache();
     log.warn("cloudflare error", error.code, error.detail ?? "");
     return error;
   }

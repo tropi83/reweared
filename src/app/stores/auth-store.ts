@@ -172,6 +172,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ busy: true, lastError: null });
     try {
       await getServices().cloudflare.validateCredentials();
+      getServices().cloudflare.invalidateModelCache();
       await get().refresh();
       return true;
     } catch (err) {

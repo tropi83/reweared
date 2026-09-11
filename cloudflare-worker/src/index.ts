@@ -7,6 +7,7 @@
  *
  * Routes:
  *   GET  /health          -> { ok: true }
+ *   GET  /models          -> { models: [{ name }] } (image models this account can run)
  *   POST /run/<model id>  -> PNG bytes (same body as the Workers AI REST API)
  *
  * Security:
@@ -85,6 +86,15 @@ export default {
       if (!authorized(request, env)) return json(401, { success: false, errors: [{ code: 10000, message: "Authentication error" }] }, cors);
       return json(200, { ok: true }, cors);
     }
+    if (request.method === "GET" && url.pathname === "/models") {
+      if (!authorized(request, env)) return json(401, { success: false, errors: [{ code: 10000, message: "Authentication error" }] }, cors);
+      try {
+        const list = (await env.AI.models({ task: "Text-to-Image", per_page: 100 })) as Array<{ name?: string }>;
+        return json(200, { models: list.filter((m) => m.name && ALLOWED_MODELS.has(m.name)).map((m) => ({ name: m.name })) }, cors);
+      } catch (err) {
+        return json(502, { success: false, errors: [{ code: 502, message: err instanceof Error ? err.message : "models() failed" }] }, cors);
+      }
+    }
     if (request.method !== "POST" || !url.pathname.startsWith("/run/")) {
       return json(404, { success: false, errors: [{ code: 7003, message: "Not found" }] }, cors);
     }
@@ -127,7 +137,7 @@ export default {
 
     try {
       // The binding returns the PNG bytes as a ReadableStream for these models.
-      const output = (await env.AI.run(model as Parameters<Ai["run"]>[0], inputs as never)) as ReadableStream | ArrayBuffer | Uint8Array;
+      const output = (await env.AI.run(model as Parameters<Ai["run"]>[0], inputs as never)) as unknown as ReadableStream | ArrayBuffer | Uint8Array;
       return new Response(output as BodyInit, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "no-store", ...cors } });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Workers AI error";

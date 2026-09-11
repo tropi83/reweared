@@ -293,7 +293,8 @@ export const en = {
   "error.QUOTA_EXCEEDED": "Daily Gemini quota reached for this model. It resets at midnight Pacific time; check your plan and billing in Google AI Studio.",
   "error.FREE_TIER_NO_ACCESS":
     "Your Google project is on the Free tier, which has no quota (limit 0) for this image model. Link a billing account to your project in Google AI Studio to use it.",
-  "error.MODEL_NOT_IN_PLAN": "This model is not included in your Google plan (limit 0). Enable billing on your Google Cloud project or pick another model.",
+  "error.MODEL_NOT_IN_PLAN":
+    "Your account is not allowed to use this model (not included in your plan, or a private/restricted model). Pick another model or check the provider's dashboard.",
   "error.NETWORK_ERROR": "Network error. Check your connection and retry.",
   "error.TIMEOUT": "The provider took too long to answer.",
   "error.PROVIDER_UNAVAILABLE": "The provider is temporarily unavailable.",

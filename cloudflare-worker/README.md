@@ -20,10 +20,11 @@ Optional: restrict browser callers by editing `ALLOWED_ORIGINS` in `wrangler.tom
 
 ## Routes
 
-| Route               | Purpose                                                           |
-| ------------------- | ----------------------------------------------------------------- |
-| `GET /health`       | credential check used by _Test connection_                        |
-| `POST /run/<model>` | same JSON body as the Workers AI REST API; answers with PNG bytes |
+| Route               | Purpose                                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `GET /health`       | credential check used by _Test connection_                                                                  |
+| `GET /models`       | image models your account is allowed to run (`env.AI.models()`), used to grey out private/restricted models |
+| `POST /run/<model>` | same JSON body as the Workers AI REST API; answers with PNG bytes                                           |
 
 Allowed models: `@cf/runwayml/stable-diffusion-v1-5-img2img`, `@cf/lykon/dreamshaper-8-lcm`, `@cf/stabilityai/stable-diffusion-xl-base-1.0`, `@cf/bytedance/stable-diffusion-xl-lightning`. Bodies are validated (prompt 1–2000 chars, `num_steps` ≤ 20, `strength` 0–1, sizes 256–2048) and capped at 12 MB.
 
