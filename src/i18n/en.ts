@@ -340,7 +340,8 @@ export const en = {
   "cf.mode": "Connection mode",
   "cf.mode.direct": "Direct API",
   "cf.mode.worker": "Your Worker",
-  "cf.mode.directUnavailable": "The Cloudflare API has no CORS headers: direct mode only works in the desktop app.",
+  "cf.mode.directUnavailable":
+    "Direct API mode is only available in the desktop app: browsers cannot call api.cloudflare.com (no CORS headers). Run the desktop app (pnpm tauri dev, or the installer) to use it, or deploy the Worker template below to use Cloudflare from the web.",
   "cf.direct.help":
     "Desktop only. Create a Workers AI API token (Read + Edit) and copy your Account ID from the Workers AI page of the Cloudflare dashboard. Calls go straight from this app to api.cloudflare.com.",
   "cf.direct.openDashboard": "Open the Workers AI dashboard",

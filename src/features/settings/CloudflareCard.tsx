@@ -100,6 +100,7 @@ export function CloudflareCard() {
               { value: "worker", label: t("cf.mode.worker") },
             ]}
           />
+          {!directSupported && <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs">{t("cf.mode.directUnavailable")}</p>}
           {mode === "direct" ? (
             <>
               <p className="text-xs text-fg-muted">{t("cf.direct.help")}</p>

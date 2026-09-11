@@ -325,7 +325,8 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "cf.mode": "Mode de connexion",
   "cf.mode.direct": "API directe",
   "cf.mode.worker": "Votre Worker",
-  "cf.mode.directUnavailable": "L'API Cloudflare n'envoie pas d'en-têtes CORS : le mode direct ne fonctionne que dans l'application de bureau.",
+  "cf.mode.directUnavailable":
+    "Le mode API directe n'est disponible que dans l'application de bureau : un navigateur ne peut pas appeler api.cloudflare.com (pas d'en-têtes CORS). Lancez l'application de bureau (pnpm tauri dev, ou l'installeur) pour l'utiliser, ou déployez le Worker ci-dessous pour utiliser Cloudflare depuis le Web.",
   "cf.direct.help":
     "Bureau uniquement. Créez un jeton API Workers AI (lecture + écriture) et copiez votre Account ID depuis la page Workers AI du tableau de bord Cloudflare. Les appels partent directement de cette application vers api.cloudflare.com.",
   "cf.direct.openDashboard": "Ouvrir le tableau de bord Workers AI",
