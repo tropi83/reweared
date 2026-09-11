@@ -45,6 +45,7 @@ export class TauriFsStorage implements StorageProvider {
     this.locationLabel = await path.appDataDir();
     await fs.mkdir("projects", { baseDir: this.base, recursive: true });
     await fs.mkdir("recipes", { baseDir: this.base, recursive: true });
+    await fs.mkdir("metadata", { baseDir: this.base, recursive: true });
   }
 
   private get api(): FsModule {
@@ -160,6 +161,23 @@ export class TauriFsStorage implements StorageProvider {
     }
   }
 
+  async readMeta<T>(key: string): Promise<T | null> {
+    if (!/^[a-z0-9_-]{1,64}$/.test(key)) throw new Error("Invalid meta key");
+    const path = `metadata/${key}.json`;
+    if (!(await this.api.exists(path, this.opts()))) return null;
+    try {
+      return JSON.parse(await this.api.readTextFile(path, this.opts())) as T;
+    } catch (err) {
+      log.warn("metadata unreadable", key, err);
+      return null;
+    }
+  }
+
+  async writeMeta(key: string, value: unknown): Promise<void> {
+    if (!/^[a-z0-9_-]{1,64}$/.test(key)) throw new Error("Invalid meta key");
+    await this.writeJsonAtomic(`metadata/${key}.json`, value);
+  }
+
   async saveSettings(settings: AppSettings): Promise<void> {
     await this.writeJsonAtomic("settings.json", settings);
   }
@@ -213,5 +231,10 @@ export class TauriFsStorage implements StorageProvider {
       await this.api.remove(`recipes/${entry.name}`, this.opts());
     }
     if (await this.api.exists("settings.json", this.opts())) await this.api.remove("settings.json", this.opts());
+    if (await this.api.exists("metadata", this.opts())) {
+      for (const entry of await this.api.readDir("metadata", this.opts())) {
+        await this.api.remove(`metadata/${entry.name}`, this.opts());
+      }
+    }
   }
 }

@@ -75,6 +75,10 @@ interface ImageProvider {
 - Auth headers come from `GeminiAuthManager` (`x-goog-api-key` or `Authorization: Bearer` + `x-goog-user-project`).
 - Error normalization in `GeminiErrors.ts` (HTTP status + message → code, `Retry-After` → `retryAfterMs`).
 
+### Quotas and usage
+
+Google returns the same "You exceeded your current quota" sentence for throttling, daily exhaustion and models outside the plan; `GeminiErrors.parseQuotaInfo` reads the structured `google.rpc.QuotaFailure` / `RetryInfo` details to classify (`RATE_LIMITED` retryable with Google's delay · `QUOTA_EXCEEDED` · `MODEL_NOT_IN_PLAN` when `quotaValue` is 0). `domain/services/usage-tracker.ts` counts requests locally per provider/model (rolling minute, Pacific day), learns limits from those details (`quotaValue`) unless the user set manual ones, and persists through `StorageProvider.readMeta/writeMeta` (`metadata/usage.json` on desktop). Only requests from this device are counted; the UI states it.
+
 ### Mock
 
 Renders a tinted, labelled copy of the source on a canvas; scenarios: `success | slow | flaky | rate_limited | timeout | error | no_image`.

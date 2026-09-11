@@ -38,6 +38,10 @@ export interface StorageProvider {
   saveRecipe(recipe: Recipe): Promise<void>;
   deleteRecipe(recipeId: string): Promise<void>;
 
+  /** Small non-secret JSON documents (usage counters, caches). Keys are `[a-z0-9_-]+`. */
+  readMeta<T>(key: string): Promise<T | null>;
+  writeMeta(key: string, value: unknown): Promise<void>;
+
   getUsage(): Promise<StorageUsage>;
   /** Wipes every project, image, recipe and setting. */
   clearAll(): Promise<void>;

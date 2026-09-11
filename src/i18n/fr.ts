@@ -271,7 +271,10 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "error.INVALID_CREDENTIAL": "Le fournisseur a refusé votre identifiant. Vérifiez-le dans les réglages.",
   "error.PERMISSION_DENIED": "Votre compte n'a pas accès à ce modèle ou à ce projet.",
   "error.RATE_LIMITED": "Limite de débit Gemini atteinte. Nouvel essai automatique dès que possible.",
-  "error.QUOTA_EXCEEDED": "Votre quota Gemini est épuisé. Vérifiez les quotas et la facturation de votre projet Google.",
+  "error.QUOTA_EXCEEDED":
+    "Quota Gemini journalier atteint pour ce modèle. Il se réinitialise à minuit heure du Pacifique ; vérifiez votre plan et la facturation dans Google AI Studio.",
+  "error.MODEL_NOT_IN_PLAN":
+    "Ce modèle n'est pas inclus dans votre plan Google (limite 0). Activez la facturation sur votre projet Google Cloud ou choisissez un autre modèle.",
   "error.NETWORK_ERROR": "Erreur réseau. Vérifiez votre connexion et réessayez.",
   "error.TIMEOUT": "Le fournisseur a mis trop de temps à répondre.",
   "error.PROVIDER_UNAVAILABLE": "Le fournisseur est temporairement indisponible.",
@@ -284,6 +287,27 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "error.CANCELLED": "Annulé.",
   "error.STORAGE_ERROR": "Le résultat n'a pas pu être enregistré sur cet appareil.",
   "error.UNKNOWN_ERROR": "Une erreur est survenue.",
+
+  "usage.title": "Utilisation",
+  "usage.details": "Détails",
+  "usage.minute": "Dernière minute",
+  "usage.today": "Aujourd'hui",
+  "usage.limitMinute": "Limite / min",
+  "usage.limitDay": "Limite / jour",
+  "usage.source": "Limites",
+  "usage.sourceManual": "Manuelles",
+  "usage.sourceLearned": "Depuis Google",
+  "usage.limitsUnknown":
+    "Comptage local à cet appareil. Les limites sont apprises des réponses de Google ou définies dans les réglages. Compteur journalier remis à zéro à {time}.",
+  "usage.limitsLearned": "Comptage local à cet appareil. Limites communiquées par Google. Compteur journalier remis à zéro à {time}.",
+  "usage.limitsManual": "Comptage local à cet appareil. Limites définies manuellement. Compteur journalier remis à zéro à {time}.",
+  "usage.throttled": "{count} limitée(s)",
+  "usage.body":
+    "Google n'expose pas la consommation des clés API : les requêtes sont donc comptées localement par modèle. Les limites proviennent des réponses 429 de Google (quotaValue) ou peuvent être saisies manuellement. Les compteurs journaliers suivent la remise à zéro de Google à minuit, heure du Pacifique.",
+  "usage.empty": "Aucune requête enregistrée pour l'instant.",
+  "usage.reset": "Réinitialiser les compteurs",
+  "usage.reset.help": "Efface les compteurs locaux et les limites apprises sur cet appareil.",
+  "usage.reset.body": "Les compteurs locaux et les limites apprises seront effacés. Cela ne change rien côté Google.",
 
   "shortcuts.title": "Raccourcis clavier",
   "shortcuts.generate": "Générer",

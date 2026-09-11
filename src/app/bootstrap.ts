@@ -1,5 +1,5 @@
 import { createLogger } from "@/lib/logger";
-import { createServices, hasServices } from "./services";
+import { createServices, hasServices, USAGE_META_KEY } from "./services";
 import { useAuthStore } from "./stores/auth-store";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "./stores/generation-store";
 import { useProjectsStore } from "./stores/projects-store";
@@ -21,6 +21,7 @@ export function bootstrap(): Promise<void> {
     const services = getServices();
     await services.storage.init();
     await useSettingsStore.getState().load();
+    services.usage.load(await services.storage.readMeta(USAGE_META_KEY));
     await services.auth.autoDetect();
     services.auth.subscribe(() => void useAuthStore.getState().refresh());
     await Promise.all([useAuthStore.getState().refresh(), useProjectsStore.getState().loadSummaries(), useRecipesStore.getState().load()]);

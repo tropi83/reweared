@@ -68,9 +68,6 @@ describe("GeminiMapper", () => {
 describe("GeminiErrors", () => {
   it("maps HTTP statuses to normalized codes", () => {
     expect(mapGeminiHttpError(429, { error: { message: "Resource exhausted, per minute" } }, "3").code).toBe("RATE_LIMITED");
-    expect(mapGeminiHttpError(429, { error: { message: "You exceeded your current quota, please check your plan and billing" } }, null).code).toBe(
-      "QUOTA_EXCEEDED",
-    );
     expect(mapGeminiHttpError(401, undefined, null).code).toBe("INVALID_CREDENTIAL");
     expect(mapGeminiHttpError(400, { error: { message: "API key not valid. Please pass a valid API key." } }, null).code).toBe("INVALID_CREDENTIAL");
     expect(mapGeminiHttpError(403, { error: { message: "Permission denied on project" } }, null).code).toBe("PERMISSION_DENIED");
@@ -154,5 +151,90 @@ describe("GeminiProvider", () => {
   it("refuses non-allowlisted hosts", async () => {
     const { httpFetch } = await import("@/infrastructure/http/http-client");
     await expect(httpFetch("https://evil.example.com/x")).rejects.toThrow(/allowlisted/);
+  });
+});
+
+describe("Gemini 429 classification from structured details", () => {
+  const google429 = (violations: Array<Record<string, unknown>>, retryDelay?: string) => ({
+    error: {
+      code: 429,
+      message:
+        "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.",
+      status: "RESOURCE_EXHAUSTED",
+      details: [
+        { "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations },
+        ...(retryDelay ? [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay }] : []),
+      ],
+    },
+  });
+
+  it("does not mistake the rate-limits doc URL for a per-minute limit", () => {
+    const err = mapGeminiHttpError(
+      429,
+      google429([
+        {
+          quotaMetric: "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+          quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+          quotaDimensions: { model: "gemini-3.1-flash-image" },
+          quotaValue: "100",
+        },
+      ]),
+      null,
+    );
+    expect(err.code).toBe("QUOTA_EXCEEDED");
+    expect(err.retryable).toBe(false);
+    expect(err.detail).toContain("GenerateRequestsPerDayPerProjectPerModel-FreeTier=100");
+  });
+
+  it("maps per-minute violations to a retryable RATE_LIMITED with RetryInfo delay", () => {
+    const err = mapGeminiHttpError(429, google429([{ quotaId: "GenerateRequestsPerMinutePerProjectPerModel", quotaValue: "10" }], "23s"), null);
+    expect(err.code).toBe("RATE_LIMITED");
+    expect(err.retryable).toBe(true);
+    expect(err.retryAfterMs).toBe(23_000);
+  });
+
+  it("flags models with a zero limit as not in the plan", () => {
+    const err = mapGeminiHttpError(
+      429,
+      google429([{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue: "0", quotaDimensions: { model: "gemini-3-pro-image" } }]),
+      null,
+    );
+    expect(err.code).toBe("MODEL_NOT_IN_PLAN");
+    expect(err.retryable).toBe(false);
+  });
+
+  it("falls back sensibly without details", () => {
+    expect(mapGeminiHttpError(429, { error: { message: "Too many requests per minute" } }, "2").code).toBe("RATE_LIMITED");
+    expect(mapGeminiHttpError(429, { error: { message: "You exceeded your current quota, please check your plan and billing details." } }, null).code).toBe(
+      "QUOTA_EXCEEDED",
+    );
+    expect(mapGeminiHttpError(429, undefined, null).code).toBe("RATE_LIMITED");
+  });
+
+  it("feeds the usage tracker and learns limits from the provider", async () => {
+    const events: unknown[] = [];
+    const learned: unknown[] = [];
+    __setFetchOverride(async () =>
+      jsonResponse(
+        429,
+        google429([{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue: "100", quotaDimensions: { model: "gemini-3.1-flash-image" } }]),
+      ),
+    );
+    const provider = new GeminiProvider(auth, { track: (e) => events.push(e), learnLimit: (...a) => learned.push(a) });
+    await expect(provider.generate({ prompt: "x", model: "gemini-3.1-flash-image" }, { signal: new AbortController().signal })).rejects.toMatchObject({
+      code: "QUOTA_EXCEEDED",
+    });
+    expect(events).toEqual([{ provider: "gemini", model: "gemini-3.1-flash-image", outcome: "quota" }]);
+    expect(learned).toEqual([["gemini", "gemini-3.1-flash-image", "day", 100]]);
+
+    __setFetchOverride(async () =>
+      jsonResponse(200, {
+        status: "completed",
+        steps: [{ type: "model_output", content: [{ type: "image", mime_type: "image/png", data: PNG_B64 }] }],
+        usage: { total_tokens: 7 },
+      }),
+    );
+    await provider.generate({ prompt: "x", model: "gemini-3.1-flash-image" }, { signal: new AbortController().signal });
+    expect(events.at(-1)).toEqual({ provider: "gemini", model: "gemini-3.1-flash-image", outcome: "ok", tokens: 7 });
   });
 });

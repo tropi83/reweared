@@ -38,7 +38,8 @@ Import an image, describe a change, generate several independent variations, com
 | **Gallery**    | Responsive grid on thumbnails, fullscreen with zoom/pan, side-by-side compare with the source, metadata panel, favourites, multi-select                                    |
 | **Export**     | PNG / JPEG / WebP with quality, single file or ZIP for batches, native save dialog on desktop                                                                              |
 | **Privacy**    | Local-first, BYOK, no account, no backend, no telemetry. Credentials in the OS keychain on desktop                                                                         |
-| **Settings**   | Providers (Google OAuth / API key / Mock), concurrency, retries, timeout, upload size, theme, language (EN/FR), storage tools, diagnostics                                 |
+| **Usage**      | Local per-model gauge (last minute / today, Pacific reset) with limits learned from Google's 429 details or entered manually — Google exposes no consumption API for keys  |
+| **Settings**   | Providers (Google OAuth / API key / Mock), usage & quotas, concurrency, retries, timeout, upload size, theme, language (EN/FR), storage tools, diagnostics                 |
 
 ## How it works
 

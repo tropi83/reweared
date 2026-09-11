@@ -12,12 +12,17 @@ interface Schema extends DBSchema {
     value: { key: string; projectId: string; bucket: ImageBucket; assetId: string; bytes: ArrayBuffer; type: string; size: number };
     indexes: { projectId: string };
   };
-  settings: { key: string; value: AppSettings };
+  settings: { key: string; value: AppSettings | unknown };
   recipes: { key: string; value: Recipe };
 }
 
 const DB_NAME = "ai-image-variations";
 const DB_VERSION = 1;
+
+function assertMetaKey(key: string): string {
+  if (!/^[a-z0-9_-]{1,64}$/.test(key)) throw new Error("Invalid meta key");
+  return key;
+}
 
 function imageKey(projectId: string, bucket: ImageBucket, assetId: string): string {
   return `${assertSafeId(projectId)}/${bucket}/${assertSafeId(assetId)}`;
@@ -105,6 +110,15 @@ export class IndexedDbStorage implements StorageProvider {
   async getSettings(): Promise<AppSettings | null> {
     const raw = await this.store.get("settings", "app");
     return raw ? migrateSettings(raw) : null;
+  }
+
+  async readMeta<T>(key: string): Promise<T | null> {
+    const raw = await this.store.get("settings", `meta:${assertMetaKey(key)}`);
+    return (raw as T | undefined) ?? null;
+  }
+
+  async writeMeta(key: string, value: unknown): Promise<void> {
+    await this.store.put("settings", structuredClone(value), `meta:${assertMetaKey(key)}`);
   }
 
   async saveSettings(settings: AppSettings): Promise<void> {

@@ -1,5 +1,6 @@
 import { AppError, DEFAULT_SETTINGS } from "@/domain/models";
 import { GenerationQueue } from "@/domain/services/generation-queue";
+import { UsageTracker } from "@/domain/services/usage-tracker";
 import type { ImageProvider } from "@/domain/services/image-provider";
 import { GeminiAuthManager } from "@/infrastructure/auth/GeminiAuthManager";
 import { GEMINI_PROVIDER_ID, GeminiProvider } from "@/infrastructure/providers/gemini/GeminiProvider";
@@ -17,8 +18,11 @@ export interface AppServices {
   mock: MockImageProvider;
   gemini: GeminiProvider;
   queue: GenerationQueue;
+  usage: UsageTracker;
   appVersion: string;
 }
+
+export const USAGE_META_KEY = "usage";
 
 export const APP_VERSION: string = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "0.1.0";
 
@@ -48,8 +52,9 @@ export function createServices(bindings: {
 }): AppServices {
   const storage = bindings.storage ?? createStorageProvider();
   const auth = new GeminiAuthManager();
-  const gemini = new GeminiProvider(auth);
-  const mock = new MockImageProvider();
+  const usage = new UsageTracker((record) => storage.writeMeta(USAGE_META_KEY, record));
+  const gemini = new GeminiProvider(auth, usage);
+  const mock = new MockImageProvider({ usage });
   const providers = new Map<string, ImageProvider>([[GEMINI_PROVIDER_ID, gemini]]);
   if (MOCK_ENABLED) providers.set(MOCK_PROVIDER_ID, mock);
 
@@ -71,6 +76,6 @@ export function createServices(bindings: {
     },
   );
 
-  services = { storage, auth, providers, mock, gemini, queue, appVersion: APP_VERSION };
+  services = { storage, auth, providers, mock, gemini, queue, usage, appVersion: APP_VERSION };
   return services;
 }

@@ -2,7 +2,7 @@ import { AppError, type AuthStatus, type ModelInfo, type ProviderInfo } from "@/
 import type { GenerateOptions, ImageGenerationRequest, ImageGenerationResult, ImageProvider } from "@/domain/services/image-provider";
 import { httpFetch } from "@/infrastructure/http/http-client";
 import { createLogger } from "@/lib/logger";
-import { mapGeminiHttpError, mapInteractionOutcome } from "./GeminiErrors";
+import { mapGeminiHttpError, mapInteractionOutcome, parseQuotaInfo } from "./GeminiErrors";
 import { extractImage, extractText, toInteractionBody, type GeminiErrorBody, type InteractionResponse } from "./GeminiMapper";
 import { GEMINI_IMAGE_MODELS } from "./GeminiModels";
 
@@ -10,6 +10,12 @@ const log = createLogger("gemini");
 
 export const GEMINI_PROVIDER_ID = "gemini";
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+
+/** Local usage accounting hook (see domain/services/usage-tracker.ts). */
+export interface GeminiUsageSink {
+  track(event: { provider: string; model: string; outcome: "ok" | "rate_limited" | "quota" | "error"; tokens?: number }): void;
+  learnLimit(provider: string, model: string, window: "minute" | "day", value: number): void;
+}
 
 /** Minimal surface the provider needs from the auth layer. */
 export interface GeminiAuthSource {
@@ -26,7 +32,10 @@ export class GeminiProvider implements ImageProvider {
   readonly info: ProviderInfo = { id: GEMINI_PROVIDER_ID, displayName: "Google Gemini", credentialKinds: ["oauth", "api_key"] };
   private modelCache: { at: number; models: ModelInfo[] } | null = null;
 
-  constructor(private readonly auth: GeminiAuthSource) {}
+  constructor(
+    private readonly auth: GeminiAuthSource,
+    private readonly usage?: GeminiUsageSink,
+  ) {}
 
   /**
    * Catalogue merged with the live model list when reachable. Unknown catalogue entries are
@@ -96,23 +105,35 @@ export class GeminiProvider implements ImageProvider {
       if (signal.aborted) throw err;
       throw new AppError("NETWORK_ERROR", "Could not reach Gemini.", { cause: err });
     }
-    if (!response.ok) throw await this.toError(response);
+    if (!response.ok) throw await this.toError(response, request.model);
 
     const json = (await response.json()) as InteractionResponse;
     const image = extractImage(json);
+    const tokens = json.usage?.total_tokens;
+    this.usage?.track({ provider: GEMINI_PROVIDER_ID, model: request.model, outcome: "ok", ...(tokens !== undefined ? { tokens } : {}) });
     if (!image) {
       log.info("interaction without image", json.status ?? "unknown");
       throw mapInteractionOutcome(json.status, extractText(json));
     }
     const providerMeta: Record<string, string | number> = {};
     if (json.id) providerMeta.interactionId = json.id;
-    if (json.usage?.total_tokens !== undefined) providerMeta.totalTokens = json.usage.total_tokens;
+    if (tokens !== undefined) providerMeta.totalTokens = tokens;
     return { image: image.blob, mimeType: image.mimeType, providerMeta };
   }
 
-  private async toError(response: Response): Promise<AppError> {
+  private async toError(response: Response, model?: string): Promise<AppError> {
     const body = (await response.json().catch(() => undefined)) as GeminiErrorBody | undefined;
     const error = mapGeminiHttpError(response.status, body, response.headers.get("retry-after"));
+    if (model && this.usage) {
+      const outcome =
+        error.code === "RATE_LIMITED" ? "rate_limited" : error.code === "QUOTA_EXCEEDED" || error.code === "MODEL_NOT_IN_PLAN" ? "quota" : "error";
+      this.usage.track({ provider: GEMINI_PROVIDER_ID, model, outcome });
+      for (const v of parseQuotaInfo(body).violations) {
+        if ((v.window === "minute" || v.window === "day") && v.quotaValue !== undefined) {
+          this.usage.learnLimit(GEMINI_PROVIDER_ID, v.model ?? model, v.window, v.quotaValue);
+        }
+      }
+    }
     if (error.code === "INVALID_CREDENTIAL" || error.code === "AUTH_EXPIRED") {
       this.auth.onCredentialRejected?.(error.code);
     }

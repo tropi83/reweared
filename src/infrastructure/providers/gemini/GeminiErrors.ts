@@ -11,6 +11,69 @@ export function parseRetryAfter(value: string | null): number | undefined {
   return undefined;
 }
 
+export type QuotaWindow = "minute" | "day" | "other";
+
+export interface QuotaViolation {
+  quotaId: string;
+  quotaMetric?: string;
+  /** Limit value as reported by Google ("0" means the model is not part of the plan). */
+  quotaValue?: number;
+  model?: string;
+  window: QuotaWindow;
+}
+
+export interface QuotaInfo {
+  violations: QuotaViolation[];
+  /** From google.rpc.RetryInfo, when present. */
+  retryDelayMs?: number;
+}
+
+function windowOf(quotaId: string): QuotaWindow {
+  if (/perminute|persecond/i.test(quotaId)) return "minute";
+  if (/perday/i.test(quotaId)) return "day";
+  return "other";
+}
+
+/** Parses the structured quota information Google attaches to 429 responses. */
+export function parseQuotaInfo(body: GeminiErrorBody | undefined): QuotaInfo {
+  const info: QuotaInfo = { violations: [] };
+  for (const detail of body?.error?.details ?? []) {
+    const type = detail["@type"] ?? "";
+    if (type.endsWith("QuotaFailure")) {
+      for (const v of detail.violations ?? []) {
+        const quotaId = v.quotaId ?? "";
+        const value = v.quotaValue !== undefined ? Number(v.quotaValue) : undefined;
+        info.violations.push({
+          quotaId,
+          ...(v.quotaMetric ? { quotaMetric: v.quotaMetric } : {}),
+          ...(value !== undefined && Number.isFinite(value) ? { quotaValue: value } : {}),
+          ...(v.quotaDimensions?.model ? { model: v.quotaDimensions.model } : {}),
+          window: windowOf(quotaId),
+        });
+      }
+    } else if (type.endsWith("RetryInfo") && detail.retryDelay) {
+      const seconds = Number(String(detail.retryDelay).replace(/s$/, ""));
+      if (Number.isFinite(seconds)) info.retryDelayMs = Math.max(0, Math.round(seconds * 1000));
+    }
+  }
+  return info;
+}
+
+/**
+ * Classifies a 429. Google uses the same "You exceeded your current quota" wording for
+ * per-minute throttling (retry soon), daily exhaustion (wait for the reset) and models that
+ * are simply not part of the plan (limit 0), so the structured details decide.
+ */
+function classify429(quota: QuotaInfo, lower: string): GenerationErrorCode {
+  if (quota.violations.some((v) => v.quotaValue === 0)) return "MODEL_NOT_IN_PLAN";
+  if (quota.violations.some((v) => v.window === "day")) return "QUOTA_EXCEEDED";
+  if (quota.violations.some((v) => v.window === "minute")) return "RATE_LIMITED";
+  if (quota.retryDelayMs !== undefined) return quota.retryDelayMs <= 120_000 ? "RATE_LIMITED" : "QUOTA_EXCEEDED";
+  if (/per minute|per second|too many requests/.test(lower)) return "RATE_LIMITED";
+  if (/billing|plan/.test(lower)) return "QUOTA_EXCEEDED";
+  return "RATE_LIMITED";
+}
+
 /**
  * Normalizes an HTTP failure from the Gemini API. The raw message is kept only in `detail`
  * (truncated) and never contains credentials since Google does not echo them back.
@@ -18,8 +81,10 @@ export function parseRetryAfter(value: string | null): number | undefined {
 export function mapGeminiHttpError(status: number, body: GeminiErrorBody | undefined, retryAfter: string | null): AppError {
   const message = body?.error?.message ?? "";
   const googleStatus = body?.error?.status ?? "";
-  const detail = `HTTP ${status}${googleStatus ? ` ${googleStatus}` : ""}${message ? `: ${message.slice(0, 400)}` : ""}`;
   const lower = message.toLowerCase();
+  const quota = parseQuotaInfo(body);
+  const quotaSummary = quota.violations.map((v) => `${v.quotaId}${v.quotaValue !== undefined ? `=${v.quotaValue}` : ""}`).join(", ");
+  const detail = `HTTP ${status}${googleStatus ? ` ${googleStatus}` : ""}${message ? `: ${message.slice(0, 400)}` : ""}${quotaSummary ? ` [${quotaSummary}]` : ""}`;
 
   let code: GenerationErrorCode;
   switch (status) {
@@ -43,7 +108,7 @@ export function mapGeminiHttpError(status: number, body: GeminiErrorBody | undef
       code = "INVALID_IMAGE";
       break;
     case 429:
-      code = /quota|billing|exceeded your current quota/.test(lower) && !/per minute|rate/.test(lower) ? "QUOTA_EXCEEDED" : "RATE_LIMITED";
+      code = classify429(quota, lower);
       break;
     case 500:
     case 502:
@@ -55,7 +120,7 @@ export function mapGeminiHttpError(status: number, body: GeminiErrorBody | undef
       code = status >= 500 ? "PROVIDER_UNAVAILABLE" : "UNKNOWN_ERROR";
   }
 
-  const retryAfterMs = parseRetryAfter(retryAfter);
+  const retryAfterMs = quota.retryDelayMs ?? parseRetryAfter(retryAfter);
   return new AppError(code, userMessageFor(code), {
     detail,
     ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
@@ -92,7 +157,9 @@ export function userMessageFor(code: GenerationErrorCode): string {
     case "RATE_LIMITED":
       return "Gemini rate limit reached. We'll retry automatically when possible.";
     case "QUOTA_EXCEEDED":
-      return "Your Gemini quota is exhausted.";
+      return "Your Gemini quota for this model is exhausted for today.";
+    case "MODEL_NOT_IN_PLAN":
+      return "This model is not included in your Google plan (limit 0).";
     case "NETWORK_ERROR":
       return "Network error while contacting Gemini.";
     case "TIMEOUT":

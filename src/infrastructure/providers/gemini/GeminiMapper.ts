@@ -47,8 +47,15 @@ export interface InteractionResponse {
   usage?: { total_tokens?: number };
 }
 
+/** google.rpc.QuotaFailure / RetryInfo entries carried in `error.details` of a 429. */
+export interface GeminiErrorDetail {
+  "@type"?: string;
+  violations?: Array<{ quotaMetric?: string; quotaId?: string; quotaValue?: string; quotaDimensions?: Record<string, string> }>;
+  retryDelay?: string;
+}
+
 export interface GeminiErrorBody {
-  error?: { code?: number; message?: string; status?: string };
+  error?: { code?: number; message?: string; status?: string; details?: GeminiErrorDetail[] };
 }
 
 export async function blobToBase64(blob: Blob): Promise<string> {

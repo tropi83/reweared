@@ -287,7 +287,8 @@ export const en = {
   "error.INVALID_CREDENTIAL": "The provider rejected your credential. Check it in Settings.",
   "error.PERMISSION_DENIED": "Your account does not have access to this model or project.",
   "error.RATE_LIMITED": "Gemini rate limit reached. We'll retry automatically when possible.",
-  "error.QUOTA_EXCEEDED": "Your Gemini quota is exhausted. Check your Google project's quota and billing.",
+  "error.QUOTA_EXCEEDED": "Daily Gemini quota reached for this model. It resets at midnight Pacific time; check your plan and billing in Google AI Studio.",
+  "error.MODEL_NOT_IN_PLAN": "This model is not included in your Google plan (limit 0). Enable billing on your Google Cloud project or pick another model.",
   "error.NETWORK_ERROR": "Network error. Check your connection and retry.",
   "error.TIMEOUT": "The provider took too long to answer.",
   "error.PROVIDER_UNAVAILABLE": "The provider is temporarily unavailable.",
@@ -300,6 +301,27 @@ export const en = {
   "error.CANCELLED": "Cancelled.",
   "error.STORAGE_ERROR": "The result could not be saved on this device.",
   "error.UNKNOWN_ERROR": "Something went wrong.",
+
+  // Usage
+  "usage.title": "Usage",
+  "usage.details": "Details",
+  "usage.minute": "Last minute",
+  "usage.today": "Today",
+  "usage.limitMinute": "Limit / min",
+  "usage.limitDay": "Limit / day",
+  "usage.source": "Limits",
+  "usage.sourceManual": "Manual",
+  "usage.sourceLearned": "From Google",
+  "usage.limitsUnknown": "Counted on this device only. Limits are learned from Google's responses or set in Settings. Daily counter resets at {time}.",
+  "usage.limitsLearned": "Counted on this device only. Limits reported by Google. Daily counter resets at {time}.",
+  "usage.limitsManual": "Counted on this device only. Limits set manually. Daily counter resets at {time}.",
+  "usage.throttled": "{count} throttled",
+  "usage.body":
+    "Google does not expose consumption for API keys, so requests are counted locally per model. Limits come from Google's 429 responses (quotaValue) or can be entered manually. Daily counters follow Google's reset at midnight Pacific time.",
+  "usage.empty": "No requests recorded yet.",
+  "usage.reset": "Reset counters",
+  "usage.reset.help": "Clears local counters and learned limits on this device.",
+  "usage.reset.body": "Local usage counters and learned limits will be cleared. This does not change anything on Google's side.",
 
   // Shortcuts
   "shortcuts.title": "Keyboard shortcuts",

@@ -16,6 +16,7 @@ export type GenerationErrorCode =
   | "INVALID_IMAGE"
   | "UNSUPPORTED_FORMAT"
   | "MODEL_UNAVAILABLE"
+  | "MODEL_NOT_IN_PLAN"
   | "CONTENT_REJECTED"
   | "NO_IMAGE_RETURNED"
   | "CANCELLED"

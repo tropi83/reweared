@@ -18,6 +18,7 @@ import { MOCK_PROVIDER_ID } from "@/infrastructure/providers/mock/MockImageProvi
 import { useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
 import { RecipePicker } from "../recipes/RecipePicker";
+import { UsageMeter } from "./UsageMeter";
 
 const COUNT_OPTIONS = [1, 2, 4, 6, 8];
 
@@ -337,6 +338,8 @@ export function Composer() {
           )}
         </div>
       </div>
+
+      <UsageMeter providerId={providerId} modelId={composer.modelId} />
 
       <RecipePicker
         open={recipeOpen}

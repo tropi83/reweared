@@ -9,6 +9,8 @@ export interface MockProviderOptions {
   /** Base latency in ms (jittered ±50%). */
   latencyMs?: number;
   random?: () => number;
+  /** Optional local usage accounting, mirrors the Gemini provider. */
+  usage?: { track(event: { provider: string; model: string; outcome: "ok" | "rate_limited" | "quota" | "error" }): void };
 }
 
 export const MOCK_PROVIDER_ID = "mock";
@@ -80,15 +82,26 @@ export class MockImageProvider implements ImageProvider {
     }
     await sleep(Math.round(latency * (0.5 + random())), signal);
 
-    if (scenario === "error") throw new AppError("CONTENT_REJECTED", "Mock: content rejected.");
-    if (scenario === "no_image") throw new AppError("NO_IMAGE_RETURNED", "Mock: model returned text only.");
+    const track = (outcome: "ok" | "rate_limited" | "quota" | "error") =>
+      this.options.usage?.track({ provider: MOCK_PROVIDER_ID, model: request.model, outcome });
+    if (scenario === "error") {
+      track("error");
+      throw new AppError("CONTENT_REJECTED", "Mock: content rejected.");
+    }
+    if (scenario === "no_image") {
+      track("error");
+      throw new AppError("NO_IMAGE_RETURNED", "Mock: model returned text only.");
+    }
     if (scenario === "rate_limited" && n % 2 === 1) {
+      track("rate_limited");
       throw new AppError("RATE_LIMITED", "Mock: rate limited.", { retryAfterMs: 800, detail: "HTTP 429" });
     }
     if (scenario === "flaky" && random() < 0.35) {
+      track("error");
       throw new AppError(random() < 0.5 ? "PROVIDER_UNAVAILABLE" : "NETWORK_ERROR", "Mock: transient failure.");
     }
 
+    track("ok");
     const image = await renderMockImage(request, n, random);
     return { image, mimeType: "image/png", providerMeta: { mock: n } };
   }

@@ -17,9 +17,11 @@ import { useT, type MessageKey } from "@/i18n";
 import { getRecentLogs } from "@/lib/logger";
 import { cn } from "@/lib/cn";
 import { ProvidersSection } from "./ProvidersSection";
+import { UsageSection } from "./UsageSection";
 
 const SECTIONS: Array<{ id: string; key: MessageKey }> = [
   { id: "providers", key: "settings.section.providers" },
+  { id: "usage", key: "usage.title" },
   { id: "generation", key: "settings.section.generation" },
   { id: "appearance", key: "settings.section.appearance" },
   { id: "storage", key: "settings.section.storage" },
@@ -72,6 +74,7 @@ export function SettingsView({ section }: { section?: string }) {
         <div className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl space-y-10 p-4 pb-24 md:p-6">
             <ProvidersSection />
+            <UsageSection />
             <GenerationSection />
             <AppearanceSection />
             <StorageSection />
