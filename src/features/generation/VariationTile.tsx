@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { AlertTriangle, Check, Download, GitBranch, Maximize2, RotateCw, Sparkles, Star, X } from "lucide-react";
+import { AlertTriangle, Check, Download, ExternalLink, GitBranch, Maximize2, RotateCw, Sparkles, Star, X } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
@@ -9,6 +9,8 @@ import { useUiStore } from "@/app/stores/ui-store";
 import { getServices } from "@/app/services";
 import type { GenerationJob, ProjectDocument } from "@/domain/models";
 import { exportSingle } from "@/infrastructure/image/export";
+import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
+import { openExternal } from "@/lib/open-external";
 import { useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
 
@@ -16,6 +18,8 @@ interface Props {
   job: GenerationJob;
   doc: ProjectDocument;
 }
+
+const QUOTA_CODES = new Set(["RATE_LIMITED", "QUOTA_EXCEEDED", "MODEL_NOT_IN_PLAN", "FREE_TIER_NO_ACCESS"]);
 
 export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
   const t = useT();
@@ -168,6 +172,15 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
       >
         <RotateCw className="size-3" /> {t("common.retry")}
       </button>
+      {job.provider === "gemini" && job.error && QUOTA_CODES.has(job.error.code) && (
+        <button
+          type="button"
+          onClick={() => void openExternal(GOOGLE_RATE_LIMIT_DASHBOARD)}
+          className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline"
+        >
+          {t("usage.googleDashboard")} <ExternalLink className="size-3" />
+        </button>
+      )}
     </div>
   );
 });

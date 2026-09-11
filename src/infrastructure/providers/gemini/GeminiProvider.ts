@@ -130,7 +130,7 @@ export class GeminiProvider implements ImageProvider {
       this.usage.track({ provider: GEMINI_PROVIDER_ID, model, outcome });
       for (const v of parseQuotaInfo(body).violations) {
         if ((v.window === "minute" || v.window === "day") && v.quotaValue !== undefined) {
-          this.usage.learnLimit(GEMINI_PROVIDER_ID, v.model ?? model, v.window, v.quotaValue);
+          this.usage.learnLimit(GEMINI_PROVIDER_ID, model, v.window, v.quotaValue);
         }
       }
     }

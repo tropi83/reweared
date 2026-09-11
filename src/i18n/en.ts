@@ -288,6 +288,8 @@ export const en = {
   "error.PERMISSION_DENIED": "Your account does not have access to this model or project.",
   "error.RATE_LIMITED": "Gemini rate limit reached. We'll retry automatically when possible.",
   "error.QUOTA_EXCEEDED": "Daily Gemini quota reached for this model. It resets at midnight Pacific time; check your plan and billing in Google AI Studio.",
+  "error.FREE_TIER_NO_ACCESS":
+    "Your Google project is on the Free tier, which has no quota (limit 0) for this image model. Link a billing account to your project in Google AI Studio to use it.",
   "error.MODEL_NOT_IN_PLAN": "This model is not included in your Google plan (limit 0). Enable billing on your Google Cloud project or pick another model.",
   "error.NETWORK_ERROR": "Network error. Check your connection and retry.",
   "error.TIMEOUT": "The provider took too long to answer.",
@@ -305,6 +307,8 @@ export const en = {
   // Usage
   "usage.title": "Usage",
   "usage.details": "Details",
+  "usage.googleDashboard": "Google dashboard",
+  "usage.openGoogleDashboard": "See your real quotas and usage on Google",
   "usage.minute": "Last minute",
   "usage.today": "Today",
   "usage.limitMinute": "Limit / min",

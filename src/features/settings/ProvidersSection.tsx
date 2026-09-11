@@ -13,18 +13,10 @@ import { getPlatform } from "@/infrastructure/platform/capabilities";
 import type { MockScenario } from "@/infrastructure/providers/mock/MockImageProvider";
 import { useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
+import { openExternal } from "@/lib/open-external";
 import { Section } from "./SettingsView";
 
 const AI_STUDIO_KEYS_URL = "https://aistudio.google.com/api-keys";
-
-async function openExternal(url: string) {
-  if (getPlatform().isTauri) {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(url);
-  } else {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-}
 
 function StatusBadge({ status }: { status: AuthStatus }) {
   const t = useT();

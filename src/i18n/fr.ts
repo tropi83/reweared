@@ -273,6 +273,8 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "error.RATE_LIMITED": "Limite de débit Gemini atteinte. Nouvel essai automatique dès que possible.",
   "error.QUOTA_EXCEEDED":
     "Quota Gemini journalier atteint pour ce modèle. Il se réinitialise à minuit heure du Pacifique ; vérifiez votre plan et la facturation dans Google AI Studio.",
+  "error.FREE_TIER_NO_ACCESS":
+    "Votre projet Google est en offre gratuite (Free tier), qui n'a aucun quota (limite 0) pour ce modèle image. Associez un compte de facturation à votre projet dans Google AI Studio pour l'utiliser.",
   "error.MODEL_NOT_IN_PLAN":
     "Ce modèle n'est pas inclus dans votre plan Google (limite 0). Activez la facturation sur votre projet Google Cloud ou choisissez un autre modèle.",
   "error.NETWORK_ERROR": "Erreur réseau. Vérifiez votre connexion et réessayez.",
@@ -290,6 +292,8 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
 
   "usage.title": "Utilisation",
   "usage.details": "Détails",
+  "usage.googleDashboard": "Tableau de bord Google",
+  "usage.openGoogleDashboard": "Voir vos quotas et votre consommation réels chez Google",
   "usage.minute": "Dernière minute",
   "usage.today": "Aujourd'hui",
   "usage.limitMinute": "Limite / min",

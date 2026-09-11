@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "@/domain/models";
 import { __setFetchOverride } from "@/infrastructure/http/http-client";
 import { GeminiProvider } from "./GeminiProvider";
-import { mapGeminiHttpError, parseRetryAfter } from "./GeminiErrors";
+import { mapGeminiHttpError, parseQuotaInfo, parseRetryAfter } from "./GeminiErrors";
 import { blobToBase64, extractImage, toInteractionBody } from "./GeminiMapper";
 
 const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -193,13 +193,30 @@ describe("Gemini 429 classification from structured details", () => {
     expect(err.retryAfterMs).toBe(23_000);
   });
 
-  it("flags models with a zero limit as not in the plan", () => {
-    const err = mapGeminiHttpError(
+  it("flags a zero limit as free-tier access or as a plan exclusion", () => {
+    const free = mapGeminiHttpError(
       429,
       google429([{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue: "0", quotaDimensions: { model: "gemini-3-pro-image" } }]),
       null,
     );
-    expect(err.code).toBe("MODEL_NOT_IN_PLAN");
+    expect(free.code).toBe("FREE_TIER_NO_ACCESS");
+    expect(free.retryable).toBe(false);
+    const paid = mapGeminiHttpError(429, google429([{ quotaId: "GenerateRequestsPerDayPerProjectPerModel", quotaValue: "0" }]), null);
+    expect(paid.code).toBe("MODEL_NOT_IN_PLAN");
+  });
+
+  it("parses the quota lines from the message when structured details are missing", () => {
+    const message = [
+      "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. ",
+      "* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.5-flash-preview-image",
+      "* Quota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model_per_day, limit: 0, model: gemini-2.5-flash-preview-image",
+    ].join("\n");
+    const info = parseQuotaInfo({ error: { message } });
+    expect(info.violations).toHaveLength(2);
+    expect(info.violations[0]).toMatchObject({ quotaValue: 0, model: "gemini-2.5-flash-preview-image" });
+    expect(info.freeTier).toBe(true);
+    const err = mapGeminiHttpError(429, { error: { message } }, null);
+    expect(err.code).toBe("FREE_TIER_NO_ACCESS");
     expect(err.retryable).toBe(false);
   });
 

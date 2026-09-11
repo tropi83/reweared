@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Gauge } from "lucide-react";
+import { ExternalLink, Gauge } from "lucide-react";
 import { navigate } from "@/app/router";
 import { getServices } from "@/app/services";
 import type { UsageSnapshot } from "@/domain/services/usage-tracker";
+import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
+import { openExternal } from "@/lib/open-external";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/cn";
 
@@ -75,6 +77,16 @@ export function UsageMeter({ providerId, modelId }: { providerId: string; modelI
         <button type="button" className="ml-auto text-accent hover:underline" onClick={() => navigate({ name: "settings", section: "usage" })}>
           {t("usage.details")}
         </button>
+        {providerId === "gemini" && (
+          <button
+            type="button"
+            className="inline-flex items-center gap-0.5 text-accent hover:underline"
+            title={t("usage.openGoogleDashboard")}
+            onClick={() => void openExternal(GOOGLE_RATE_LIMIT_DASHBOARD)}
+          >
+            {t("usage.googleDashboard")} <ExternalLink className="size-3" />
+          </button>
+        )}
       </div>
       <div className="flex gap-3">
         <Bar label={t("usage.minute")} used={minute.used} limit={minute.limit} ratio={minute.ratio} />

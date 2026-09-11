@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { ExternalLink, RotateCcw } from "lucide-react";
 import { getServices } from "@/app/services";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Misc";
 import type { UsageSnapshot } from "@/domain/services/usage-tracker";
+import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
 import { useT } from "@/i18n";
+import { openExternal } from "@/lib/open-external";
 import { Section } from "./SettingsView";
 
 interface Row {
@@ -74,6 +76,9 @@ export function UsageSection() {
     <Section id="usage" title={t("usage.title")}>
       <div className="space-y-3 rounded-xl border border-border bg-bg-elevated p-4 text-sm">
         <p className="text-fg-muted">{t("usage.body")}</p>
+        <Button size="sm" variant="secondary" rightIcon={<ExternalLink className="size-3.5" />} onClick={() => void openExternal(GOOGLE_RATE_LIMIT_DASHBOARD)}>
+          {t("usage.openGoogleDashboard")}
+        </Button>
         {rows.length === 0 ? (
           <p className="text-fg-subtle">{t("usage.empty")}</p>
         ) : (

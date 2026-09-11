@@ -26,7 +26,14 @@ export interface QuotaInfo {
   violations: QuotaViolation[];
   /** From google.rpc.RetryInfo, when present. */
   retryDelayMs?: number;
+  /** True when the exhausted metric is a free-tier bucket (the project has no billing linked). */
+  freeTier: boolean;
 }
+
+/** Google's own usage/quota dashboard, referenced by its 429 messages and the rate-limits docs. */
+export const GOOGLE_RATE_LIMIT_DASHBOARD = "https://aistudio.google.com/rate-limit";
+
+const QUOTA_LINE = /metric:\s*([\w./-]+),\s*limit:\s*(\d+)(?:,\s*model:\s*([\w.-]+))?/g;
 
 function windowOf(quotaId: string): QuotaWindow {
   if (/perminute|persecond/i.test(quotaId)) return "minute";
@@ -36,7 +43,7 @@ function windowOf(quotaId: string): QuotaWindow {
 
 /** Parses the structured quota information Google attaches to 429 responses. */
 export function parseQuotaInfo(body: GeminiErrorBody | undefined): QuotaInfo {
-  const info: QuotaInfo = { violations: [] };
+  const info: QuotaInfo = { violations: [], freeTier: false };
   for (const detail of body?.error?.details ?? []) {
     const type = detail["@type"] ?? "";
     if (type.endsWith("QuotaFailure")) {
@@ -56,6 +63,20 @@ export function parseQuotaInfo(body: GeminiErrorBody | undefined): QuotaInfo {
       if (Number.isFinite(seconds)) info.retryDelayMs = Math.max(0, Math.round(seconds * 1000));
     }
   }
+  // Fallback: Google also spells the violations out in the message ("metric: …, limit: N, model: …").
+  if (info.violations.length === 0) {
+    for (const match of (body?.error?.message ?? "").matchAll(QUOTA_LINE)) {
+      const [, metric, limit, model] = match;
+      info.violations.push({
+        quotaId: metric ?? "",
+        ...(metric ? { quotaMetric: metric } : {}),
+        quotaValue: Number(limit),
+        ...(model ? { model } : {}),
+        window: /per_day|perday/i.test(metric ?? "") ? "day" : /per_minute|perminute/i.test(metric ?? "") ? "minute" : "other",
+      });
+    }
+  }
+  info.freeTier = info.violations.some((v) => /free_tier|freetier/i.test(`${v.quotaMetric ?? ""} ${v.quotaId}`));
   return info;
 }
 
@@ -121,7 +142,8 @@ export function mapGeminiHttpError(status: number, body: GeminiErrorBody | undef
   }
 
   const retryAfterMs = quota.retryDelayMs ?? parseRetryAfter(retryAfter);
-  return new AppError(code, userMessageFor(code), {
+  const finalCode: GenerationErrorCode = code === "MODEL_NOT_IN_PLAN" && quota.freeTier ? "FREE_TIER_NO_ACCESS" : code;
+  return new AppError(finalCode, userMessageFor(finalCode), {
     detail,
     ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
   });
@@ -160,6 +182,8 @@ export function userMessageFor(code: GenerationErrorCode): string {
       return "Your Gemini quota for this model is exhausted for today.";
     case "MODEL_NOT_IN_PLAN":
       return "This model is not included in your Google plan (limit 0).";
+    case "FREE_TIER_NO_ACCESS":
+      return "Your Google project is on the Free tier, which has no quota for this model. Link a billing account to use it.";
     case "NETWORK_ERROR":
       return "Network error while contacting Gemini.";
     case "TIMEOUT":
