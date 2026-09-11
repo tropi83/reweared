@@ -1,6 +1,6 @@
 # AI Image Variations
 
-[![CI](https://github.com/tropi83/ai-image-variations/actions/workflows/ci.yml/badge.svg)](https://github.com/tropi83/ai-image-variations/actions/workflows/ci.yml)
+[![CI](https://github.com/tropi83/reweared/actions/workflows/ci.yml/badge.svg)](https://github.com/tropi83/reweared/actions/workflows/ci.yml)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Tauri 2](https://img.shields.io/badge/Tauri-2.11-24C8D8)
 ![React 19](https://img.shields.io/badge/React-19.3-61DAFB)
