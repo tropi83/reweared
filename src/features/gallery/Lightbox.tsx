@@ -248,6 +248,7 @@ export function Lightbox() {
                 providerId: job.provider,
                 modelId: job.model,
                 generationId: null,
+                ...(job.providerOptions ? { providerOptions: job.providerOptions } : {}),
               });
               close();
               toast.info(t("generation.sourceSet"));

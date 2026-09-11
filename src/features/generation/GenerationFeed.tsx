@@ -60,6 +60,7 @@ function GenerationCard({ generation, doc, favoritesOnly }: { generation: Genera
         modelId: generation.settings.modelId,
         aspectRatio: generation.settings.aspectRatio,
         ...(generation.settings.imageSize ? { imageSize: generation.settings.imageSize } : {}),
+        ...(generation.settings.providerOptions ? { providerOptions: generation.settings.providerOptions } : {}),
         variationCount: generation.settings.variationCount,
       });
     } catch {
@@ -77,6 +78,7 @@ function GenerationCard({ generation, doc, favoritesOnly }: { generation: Genera
       providerId: generation.settings.providerId,
       modelId: generation.settings.modelId,
       generationId: generation.id,
+      ...(generation.settings.providerOptions ? { providerOptions: generation.settings.providerOptions } : {}),
     });
     document.getElementById("prompt")?.focus();
   };

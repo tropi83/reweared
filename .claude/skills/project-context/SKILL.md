@@ -11,24 +11,28 @@ Local-first workspace: import an image → prompt → N independent variations (
 
 ## Map
 
-| Concern                                                 | Where                                                                   |
-| ------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Domain models / errors                                  | `src/domain/models/*` (`AppError`, `GenerationErrorCode`)               |
-| Job queue (concurrency, retry, cancel, timeout)         | `src/domain/services/generation-queue.ts`                               |
-| Provider contract + request builder                     | `src/domain/services/image-provider.ts`                                 |
-| Gemini adapter, models catalogue, error mapping         | `src/infrastructure/providers/gemini/*`                                 |
-| Mock provider (dev/tests)                               | `src/infrastructure/providers/mock/MockImageProvider.ts`                |
-| Credentials (API key, OAuth PKCE+loopback, SecretStore) | `src/infrastructure/auth/*`                                             |
-| Storage (IndexedDB web / Tauri fs native), migrations   | `src/infrastructure/storage/*`                                          |
-| Image validation/decoding/thumbnails/export             | `src/infrastructure/image/*`                                            |
-| HTTP entry point + host allowlist                       | `src/infrastructure/http/http-client.ts`                                |
-| Composition root + stores                               | `src/app/services.ts`, `src/app/stores/*`                               |
-| UI by feature                                           | `src/features/{projects,workspace,generation,gallery,recipes,settings}` |
-| i18n                                                    | `src/i18n/en.ts` (source), `fr.ts`                                      |
-| Rust commands (keychain, OAuth loopback)                | `src-tauri/src/{secrets,oauth}.rs`                                      |
-| Permissions / CSP                                       | `src-tauri/capabilities/default.json`, `src-tauri/tauri.conf.json`      |
+| Concern                                                     | Where                                                                   |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Domain models / errors                                      | `src/domain/models/*` (`AppError`, `GenerationErrorCode`)               |
+| Job queue (concurrency, retry, cancel, timeout)             | `src/domain/services/generation-queue.ts`                               |
+| Provider contract + request builder                         | `src/domain/services/image-provider.ts`                                 |
+| Gemini adapter, models catalogue, error mapping             | `src/infrastructure/providers/gemini/*`                                 |
+| Cloudflare Workers AI adapter, auth (direct/worker), models | `src/infrastructure/providers/cloudflare/*`, `cloudflare-worker/`       |
+| Mock provider (dev/tests)                                   | `src/infrastructure/providers/mock/MockImageProvider.ts`                |
+| Credentials (API key, OAuth PKCE+loopback, SecretStore)     | `src/infrastructure/auth/*`                                             |
+| Storage (IndexedDB web / Tauri fs native), migrations       | `src/infrastructure/storage/*`                                          |
+| Image validation/decoding/thumbnails/export                 | `src/infrastructure/image/*`                                            |
+| HTTP entry point + host allowlist                           | `src/infrastructure/http/http-client.ts`                                |
+| Composition root + stores                                   | `src/app/services.ts`, `src/app/stores/*`                               |
+| UI by feature                                               | `src/features/{projects,workspace,generation,gallery,recipes,settings}` |
+| i18n                                                        | `src/i18n/en.ts` (source), `fr.ts`                                      |
+| Rust commands (keychain, OAuth loopback)                    | `src-tauri/src/{secrets,oauth}.rs`                                      |
+| Permissions / CSP                                           | `src-tauri/capabilities/default.json`, `src-tauri/tauri.conf.json`      |
 
 ## Decisions already taken (do not re-litigate without new facts)
+
+- **Default provider = Cloudflare Workers AI** (SD 1.5 img2img & co, $0/step in beta) because Gemini image models have no free tier. `api.cloudflare.com` has no CORS → direct mode desktop-only; web uses the user's own Worker (`cloudflare-worker/`). Never add a proxy of ours.
+- Diffusion providers: input prepared client-side (`ModelCapabilities.inputImage`: crop to ratio, multiples of 64), one random `seed` per job, provider options via `ModelCapabilities.options` + `job.providerOptions`.
 
 - Gemini image generation = **Interactions API** `POST /v1beta/interactions` with `response_format: { type: "image", aspect_ratio?, image_size? }`. `mime_type` is NOT sent (the live API rejected `image/png` on 2026-09-11 despite the docs).
 - Model capabilities live only in `GeminiModels.ts` (ids, aspect ratios, sizes). Verified 2026-09-11.

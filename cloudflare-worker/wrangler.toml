@@ -1,0 +1,13 @@
+name = "aiv-workers-ai"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[ai]
+binding = "AI"
+
+[vars]
+# Comma-separated list of browser origins allowed to call this Worker, or "*".
+# Example for the web build served locally: "http://localhost:1420"
+ALLOWED_ORIGINS = "*"
+
+# Set the shared secret with:  npx wrangler secret put WORKER_SECRET

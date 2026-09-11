@@ -44,6 +44,16 @@ Verified against Google's docs on 2026-09-11 (`ai.google.dev/gemini-api/docs/oau
 
 Mobile OAuth clients (Android/iOS types, custom-scheme/App Links redirects) are not wired yet; API keys work on mobile.
 
+## Cloudflare Workers AI notes
+
+Verified 2026-09-11 against https://developers.cloudflare.com/workers-ai/ (model page, REST API, pricing, limits) and the model JSON schemas in `cloudflare/cloudflare-docs`.
+
+- REST: `POST https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}` with `Authorization: Bearer <token>`. Image models answer with **raw PNG bytes** (`contentType: image/png`), errors with the v4 envelope `{ success:false, errors:[{code,message}] }` (bad token = HTTP 400/401 code 9106/10000; bad account id = 404 code 7003).
+- Input schema (SD img2img family): `prompt` (required), `negative_prompt`, `image_b64`, `width`/`height` 256–2048, `num_steps` ≤ 20, `strength` 0–1, `guidance`, `seed`. Catalogue + option specs: `src/infrastructure/providers/cloudflare/CloudflareModels.ts`.
+- **No CORS** on `api.cloudflare.com` (OPTIONS → 405): direct mode is desktop-only; the web build uses the user's Worker (`cloudflare-worker/`). New hosts are covered by `ALLOWED_HOSTS` + `allowHost()` (worker host), the Tauri `http` scope (`https://api.cloudflare.com/*`, `https://*.workers.dev/*`) and the CSP. A Worker on a custom domain needs its host added to the Tauri scope.
+- Pricing: the four models are `$0.00 per step` (beta). Everything else in Workers AI is billed in neurons (10,000/day free). Cloudflare can change this; the UI shows "Free (beta models)" and links the pricing.
+- Secrets: `cloudflare_api_token` and `cloudflare_worker_secret` (allowlisted in `SecretStore.ts` and `secrets.rs`). The account ID and Worker URL are not secrets and live in `metadata/cloudflare-config.json`.
+
 ## Gemini API notes
 
 - Image generation/editing uses the **Interactions API** (`POST /v1beta/interactions`). Models: `gemini-3.1-flash-image` (default, 512px–4K), `gemini-3.1-flash-lite-image` (1K only), `gemini-3-pro-image` (1K–4K), `gemini-2.5-flash-image` (legacy, no `image_size`). Capabilities are centralized in `src/infrastructure/providers/gemini/GeminiModels.ts` — update that file when Google changes models.

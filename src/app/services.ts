@@ -3,7 +3,10 @@ import { GenerationQueue } from "@/domain/services/generation-queue";
 import { UsageTracker } from "@/domain/services/usage-tracker";
 import type { ImageProvider } from "@/domain/services/image-provider";
 import { GeminiAuthManager } from "@/infrastructure/auth/GeminiAuthManager";
+import { CloudflareAuth } from "@/infrastructure/providers/cloudflare/CloudflareAuth";
+import { CLOUDFLARE_PROVIDER_ID, CloudflareProvider } from "@/infrastructure/providers/cloudflare/CloudflareProvider";
 import { GEMINI_PROVIDER_ID, GeminiProvider } from "@/infrastructure/providers/gemini/GeminiProvider";
+import { createSecretStore } from "@/infrastructure/auth/SecretStore";
 import { MOCK_PROVIDER_ID, MockImageProvider } from "@/infrastructure/providers/mock/MockImageProvider";
 import { createStorageProvider, type StorageProvider } from "@/infrastructure/storage";
 
@@ -17,6 +20,8 @@ export interface AppServices {
   providers: Map<string, ImageProvider>;
   mock: MockImageProvider;
   gemini: GeminiProvider;
+  cloudflare: CloudflareProvider;
+  cloudflareAuth: CloudflareAuth;
   queue: GenerationQueue;
   usage: UsageTracker;
   appVersion: string;
@@ -51,11 +56,18 @@ export function createServices(bindings: {
   storage?: StorageProvider;
 }): AppServices {
   const storage = bindings.storage ?? createStorageProvider();
-  const auth = new GeminiAuthManager();
+  const secrets = createSecretStore();
+  const auth = new GeminiAuthManager(secrets);
   const usage = new UsageTracker((record) => storage.writeMeta(USAGE_META_KEY, record));
   const gemini = new GeminiProvider(auth, usage);
+  const cloudflareAuth = new CloudflareAuth(secrets, { read: (k) => storage.readMeta(k), write: (k, v) => storage.writeMeta(k, v) });
+  const cloudflare = new CloudflareProvider(cloudflareAuth, usage);
   const mock = new MockImageProvider({ usage });
-  const providers = new Map<string, ImageProvider>([[GEMINI_PROVIDER_ID, gemini]]);
+  // Cloudflare first: its img2img models are free while in beta, which is the default path.
+  const providers = new Map<string, ImageProvider>([
+    [CLOUDFLARE_PROVIDER_ID, cloudflare],
+    [GEMINI_PROVIDER_ID, gemini],
+  ]);
   if (MOCK_ENABLED) providers.set(MOCK_PROVIDER_ID, mock);
 
   const queue = new GenerationQueue(
@@ -76,6 +88,6 @@ export function createServices(bindings: {
     },
   );
 
-  services = { storage, auth, providers, mock, gemini, queue, usage, appVersion: APP_VERSION };
+  services = { storage, auth, providers, mock, gemini, cloudflare, cloudflareAuth, queue, usage, appVersion: APP_VERSION };
   return services;
 }

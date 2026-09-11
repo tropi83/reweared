@@ -79,6 +79,59 @@ export function fitWithin(width: number, height: number, maxDimension: number): 
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
+export interface Geometry {
+  /** Source rectangle to crop (in source pixels). */
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+  /** Output size. */
+  width: number;
+  height: number;
+}
+
+/**
+ * Computes a centre crop to `aspectRatio` (optional), a resize so the longest side is at most
+ * `maxDimension`, and rounds the output down to `multipleOf` (diffusion models need 8 or 64).
+ * Pure so it can be unit-tested without a canvas.
+ */
+export function computeGeometry(width: number, height: number, opts: { maxDimension: number; aspectRatio?: string; multipleOf?: number }): Geometry {
+  let sx = 0;
+  let sy = 0;
+  let sw = width;
+  let sh = height;
+  if (opts.aspectRatio) {
+    const [rw, rh] = opts.aspectRatio.split(":").map(Number) as [number, number];
+    const target = rw / rh;
+    if (width / height > target) {
+      sw = Math.round(height * target);
+      sx = Math.round((width - sw) / 2);
+    } else if (width / height < target) {
+      sh = Math.round(width / target);
+      sy = Math.round((height - sh) / 2);
+    }
+  }
+  let out = fitWithin(sw, sh, opts.maxDimension);
+  if (opts.multipleOf && opts.multipleOf > 1) {
+    const m = opts.multipleOf;
+    out = { width: Math.max(m, Math.floor(out.width / m) * m), height: Math.max(m, Math.floor(out.height / m) * m) };
+  }
+  return { sx, sy, sw, sh, width: out.width, height: out.height };
+}
+
+/** Draws a bitmap through a Geometry (crop + resize) into a new blob. */
+export async function encodeBitmapWithGeometry(bitmap: ImageBitmap, geometry: Geometry, type: ImageMimeType, quality?: number): Promise<Blob> {
+  const canvas = createCanvas(geometry.width, geometry.height);
+  const ctx = canvas.getContext("2d") as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+  if (!ctx) throw new AppError("INVALID_IMAGE", "Canvas unavailable.");
+  if (type === "image/jpeg") {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, geometry.width, geometry.height);
+  }
+  ctx.drawImage(bitmap, geometry.sx, geometry.sy, geometry.sw, geometry.sh, 0, 0, geometry.width, geometry.height);
+  return canvasToBlob(canvas, type, quality);
+}
+
 export interface EncodeOptions {
   maxDimension?: number;
   type: ImageMimeType;
@@ -118,18 +171,35 @@ export interface PreparedImage {
  * PNG (when the source has transparency-capable format and is small) or JPEG. The stored
  * original is never touched.
  */
-export async function prepareForProvider(blob: Blob, sourceMime: string, maxDimension: number): Promise<PreparedImage> {
+export interface PrepareOptions {
+  maxDimension: number;
+  /** Centre-crop to this ratio ("4:5"); the output then has exactly that ratio. */
+  cropToAspectRatio?: string;
+  /** Round output dimensions down to a multiple of this value. */
+  multipleOf?: number;
+  /** Force this output format instead of choosing from the source. */
+  format?: "image/png" | "image/jpeg";
+}
+
+export async function prepareForProvider(blob: Blob, sourceMime: string, options: number | PrepareOptions): Promise<PreparedImage> {
+  const opts: PrepareOptions = typeof options === "number" ? { maxDimension: options } : options;
   const { bitmap, width, height } = await decodeImage(blob);
   try {
-    const fits = Math.max(width, height) <= maxDimension;
+    const geometry = computeGeometry(width, height, {
+      maxDimension: opts.maxDimension,
+      ...(opts.cropToAspectRatio ? { aspectRatio: opts.cropToAspectRatio } : {}),
+      ...(opts.multipleOf ? { multipleOf: opts.multipleOf } : {}),
+    });
+    const untouched = geometry.width === width && geometry.height === height && geometry.sw === width && geometry.sh === height;
     const isProviderNative = sourceMime === "image/png" || sourceMime === "image/jpeg";
-    if (fits && isProviderNative) {
+    const formatMatches = !opts.format || opts.format === sourceMime;
+    if (untouched && isProviderNative && formatMatches) {
       return { blob, mimeType: sourceMime, width, height };
     }
     const keepAlpha = sourceMime === "image/png" || sourceMime === "image/webp" || sourceMime === "image/gif" || sourceMime === "image/avif";
-    const type = keepAlpha ? "image/png" : "image/jpeg";
-    const encoded = await encodeBitmap(bitmap, { maxDimension, type, quality: 0.92 });
-    return { blob: encoded.blob, mimeType: type, width: encoded.width, height: encoded.height };
+    const type = opts.format ?? (keepAlpha ? "image/png" : "image/jpeg");
+    const out = await encodeBitmapWithGeometry(bitmap, geometry, type, type === "image/jpeg" ? 0.92 : undefined);
+    return { blob: out, mimeType: type, width: geometry.width, height: geometry.height };
   } finally {
     bitmap.close();
   }

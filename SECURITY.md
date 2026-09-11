@@ -12,6 +12,8 @@
 
 ## Credentials
 
+- **Cloudflare:** the API token (direct mode) and the Worker shared secret live in the SecretStore like the Gemini key (OS keychain on desktop, memory or opt-in localStorage on web). Account ID and Worker URL are configuration, not secrets. Worker URLs must be `https`, without credentials or query strings; `allowHost()` refuses localhost/loopback. The Worker template validates every input against the model schema, caps bodies at 12 MB, only runs allowlisted models and compares the shared secret in constant time.
+
 - **Desktop (Windows/macOS/Linux):** `keyring` crate → Windows Credential Manager / macOS Keychain / Secret Service. Rust commands `secret_get/set/delete` accept only `gemini_api_key` and `google_oauth`.
 - **Web:** memory by default. _Remember on this device_ writes to `localStorage` **only after the user acknowledges** the browser disclaimer. The UI never claims browser storage is secure.
 - **Mobile:** secure storage is not integrated yet; credentials are session-only (the Rust command reports unsupported and the frontend degrades). Tracked for Phase 6.
@@ -25,13 +27,13 @@ All logging goes through `lib/logger.ts`, which redacts Google API keys, `ya29.`
 
 ## Tauri permissions (`src-tauri/capabilities/default.json`)
 
-| Permission                                                                                                 | Why                                                                                       |
-| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `core:default`, `core:window:allow-set-title`                                                              | window basics                                                                             |
-| `opener:allow-open-url` scoped to `accounts.google.com`, `aistudio.google.com`, `console.cloud.google.com` | OAuth consent and "get an API key" links open in the system browser                       |
-| `dialog:allow-open`, `dialog:allow-save`                                                                   | import picker, export save dialog                                                         |
-| `fs:*` listed + `fs:scope` = `$APPDATA`, `$APPDATA/**`                                                     | project storage; paths picked through dialogs are added to the scope by the dialog plugin |
-| `http:default` scoped to the four Google hosts                                                             | Gemini API, token/revoke/userinfo, project listing                                        |
+| Permission                                                                                                                                              | Why                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `core:default`, `core:window:allow-set-title`                                                                                                           | window basics                                                                                                  |
+| `opener:allow-open-url` scoped to `accounts.google.com`, `aistudio.google.com`, `console.cloud.google.com`, `dash.cloudflare.com`, `github.com/tropi83` | OAuth consent, "get an API key", the Cloudflare dashboard and the Worker template open in the system browser   |
+| `dialog:allow-open`, `dialog:allow-save`                                                                                                                | import picker, export save dialog                                                                              |
+| `fs:*` listed + `fs:scope` = `$APPDATA`, `$APPDATA/**`                                                                                                  | project storage; paths picked through dialogs are added to the scope by the dialog plugin                      |
+| `http:default` scoped to the four Google hosts, `api.cloudflare.com` and `*.workers.dev`                                                                | Gemini API, token/revoke/userinfo, project listing; Cloudflare Workers AI direct API and the user's own Worker |
 
 No shell, no process, no notification, no clipboard plugin. `dragDropEnabled: false` on the window so HTML5 drag-and-drop delivers `File` objects to the webview without a native file-path bridge.
 

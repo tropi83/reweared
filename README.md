@@ -69,6 +69,19 @@ pnpm test           # 74 tests (Vitest) — see below
 
 The **Mock provider** (always available in dev builds, or with `VITE_ENABLE_MOCK_PROVIDER=true`) generates placeholder images without any network call, so the whole workflow can be exercised without a Google account. Switch to it in the composer's _Provider_ select; simulate rate limits, outages or timeouts from Settings → Providers → Mock.
 
+## Using Cloudflare Workers AI (default, free)
+
+Cloudflare runs four Stable Diffusion image-to-image models at **$0 per step while in beta** (Workers AI pricing, checked 2026-09-11): `@cf/runwayml/stable-diffusion-v1-5-img2img` (default), DreamShaper 8 LCM, SDXL 1.0, SDXL Lightning. Text-to-Image tasks are limited to 720 requests/min; beta models may be lower.
+
+Two ways to connect, both inside **your** Cloudflare account:
+
+| Mode            | Where it works | Setup                                                                                                                                                                                                                                                                                                        |
+| --------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Direct API**  | Desktop app    | Cloudflare dashboard → Workers AI → _Create a Workers AI API token_ (Read + Edit) and copy the _Account ID_. Paste both in Settings → Providers → Cloudflare. Calls go straight to `api.cloudflare.com`.                                                                                                     |
+| **Your Worker** | Web + desktop  | `api.cloudflare.com` sends no CORS headers, so browsers cannot call it. Deploy the 100-line Worker in [`cloudflare-worker/`](cloudflare-worker/README.md) (free plan, `wrangler deploy`), paste its URL and optional shared secret. The Worker uses the `AI` binding, so no token exists outside Cloudflare. |
+
+Diffusion models are deterministic, so each variation gets its own random seed (kept in the job for reproducibility). The composer's _Advanced options_ expose `strength` (how far from the source), `guidance`, `num_steps` (≤ 20) and a negative prompt. The app crops/resizes the source to the chosen ratio and 512px/1K (multiples of 64) because the model cannot change the ratio itself.
+
 ## Using Gemini
 
 AI Image Variations does not pay for your Gemini usage. Your Gemini usage is subject to Google's quotas, model availability and billing rules.

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { AppError, deriveGenerationStatus, type AspectRatio, type Generation, type GenerationJob, type ImageSize, type ModelInfo } from "@/domain/models";
-import { buildRequestForModel, type ImageGenerationRequest, type ImageGenerationResult } from "@/domain/services/image-provider";
+import { buildRequestForModel, inputPreparationFor, type ImageGenerationRequest, type ImageGenerationResult } from "@/domain/services/image-provider";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { createId, nowIso } from "@/lib/ids";
 import { createLogger } from "@/lib/logger";
@@ -19,6 +19,7 @@ export interface StartGenerationParams {
   imageSize?: ImageSize;
   variationCount: number;
   recipeId?: string;
+  providerOptions?: Record<string, string | number | boolean>;
 }
 
 interface GenerationState {
@@ -34,10 +35,17 @@ interface GenerationState {
 }
 
 /** Cache of prepared source images so N variations share one downscale/encode pass. */
-const preparedCache = new Map<string, Promise<{ blob: Blob; mimeType: "image/png" | "image/jpeg" }>>();
+const preparedCache = new Map<string, Promise<{ blob: Blob; mimeType: "image/png" | "image/jpeg"; width: number; height: number }>>();
 
-function preparedKey(projectId: string, assetId: string, maxDimension: number) {
-  return `${projectId}/${assetId}/${maxDimension}`;
+/** 31-bit seed so deterministic providers (diffusion) produce a different image per job. */
+function randomSeed(): number {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return (buf[0] ?? 0) % 2_147_483_647;
+}
+
+function preparedKey(projectId: string, assetId: string, spec: { maxDimension: number; multipleOf?: number; cropToAspectRatio?: string; format: string }) {
+  return `${projectId}/${assetId}/${spec.maxDimension}/${spec.multipleOf ?? 0}/${spec.cropToAspectRatio ?? "-"}/${spec.format}`;
 }
 
 export async function buildRequestForJob(job: GenerationJob, _signal: AbortSignal): Promise<ImageGenerationRequest> {
@@ -47,15 +55,28 @@ export async function buildRequestForJob(job: GenerationJob, _signal: AbortSigna
   if (!doc || doc.project.id !== job.projectId || !asset) {
     throw new AppError("INVALID_IMAGE", "The source image is no longer available.", { retryable: false });
   }
-  const maxDimension = useSettingsStore.getState().settings.prepareMaxDimension;
-  const key = preparedKey(job.projectId, job.sourceImageId, maxDimension);
+  const models = useGenerationStore.getState().modelsByProvider[job.provider] ?? [];
+  const model = models.find((m) => m.id === job.model);
+  if (!model) throw new AppError("MODEL_UNAVAILABLE", "The selected model is not available.", { retryable: false });
+
+  const spec = inputPreparationFor(
+    model,
+    { aspectRatio: job.aspectRatio, ...(job.imageSize ? { imageSize: job.imageSize } : {}) },
+    useSettingsStore.getState().settings.prepareMaxDimension,
+  );
+  const key = preparedKey(job.projectId, job.sourceImageId, spec);
   let prepared = preparedCache.get(key);
   if (!prepared) {
     prepared = (async () => {
       const blob = await storage.readImage(job.projectId, asset.kind, asset.id);
       if (!blob) throw new AppError("INVALID_IMAGE", "The source image file is missing.", { retryable: false });
-      const out = await prepareForProvider(blob, asset.mimeType, maxDimension);
-      return { blob: out.blob, mimeType: out.mimeType };
+      const out = await prepareForProvider(blob, asset.mimeType, {
+        maxDimension: spec.maxDimension,
+        ...(spec.multipleOf ? { multipleOf: spec.multipleOf } : {}),
+        ...(spec.cropToAspectRatio ? { cropToAspectRatio: spec.cropToAspectRatio } : {}),
+        ...(model.capabilities.inputImage ? { format: spec.format } : {}),
+      });
+      return { blob: out.blob, mimeType: out.mimeType, width: out.width, height: out.height };
     })();
     preparedCache.set(key, prepared);
     prepared.catch(() => preparedCache.delete(key));
@@ -63,14 +84,13 @@ export async function buildRequestForJob(job: GenerationJob, _signal: AbortSigna
     setTimeout(() => preparedCache.delete(key), 5 * 60_000);
   }
   const source = await prepared;
-  const models = useGenerationStore.getState().modelsByProvider[job.provider] ?? [];
-  const model = models.find((m) => m.id === job.model);
-  if (!model) throw new AppError("MODEL_UNAVAILABLE", "The selected model is not available.", { retryable: false });
   return buildRequestForModel(model, {
     prompt: job.prompt,
-    sourceImage: { blob: source.blob, mimeType: source.mimeType },
+    sourceImage: { blob: source.blob, mimeType: source.mimeType, width: source.width, height: source.height },
     aspectRatio: job.aspectRatio,
     ...(job.imageSize ? { imageSize: job.imageSize } : {}),
+    ...(job.seed !== undefined ? { seed: job.seed } : {}),
+    ...(job.providerOptions ? { options: job.providerOptions } : {}),
   });
 }
 
@@ -146,6 +166,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       model: params.modelId,
       aspectRatio: params.aspectRatio,
       ...(params.imageSize && model.capabilities.supportedImageSizes.includes(params.imageSize) ? { imageSize: params.imageSize } : {}),
+      ...(params.providerOptions && Object.keys(params.providerOptions).length > 0 ? { providerOptions: params.providerOptions } : {}),
+      seed: randomSeed(),
       status: "queued",
       attempt: 0,
       createdAt: now,
@@ -162,6 +184,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
         modelId: params.modelId,
         aspectRatio: params.aspectRatio,
         ...(params.imageSize ? { imageSize: params.imageSize } : {}),
+        ...(params.providerOptions && Object.keys(params.providerOptions).length > 0 ? { providerOptions: params.providerOptions } : {}),
         variationCount: count,
       },
       status: "active",

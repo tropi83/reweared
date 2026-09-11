@@ -41,6 +41,7 @@ function harness(
   const provider: ImageProvider = {
     info: { id: "mock", displayName: "Mock", credentialKinds: ["none"] },
     getModels: async () => [],
+    getAuthStatus: async () => ({ state: "authenticated", kind: "none" }),
     validateCredentials: async () => ({ state: "authenticated", kind: "none" }),
     generate,
   };
@@ -156,6 +157,7 @@ describe("GenerationQueue", () => {
     const provider: ImageProvider = {
       info: { id: "mock", displayName: "Mock", credentialKinds: ["none"] },
       getModels: async () => [],
+      getAuthStatus: async () => ({ state: "authenticated", kind: "none" }),
       validateCredentials: async () => ({ state: "authenticated", kind: "none" }),
       generate: (_r, { signal }) =>
         new Promise((resolve, reject) => {

@@ -5,7 +5,7 @@
 //! Values are never logged.
 
 const SERVICE: &str = "com.aiimagevariations.app";
-const ALLOWED_KEYS: &[&str] = &["gemini_api_key", "google_oauth"];
+const ALLOWED_KEYS: &[&str] = &["gemini_api_key", "google_oauth", "cloudflare_api_token", "cloudflare_worker_secret"];
 
 fn check_key(key: &str) -> Result<(), String> {
     if ALLOWED_KEYS.contains(&key) {

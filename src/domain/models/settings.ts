@@ -34,7 +34,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   schemaVersion: SETTINGS_SCHEMA_VERSION,
   locale: "en",
   theme: "system",
-  activeProviderId: "gemini",
+  activeProviderId: "cloudflare",
   lastModelByProvider: {},
   defaultVariationCount: 4,
   defaultAspectRatio: "original",

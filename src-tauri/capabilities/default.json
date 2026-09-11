@@ -17,6 +17,12 @@
         },
         {
           "url": "https://console.cloud.google.com/*"
+        },
+        {
+          "url": "https://dash.cloudflare.com/*"
+        },
+        {
+          "url": "https://github.com/tropi83/*"
         }
       ]
     },
@@ -60,6 +66,12 @@
         },
         {
           "url": "https://cloudresourcemanager.googleapis.com/*"
+        },
+        {
+          "url": "https://api.cloudflare.com/*"
+        },
+        {
+          "url": "https://*.workers.dev/*"
         }
       ]
     }

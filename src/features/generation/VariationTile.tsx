@@ -228,6 +228,7 @@ function MoreLikeThisButton({ assetId, job }: { assetId: string; job: Generation
           providerId: job.provider,
           modelId: job.model,
           generationId: null,
+          ...(job.providerOptions ? { providerOptions: job.providerOptions } : {}),
         });
         toast.info(t("generation.sourceSet"));
         document.getElementById("prompt")?.focus();

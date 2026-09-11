@@ -13,6 +13,10 @@ interface ComposerState {
   modelId: string | null;
   recipeId: string | null;
   recipeValues: Record<string, string>;
+  /** Provider-specific options keyed by provider id (e.g. cloudflare.strength). */
+  providerOptions: Record<string, Record<string, string | number | boolean>>;
+  setProviderOption(providerId: string, key: string, value: string | number | boolean): void;
+  resetProviderOptions(providerId: string): void;
   /** Job whose prompt is being edited; kept for "Edit prompt" affordances. */
   editingGenerationId: string | null;
   setPrompt(prompt: string): void;
@@ -35,6 +39,7 @@ interface ComposerState {
     providerId: string;
     modelId: string;
     generationId: string | null;
+    providerOptions?: Record<string, string | number | boolean>;
   }): void;
 }
 
@@ -49,7 +54,15 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   modelId: null,
   recipeId: null,
   recipeValues: {},
+  providerOptions: {},
   editingGenerationId: null,
+  setProviderOption: (providerId, key, value) =>
+    set({ providerOptions: { ...get().providerOptions, [providerId]: { ...(get().providerOptions[providerId] ?? {}), [key]: value } } }),
+  resetProviderOptions: (providerId) => {
+    const next = { ...get().providerOptions };
+    delete next[providerId];
+    set({ providerOptions: next });
+  },
   setPrompt: (prompt) => set({ prompt }),
   setSource: (sourceImageId) => set({ sourceImageId }),
   setVariationCount: (variationCount) => set({ variationCount: Math.max(1, Math.min(8, variationCount)) }),
@@ -74,6 +87,7 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
       modelId: input.modelId,
       recipeId: null,
       recipeValues: {},
+      ...(input.providerOptions ? { providerOptions: { ...get().providerOptions, [input.providerId]: input.providerOptions } } : {}),
       editingGenerationId: input.generationId,
     }),
 }));

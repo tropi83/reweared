@@ -66,8 +66,12 @@ export class MockImageProvider implements ImageProvider {
     return MOCK_MODELS;
   }
 
-  async validateCredentials(): Promise<AuthStatus> {
+  async getAuthStatus(): Promise<AuthStatus> {
     return { state: "authenticated", kind: "none", label: "Mock provider" };
+  }
+
+  async validateCredentials(): Promise<AuthStatus> {
+    return this.getAuthStatus();
   }
 
   async generate(request: ImageGenerationRequest, { signal }: GenerateOptions): Promise<ImageGenerationResult> {

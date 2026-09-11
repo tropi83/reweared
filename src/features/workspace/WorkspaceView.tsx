@@ -50,7 +50,7 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
           <Menu className="size-5" />
         </Button>
         <ProjectTitle name={doc.project.name} />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <span className="hidden text-xs text-fg-subtle sm:inline">
             {t("history.generations", { count: generationCount })} · {t("projects.imageCount", { count: imageCount })}
           </span>
@@ -132,7 +132,7 @@ function ProjectTitle({ name }: { name: string }) {
       type="button"
       onClick={() => setEditing(true)}
       title={t("common.rename")}
-      className="min-w-0 truncate rounded-md px-1.5 py-1 text-left text-base font-semibold hover:bg-bg-elevated"
+      className="min-w-0 flex-1 truncate rounded-md px-1.5 py-1 text-left text-base font-semibold hover:bg-bg-elevated md:max-w-md md:flex-none"
     >
       {name}
     </button>

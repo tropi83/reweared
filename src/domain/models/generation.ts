@@ -11,6 +11,8 @@ export interface GenerationSettings {
   modelId: string;
   aspectRatio: AspectRatio;
   imageSize?: ImageSize;
+  /** Provider-specific options as chosen in the composer (e.g. diffusion strength). */
+  providerOptions?: Record<string, string | number | boolean>;
   /** Number of independent variations requested. */
   variationCount: number;
 }
@@ -51,6 +53,9 @@ export interface GenerationJob {
   model: string;
   aspectRatio: AspectRatio;
   imageSize?: ImageSize;
+  providerOptions?: Record<string, string | number | boolean>;
+  /** Random seed given to deterministic providers so each variation differs; kept for reproducibility. */
+  seed?: number;
   status: JobStatus;
   /** Number of attempts made so far (0 before the first request). */
   attempt: number;

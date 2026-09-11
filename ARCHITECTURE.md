@@ -79,6 +79,13 @@ interface ImageProvider {
 
 Google returns the same "You exceeded your current quota" sentence for throttling, daily exhaustion and models outside the plan; `GeminiErrors.parseQuotaInfo` reads the structured `google.rpc.QuotaFailure` / `RetryInfo` details to classify (`RATE_LIMITED` retryable with Google's delay · `QUOTA_EXCEEDED` · `MODEL_NOT_IN_PLAN` when `quotaValue` is 0). `domain/services/usage-tracker.ts` counts requests locally per provider/model (rolling minute, Pacific day), learns limits from those details (`quotaValue`) unless the user set manual ones, and persists through `StorageProvider.readMeta/writeMeta` (`metadata/usage.json` on desktop). Only requests from this device are counted; the UI states it.
 
+### Cloudflare Workers AI (`infrastructure/providers/cloudflare`)
+
+- `CloudflareAuth` resolves the endpoint: direct REST (`/accounts/{id}/ai/run/{model}`, bearer token; desktop only because the API has no CORS) or the user's Worker (`{workerUrl}/run/{model}`, optional bearer secret). Config in `metadata/cloudflare-config.json`, secrets in the SecretStore.
+- `CloudflareMapper` builds the JSON body (`prompt`, `image_b64`, `width/height`, `num_steps`, `strength`, `guidance`, `negative_prompt`, `seed`) with options normalized into the documented ranges; the response is raw PNG bytes, a JSON body on 200 is treated as an envelope error.
+- Diffusion models cannot change the aspect ratio and are deterministic: `ModelCapabilities.inputImage` makes `buildRequestForJob` crop/resize the source (multiples of 64) via `computeGeometry`, and each job carries a random `seed`. `ModelCapabilities.options` drives the composer's Advanced panel generically.
+- `cloudflare-worker/` is the Worker template users deploy in their own account (AI binding, CORS, secret, input validation).
+
 ### Mock
 
 Renders a tinted, labelled copy of the source on a canvas; scenarios: `success | slow | flaky | rate_limited | timeout | error | no_image`.

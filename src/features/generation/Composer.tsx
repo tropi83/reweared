@@ -10,7 +10,7 @@ import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
 import { getServices, MOCK_ENABLED } from "@/app/services";
 import { Button } from "@/components/ui/Button";
-import { Input, Label, Select, Textarea } from "@/components/ui/Input";
+import { Input, Label, Select, Switch, Textarea } from "@/components/ui/Input";
 import { Kbd, Segmented } from "@/components/ui/Misc";
 import { ALL_ASPECT_RATIOS, toGenerationError, type AspectRatio, type ImageSize, type ModelInfo } from "@/domain/models";
 import { BUILT_IN_RECIPES, extractVariables, interpolate } from "@/domain/services/recipes";
@@ -22,13 +22,18 @@ import { UsageMeter } from "./UsageMeter";
 
 const COUNT_OPTIONS = [1, 2, 4, 6, 8];
 
+/** Providers whose displayName is just the tier word (Gemini) fall back to the model id. */
+function modelLabel(m: ModelInfo): string {
+  return /^(Fast|Balanced|Professional|Legacy)$/.test(m.displayName) ? m.id : m.displayName;
+}
+
 export function Composer() {
   const t = useT();
   const doc = useProjectsStore((s) => s.current);
   const composer = useComposerStore();
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.update);
-  const authStatus = useAuthStore((s) => s.status);
+  const providerStatus = useAuthStore((s) => s.providerStatus);
   const modelsByProvider = useGenerationStore((s) => s.modelsByProvider);
   const loadModels = useGenerationStore((s) => s.loadModels);
   const start = useGenerationStore((s) => s.start);
@@ -45,9 +50,10 @@ export function Composer() {
   const isMock = providerId === MOCK_PROVIDER_ID;
 
   // Load models when the provider or the credential changes.
+  const authStatus = providerStatus[providerId];
   useEffect(() => {
     void loadModels(providerId, true);
-  }, [providerId, authStatus.state, authStatus.projectId, loadModels]);
+  }, [providerId, authStatus?.state, authStatus?.projectId, loadModels]);
 
   // Keep a valid model selected.
   useEffect(() => {
@@ -92,7 +98,10 @@ export function Composer() {
   const activeGeneration = activeJobs.length > 0 && doc ? doc.generations[activeJobs[0]!.generationId] : undefined;
   const activeDone = activeGeneration ? activeGeneration.jobIds.filter((id) => doc?.jobs[id]?.status === "completed").length : 0;
 
-  const authOk = isMock || authStatus.state === "authenticated";
+  const authOk = isMock || authStatus?.state === "authenticated";
+  const optionSpecs = model?.capabilities.options ?? [];
+  const providerOptions = composer.providerOptions[providerId] ?? {};
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const sourceId = composer.sourceImageId ?? doc?.project.originalImageId;
   const canGenerate = !!doc && !!sourceId && !!model?.available && finalPrompt.trim().length > 0 && authOk;
   const blocker: MessageKey | null = !doc?.project.originalImageId
@@ -125,6 +134,7 @@ export function Composer() {
         ...(composer.imageSize ? { imageSize: composer.imageSize } : {}),
         variationCount: composer.variationCount,
         ...(composer.recipeId ? { recipeId: composer.recipeId } : {}),
+        ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
       });
       if (settings.lastModelByProvider[providerId] !== model.id) {
         void updateSettings({ lastModelByProvider: { ...settings.lastModelByProvider, [providerId]: model.id } });
@@ -271,7 +281,7 @@ export function Composer() {
           <Select id="model" value={composer.modelId ?? ""} onChange={(e) => composer.setModel(e.target.value)}>
             {models.map((m) => (
               <option key={m.id} value={m.id} disabled={!m.available}>
-                {t(`composer.modelTier.${m.tier}` as MessageKey)} · {m.id}
+                {t(`composer.modelTier.${m.tier}` as MessageKey)} · {modelLabel(m)}
                 {!m.available ? ` (${t("composer.modelUnavailable")})` : ""}
               </option>
             ))}
@@ -291,6 +301,59 @@ export function Composer() {
           </div>
         )}
       </div>
+
+      {optionSpecs.length > 0 && (
+        <div className="rounded-lg border border-border">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-fg-muted hover:text-fg"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            aria-expanded={advancedOpen}
+          >
+            {t("composer.advanced")}
+            <span className="text-fg-subtle">{advancedOpen ? "−" : "+"}</span>
+          </button>
+          {advancedOpen && (
+            <div className="space-y-3 border-t border-border p-3">
+              {optionSpecs.map((spec) => {
+                const value = providerOptions[spec.key] ?? spec.default;
+                return (
+                  <div key={spec.key} className="space-y-1">
+                    <Label htmlFor={`opt-${spec.key}`} hint={spec.type === "number" ? String(value) : undefined}>
+                      {t(spec.labelKey as MessageKey)}
+                    </Label>
+                    {spec.type === "number" ? (
+                      <input
+                        id={`opt-${spec.key}`}
+                        type="range"
+                        min={spec.min}
+                        max={spec.max}
+                        step={spec.step}
+                        value={Number(value)}
+                        onChange={(e) => composer.setProviderOption(providerId, spec.key, Number(e.target.value))}
+                        className="w-full accent-[var(--accent)]"
+                      />
+                    ) : spec.type === "boolean" ? (
+                      <Switch checked={Boolean(value)} onChange={(v) => composer.setProviderOption(providerId, spec.key, v)} />
+                    ) : (
+                      <Input
+                        id={`opt-${spec.key}`}
+                        value={String(value)}
+                        onChange={(e) => composer.setProviderOption(providerId, spec.key, e.target.value)}
+                        className="h-8"
+                      />
+                    )}
+                    {spec.helpKey && <p className="text-[11px] text-fg-subtle">{t(spec.helpKey as MessageKey)}</p>}
+                  </div>
+                );
+              })}
+              <Button variant="ghost" size="sm" onClick={() => composer.resetProviderOptions(providerId)}>
+                {t("composer.resetAdvanced")}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         {activeGeneration ? (

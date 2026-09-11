@@ -16,7 +16,26 @@ export const ALLOWED_HOSTS: ReadonlySet<string> = new Set([
   "accounts.google.com",
   "cloudresourcemanager.googleapis.com",
   "www.googleapis.com",
+  "api.cloudflare.com",
 ]);
+
+/**
+ * Hosts the user configured explicitly (their own Cloudflare Worker). Only https hosts that look
+ * like a Worker endpoint are accepted; on desktop the Tauri http scope must also allow them
+ * (`https://*.workers.dev/*` is allowed out of the box).
+ */
+const userHosts = new Set<string>();
+
+export function allowHost(host: string): void {
+  if (!/^[a-z0-9.-]+(:\d+)?$/i.test(host) || host === "localhost" || /^127\./.test(host)) {
+    throw new Error("Refusing to allowlist this host");
+  }
+  userHosts.add(host.toLowerCase());
+}
+
+export function isHostAllowed(host: string): boolean {
+  return ALLOWED_HOSTS.has(host) || userHosts.has(host.toLowerCase());
+}
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -37,8 +56,9 @@ async function resolveFetch(): Promise<FetchLike> {
 }
 
 export async function httpFetch(url: string, init?: RequestInit): Promise<Response> {
-  const host = new URL(url).host;
-  if (!ALLOWED_HOSTS.has(host)) {
+  const parsed = new URL(url);
+  const host = parsed.host;
+  if (parsed.protocol !== "https:" || !isHostAllowed(host)) {
     throw new Error(`Refusing to contact non-allowlisted host: ${host}`);
   }
   const fetchFn = await resolveFetch();

@@ -72,6 +72,10 @@ export class GeminiProvider implements ImageProvider {
     this.modelCache = null;
   }
 
+  getAuthStatus(): Promise<AuthStatus> {
+    return this.auth.getStatus();
+  }
+
   /** Cheap authenticated call used by "Test connection". */
   async validateCredentials(): Promise<AuthStatus> {
     const status = await this.auth.getStatus();

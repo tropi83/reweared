@@ -14,6 +14,7 @@ import type { MockScenario } from "@/infrastructure/providers/mock/MockImageProv
 import { useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
 import { openExternal } from "@/lib/open-external";
+import { CloudflareCard } from "./CloudflareCard";
 import { Section } from "./SettingsView";
 
 const AI_STUDIO_KEYS_URL = "https://aistudio.google.com/api-keys";
@@ -42,6 +43,7 @@ export function ProvidersSection() {
 
   return (
     <Section id="providers" title={t("settings.section.providers")}>
+      <CloudflareCard />
       <div className="rounded-xl border border-border bg-bg-elevated p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-base font-semibold">{t("auth.gemini.title")}</h3>

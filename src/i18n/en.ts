@@ -330,6 +330,41 @@ export const en = {
   "usage.reset.help": "Clears local counters and learned limits on this device.",
   "usage.reset.body": "Local usage counters and learned limits will be cleared. This does not change anything on Google's side.",
 
+  // Cloudflare Workers AI
+  "cf.title": "Cloudflare Workers AI",
+  "cf.pricing": "Free (beta models)",
+  "cf.body":
+    "Stable Diffusion image-to-image models run in your own Cloudflare account. The four models offered cost $0 per step while in beta (Workers AI pricing, checked 2026-09-11). Rate limits and availability are set by Cloudflare.",
+  "cf.saved": "Cloudflare configuration saved",
+  "cf.disconnect": "Remove configuration",
+  "cf.mode": "Connection mode",
+  "cf.mode.direct": "Direct API",
+  "cf.mode.worker": "Your Worker",
+  "cf.mode.directUnavailable": "The Cloudflare API has no CORS headers: direct mode only works in the desktop app.",
+  "cf.direct.help":
+    "Desktop only. Create a Workers AI API token (Read + Edit) and copy your Account ID from the Workers AI page of the Cloudflare dashboard. Calls go straight from this app to api.cloudflare.com.",
+  "cf.direct.openDashboard": "Open the Workers AI dashboard",
+  "cf.accountId": "Account ID",
+  "cf.token": "API token",
+  "cf.tokenPlaceholder": "Paste your Workers AI token",
+  "cf.worker.help":
+    "Works everywhere, including the web. Deploy the provided Worker template in your Cloudflare account (free plan is enough); it calls the model through the AI binding, so no API token ever leaves Cloudflare. Protect it with a shared secret if you like.",
+  "cf.worker.template": "Worker template and deployment steps",
+  "cf.workerUrl": "Worker URL",
+  "cf.workerSecret": "Shared secret",
+  "cf.optional": "(optional)",
+  "cf.option.strength": "Strength",
+  "cf.option.strengthHelp": "How far the result may drift from the source. 0.3 keeps it close, 0.8 reimagines it.",
+  "cf.option.guidance": "Prompt guidance",
+  "cf.option.guidanceHelp": "Higher values follow the prompt more strictly (7.5 is the model default).",
+  "cf.option.steps": "Diffusion steps",
+  "cf.option.stepsHelp": "More steps refine details; Cloudflare caps this model at 20.",
+  "cf.option.negativePrompt": "Negative prompt",
+  "cf.option.negativePromptHelp": "What to avoid, e.g. blurry, text, watermark, extra fingers.",
+  "composer.advanced": "Advanced options",
+  "composer.resetAdvanced": "Reset to defaults",
+  "provider.pricing.free": "Free",
+
   // Shortcuts
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.generate": "Generate",

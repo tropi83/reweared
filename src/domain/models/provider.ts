@@ -9,6 +9,32 @@ export interface ModelCapabilities {
   supportedAspectRatios: AspectRatio[];
   /** Empty when the model does not accept an image size parameter. */
   supportedImageSizes: ImageSize[];
+  /**
+   * Present when the model needs its input image pre-sized by the app (diffusion models):
+   * the output follows the input, so ratio and resolution are decided client-side.
+   */
+  inputImage?: {
+    defaultDimension: number;
+    maxDimension: number;
+    minDimension?: number;
+    multipleOf?: number;
+    cropsToAspectRatio?: boolean;
+  };
+  /** Provider-specific option schema, rendered by the composer's "Advanced" panel. */
+  options?: ProviderOptionSpec[];
+}
+
+export interface ProviderOptionSpec {
+  key: string;
+  /** i18n key for the label. */
+  labelKey: string;
+  type: "number" | "text" | "boolean";
+  min?: number;
+  max?: number;
+  step?: number;
+  default: number | string | boolean;
+  /** i18n key for the help text. */
+  helpKey?: string;
 }
 
 export interface ModelInfo {
@@ -21,13 +47,15 @@ export interface ModelInfo {
   available: boolean;
 }
 
-export type CredentialKind = "api_key" | "oauth" | "none";
+export type CredentialKind = "api_key" | "api_token" | "oauth" | "none";
 
 export interface ProviderInfo {
   id: string;
   displayName: string;
   /** Which credential kinds the provider accepts. */
   credentialKinds: CredentialKind[];
+  /** Short i18n key describing pricing ("free while in beta", "pay as you go"). */
+  pricingKey?: string;
 }
 
 export type AuthStatusState = "unauthenticated" | "authenticated" | "expired" | "invalid";
