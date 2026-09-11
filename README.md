@@ -71,7 +71,9 @@ The **Mock provider** (always available in dev builds, or with `VITE_ENABLE_MOCK
 
 ## Using Gemini
 
-AI Image Variations does not pay for your Gemini usage. Your Gemini usage is subject to Google's quotas, model availability and billing rules. Any free tier is provided by Google, per project and model, and may change.
+AI Image Variations does not pay for your Gemini usage. Your Gemini usage is subject to Google's quotas, model availability and billing rules.
+
+> **Image models have no free tier in the Gemini API** (pricing page, checked 2026-09-11: every image model is "Free tier: Not available"). A key from a project without a linked billing account gets `limit: 0` and the app reports _Free tier — no access_. Link a Cloud Billing account in [AI Studio](https://aistudio.google.com/plan_information); generation then costs a few cents per image. The free image generation in the consumer Gemini app or in AI Studio's web UI is a different product with no public API, and OAuth sign-in does not change the tier: billing is always attached to the Google Cloud project.
 
 ### API key (web, desktop, mobile)
 

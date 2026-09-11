@@ -236,6 +236,9 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "auth.web.acknowledge": "J'ai compris",
   "auth.billing.notice":
     "AI Image Variations ne paie pas votre utilisation de Gemini. Celle-ci est soumise aux quotas, à la disponibilité des modèles et aux règles de facturation de Google.",
+  "auth.billing.noFreeTier":
+    "Les modèles image n'ont pas d'offre gratuite dans l'API Gemini (tarifs vérifiés le 11/09/2026) : le projet derrière votre clé ou votre compte Google doit avoir un compte de facturation associé. La génération gratuite dans l'application Gemini ou l'interface web d'AI Studio est un produit grand public distinct, sans API publique.",
+  "auth.billing.setup": "Configurer la facturation dans AI Studio",
   "auth.mock.title": "Fournisseur de test",
   "auth.mock.body": "Fournisseur de développement qui renvoie des images factices sans aucun appel réseau.",
   "auth.mock.enable": "Utiliser le fournisseur de test",

@@ -248,6 +248,9 @@ export const en = {
   "auth.web.acknowledge": "I understand",
   "auth.billing.notice":
     "AI Image Variations does not pay for your Gemini usage. Your Gemini usage is subject to Google's quotas, model availability and billing rules.",
+  "auth.billing.noFreeTier":
+    "Image models have no free tier in the Gemini API (pricing checked 2026-09-11): the project behind your key or Google account needs a linked billing account. Free image generation in the Gemini app or AI Studio's web UI is a separate consumer product with no public API.",
+  "auth.billing.setup": "Set up billing in AI Studio",
   "auth.mock.title": "Mock provider",
   "auth.mock.body": "Development provider that returns generated placeholder images without any network call.",
   "auth.mock.enable": "Use mock provider",

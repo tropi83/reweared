@@ -17,6 +17,7 @@ import { openExternal } from "@/lib/open-external";
 import { Section } from "./SettingsView";
 
 const AI_STUDIO_KEYS_URL = "https://aistudio.google.com/api-keys";
+const AI_STUDIO_BILLING_URL = "https://aistudio.google.com/plan_information";
 
 function StatusBadge({ status }: { status: AuthStatus }) {
   const t = useT();
@@ -48,7 +49,19 @@ export function ProvidersSection() {
           {auth.status.label && <span className="text-xs text-fg-muted">{auth.status.label}</span>}
         </div>
         <p className="mt-1 text-sm text-fg-muted">{t("auth.gemini.body")}</p>
-        <p className="mt-2 rounded-lg bg-bg-sunken px-3 py-2 text-xs text-fg-muted">{t("auth.billing.notice")}</p>
+        <div className="mt-2 space-y-1.5 rounded-lg bg-bg-sunken px-3 py-2 text-xs text-fg-muted">
+          <p>{t("auth.billing.notice")}</p>
+          <p>
+            {t("auth.billing.noFreeTier")}{" "}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-accent hover:underline"
+              onClick={() => void openExternal(AI_STUDIO_BILLING_URL)}
+            >
+              {t("auth.billing.setup")} <ExternalLink className="size-3" />
+            </button>
+          </p>
+        </div>
 
         {disclaimerNeeded && (
           <div className="mt-3 flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">

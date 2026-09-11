@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- Clear "no free tier for image models" notice with a link to AI Studio billing; `FREE_TIER_NO_ACCESS` error for `limit: 0` on free-tier metrics; Google usage dashboard links.
 - Local usage meter: requests per model over the last minute and the current Pacific day, with limits learned from Google's 429 responses or set manually (composer gauge + Settings → Usage).
 - Prettier, EditorConfig and rustfmt configuration; `pnpm check` / `pnpm rust:check` gates.
 - GitHub Actions CI (web checks, Rust checks, secrets scan) and a tag-driven release workflow.

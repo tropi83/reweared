@@ -8,6 +8,9 @@ import type { AspectRatio, ImageSize, ModelInfo } from "@/domain/models";
  * - Gemini 3.1 Flash-Lite Image only supports 1K.
  * - Gemini 2.5 Flash Image (legacy) accepts aspect ratios but no image_size parameter.
  * - Supported aspect ratios: 1:1, 3:2, 2:3, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9.
+ * - Pricing (https://ai.google.dev/gemini-api/docs/pricing, 2026-09-11): every image model is
+ *   "Free tier: Not available" — a project without a billing account gets `limit: 0`.
+ * - gemini-2.5-flash-image is deprecated and shuts down on 2026-10-02.
  *
  * Every model-specific rule lives here; nothing else in the app tests model ids.
  */
@@ -62,7 +65,7 @@ export const GEMINI_IMAGE_MODELS: ModelInfo[] = [
     id: "gemini-2.5-flash-image",
     displayName: "Legacy",
     tier: "legacy",
-    description: "Gemini 2.5 Flash Image — previous generation.",
+    description: "Gemini 2.5 Flash Image — deprecated, shuts down 2026-10-02.",
     available: true,
     capabilities: {
       imageGeneration: true,
