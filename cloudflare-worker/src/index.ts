@@ -25,11 +25,13 @@ export interface Env {
 }
 
 const ALLOWED_MODELS = new Set([
+  "@cf/black-forest-labs/flux-2-klein-4b",
+  "@cf/black-forest-labs/flux-2-klein-9b",
   "@cf/runwayml/stable-diffusion-v1-5-img2img",
-  "@cf/lykon/dreamshaper-8-lcm",
-  "@cf/stabilityai/stable-diffusion-xl-base-1.0",
-  "@cf/bytedance/stable-diffusion-xl-lightning",
 ]);
+/** FLUX.2 models take multipart/form-data (prompt, input_image_0..3, width, height, seed, guidance). */
+const MULTIPART_MODELS = new Set(["@cf/black-forest-labs/flux-2-klein-4b", "@cf/black-forest-labs/flux-2-klein-9b"]);
+const MAX_REFERENCE_BYTES = 4 * 1024 * 1024;
 
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
 
@@ -106,6 +108,8 @@ export default {
     const length = Number(request.headers.get("content-length") ?? "0");
     if (length > MAX_BODY_BYTES) return json(413, { success: false, errors: [{ code: 413, message: "Body too large" }] }, cors);
 
+    if (MULTIPART_MODELS.has(model)) return runMultipart(request, env, model, cors);
+
     let body: RunBody;
     try {
       body = (await request.json()) as RunBody;
@@ -146,6 +150,56 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env>;
+
+/** FLUX.2 path: validate the form fields, rebuild a clean form and stream it to the AI binding. */
+async function runMultipart(request: Request, env: Env, model: string, cors: Record<string, string>): Promise<Response> {
+  let incoming: FormData;
+  try {
+    incoming = await request.formData();
+  } catch {
+    return json(400, { success: false, errors: [{ code: 400, message: "Expected multipart/form-data" }] }, cors);
+  }
+  const prompt = incoming.get("prompt");
+  if (typeof prompt !== "string" || prompt.trim().length === 0 || prompt.length > 2200) {
+    return json(400, { success: false, errors: [{ code: 400, message: "prompt is required (1-2200 chars)" }] }, cors);
+  }
+  const form = new FormData();
+  form.append("prompt", prompt.trim());
+  for (let i = 0; i < 4; i++) {
+    const image = incoming.get(`input_image_${i}`);
+    if (image instanceof File) {
+      if (image.size > MAX_REFERENCE_BYTES || !/^image\/(png|jpeg)$/.test(image.type)) {
+        return json(400, { success: false, errors: [{ code: 400, message: `input_image_${i} must be a PNG/JPEG under 4 MB` }] }, cors);
+      }
+      form.append(`input_image_${i}`, image, image.name || `input_${i}.png`);
+    }
+  }
+  const numField = (key: string, min: number, max: number) => {
+    const raw = incoming.get(key);
+    if (typeof raw !== "string" || raw.trim() === "") return;
+    const n = Number(raw);
+    if (Number.isFinite(n)) form.append(key, String(Math.min(max, Math.max(min, n))));
+  };
+  numField("width", 256, 1920);
+  numField("height", 256, 1920);
+  numField("seed", 0, 2_147_483_647);
+  numField("guidance", 0, 10);
+
+  const formResponse = new Response(form);
+  try {
+    const result = (await env.AI.run(
+      model as Parameters<Ai["run"]>[0],
+      {
+        multipart: { body: formResponse.body, contentType: formResponse.headers.get("content-type") ?? "multipart/form-data" },
+      } as never,
+    )) as { image?: string };
+    return json(200, { success: true, result: { image: result.image ?? "" } }, cors);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Workers AI error";
+    const status = /rate limit|too many|quota|allocation|neuron/i.test(message) ? 429 : /not allowed/i.test(message) ? 403 : 502;
+    return json(status, { success: false, errors: [{ code: status === 403 ? 5018 : status, message }] }, cors);
+  }
+}
 
 function authorized(request: Request, env: Env): boolean {
   if (!env.WORKER_SECRET) return true;

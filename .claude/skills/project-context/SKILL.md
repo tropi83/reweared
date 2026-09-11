@@ -31,7 +31,7 @@ Local-first workspace: import an image → prompt → N independent variations (
 
 ## Decisions already taken (do not re-litigate without new facts)
 
-- **Default provider = Cloudflare Workers AI** (SD 1.5 img2img & co, $0/step in beta) because Gemini image models have no free tier. `api.cloudflare.com` has no CORS → direct mode desktop-only; web uses the user's own Worker (`cloudflare-worker/`). Never add a proxy of ours.
+- **Default provider = Cloudflare Workers AI**, model **FLUX.2 [klein] 4B** (multipart API, reference image ≤ 512 px, ≈110 neurons per 1K image inside the 10,000 free daily neurons) because Gemini image models have no free tier. SD 1.5 img2img is private on many accounts (5018); SDXL/DreamShaper have no image input (3030) and must not be re-added as img2img. `api.cloudflare.com` has no CORS → direct mode desktop-only; web uses the user's own Worker (`cloudflare-worker/`). Never add a proxy of ours.
 - Diffusion providers: input prepared client-side (`ModelCapabilities.inputImage`: crop to ratio, multiples of 64), one random `seed` per job, provider options via `ModelCapabilities.options` + `job.providerOptions`.
 
 - Gemini image generation = **Interactions API** `POST /v1beta/interactions` with `response_format: { type: "image", aspect_ratio?, image_size? }`. `mime_type` is NOT sent (the live API rejected `image/png` on 2026-09-11 despite the docs).

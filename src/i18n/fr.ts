@@ -317,9 +317,9 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "usage.reset.body": "Les compteurs locaux et les limites apprises seront effacés. Cela ne change rien côté Google.",
 
   "cf.title": "Cloudflare Workers AI",
-  "cf.pricing": "Gratuit (modèles bêta)",
+  "cf.pricing": "Allocation gratuite quotidienne",
   "cf.body":
-    "Des modèles Stable Diffusion image-vers-image exécutés dans votre propre compte Cloudflare. Les quatre modèles proposés coûtent 0 $ par étape tant qu'ils sont en bêta (tarifs Workers AI vérifiés le 11/09/2026). Limites et disponibilité sont fixées par Cloudflare.",
+    "FLUX.2 [klein] (génération + édition à partir de votre image) et Stable Diffusion img2img s'exécutent dans votre propre compte Cloudflare. Workers AI inclut 10 000 neurons gratuits par jour : environ 90 images FLUX.2 [klein] 4B en 1K (tarifs vérifiés le 12/09/2026). Au-delà, 0,011 $ pour 1 000 neurons avec l'offre Workers Paid.",
   "cf.saved": "Configuration Cloudflare enregistrée",
   "cf.disconnect": "Supprimer la configuration",
   "cf.mode": "Mode de connexion",
@@ -339,6 +339,10 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "cf.workerUrl": "URL du Worker",
   "cf.workerSecret": "Secret partagé",
   "cf.optional": "(facultatif)",
+  "cf.option.keepSubject": "Conserver le sujet de la source",
+  "cf.option.keepSubjectHelp":
+    "Ajoute au prompt une consigne d'utiliser l'image de référence et d'en garder le sujet reconnaissable. Désactivez pour des réinterprétations libres.",
+  "cf.option.fluxGuidanceHelp": "0 = valeur par défaut du modèle. Plus haut = suit le prompt plus littéralement.",
   "cf.option.strength": "Intensité",
   "cf.option.strengthHelp": "À quel point le résultat peut s'éloigner de la source. 0,3 reste proche, 0,8 réinvente.",
   "cf.option.guidance": "Fidélité au prompt",

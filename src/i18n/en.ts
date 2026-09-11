@@ -333,9 +333,9 @@ export const en = {
 
   // Cloudflare Workers AI
   "cf.title": "Cloudflare Workers AI",
-  "cf.pricing": "Free (beta models)",
+  "cf.pricing": "Free daily allocation",
   "cf.body":
-    "Stable Diffusion image-to-image models run in your own Cloudflare account. The four models offered cost $0 per step while in beta (Workers AI pricing, checked 2026-09-11). Rate limits and availability are set by Cloudflare.",
+    "FLUX.2 [klein] (generation + editing from your image) and Stable Diffusion img2img run in your own Cloudflare account. Workers AI includes 10,000 neurons per day for free: about 90 FLUX.2 [klein] 4B images at 1K (pricing checked 2026-09-12). Beyond that, $0.011 per 1,000 neurons on the Workers Paid plan.",
   "cf.saved": "Cloudflare configuration saved",
   "cf.disconnect": "Remove configuration",
   "cf.mode": "Connection mode",
@@ -355,6 +355,10 @@ export const en = {
   "cf.workerUrl": "Worker URL",
   "cf.workerSecret": "Shared secret",
   "cf.optional": "(optional)",
+  "cf.option.keepSubject": "Keep the subject of the source",
+  "cf.option.keepSubjectHelp":
+    "Prefixes the prompt with an instruction to use the reference image and keep its subject recognizable. Turn off for free reinterpretations.",
+  "cf.option.fluxGuidanceHelp": "0 = model default. Higher values follow the prompt more literally.",
   "cf.option.strength": "Strength",
   "cf.option.strengthHelp": "How far the result may drift from the source. 0.3 keeps it close, 0.8 reimagines it.",
   "cf.option.guidance": "Prompt guidance",

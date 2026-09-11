@@ -69,18 +69,20 @@ pnpm test           # 74 tests (Vitest) — see below
 
 The **Mock provider** (always available in dev builds, or with `VITE_ENABLE_MOCK_PROVIDER=true`) generates placeholder images without any network call, so the whole workflow can be exercised without a Google account. Switch to it in the composer's _Provider_ select; simulate rate limits, outages or timeouts from Settings → Providers → Mock.
 
-## Using Cloudflare Workers AI (default, free)
+## Using Cloudflare Workers AI (default)
 
-Cloudflare runs four Stable Diffusion image-to-image models at **$0 per step while in beta** (Workers AI pricing, checked 2026-09-11): `@cf/runwayml/stable-diffusion-v1-5-img2img` (default), DreamShaper 8 LCM, SDXL 1.0, SDXL Lightning. Text-to-Image tasks are limited to 720 requests/min; beta models may be lower.
+Workers AI includes **10,000 neurons per day for free** (pricing page, checked 2026-09-12; $0.011 per 1,000 neurons beyond that on the Workers Paid plan). The default model, **FLUX.2 [klein] 4B** (Black Forest Labs), unifies generation and editing: your image goes in as a reference (`input_image_0`) and costs ≈110 neurons per 1K output, i.e. **about 90 images per day at no charge**. Also offered: FLUX.2 [klein] 9B (better, priced per megapixel — a handful of free images/day) and Stable Diffusion 1.5 img2img ($0/step but restricted to some accounts, error 5018).
+
+> Why not SDXL / DreamShaper? Their documented schema lists `image_b64`, but the deployed models have no image input and answer `3030 input tensor "image" is not present`. They are text-to-image only and are not listed.
 
 Two ways to connect, both inside **your** Cloudflare account:
 
-| Mode            | Where it works | Setup                                                                                                                                                                                                                                                                                                        |
-| --------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Direct API**  | Desktop app    | Cloudflare dashboard → Workers AI → _Create a Workers AI API token_ (Read + Edit) and copy the _Account ID_. Paste both in Settings → Providers → Cloudflare. Calls go straight to `api.cloudflare.com`.                                                                                                     |
-| **Your Worker** | Web + desktop  | `api.cloudflare.com` sends no CORS headers, so browsers cannot call it. Deploy the 100-line Worker in [`cloudflare-worker/`](cloudflare-worker/README.md) (free plan, `wrangler deploy`), paste its URL and optional shared secret. The Worker uses the `AI` binding, so no token exists outside Cloudflare. |
+| Mode            | Where it works | Setup                                                                                                                                                                                                                                                                                               |
+| --------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Direct API**  | Desktop app    | Cloudflare dashboard → Workers AI → _Create a Workers AI API token_ (Read + Edit) and copy the _Account ID_. Paste both in Settings → Providers → Cloudflare. Calls go straight to `api.cloudflare.com`.                                                                                            |
+| **Your Worker** | Web + desktop  | `api.cloudflare.com` sends no CORS headers, so browsers cannot call it. Deploy the Worker in [`cloudflare-worker/`](cloudflare-worker/README.md) (free plan, `wrangler deploy`), paste its URL and optional shared secret. The Worker uses the `AI` binding, so no token exists outside Cloudflare. |
 
-Diffusion models are deterministic, so each variation gets its own random seed (kept in the job for reproducibility). The composer's _Advanced options_ expose `strength` (how far from the source), `guidance`, `num_steps` (≤ 20) and a negative prompt. The app crops/resizes the source to the chosen ratio and 512px/1K (multiples of 64) because the model cannot change the ratio itself.
+Each variation gets its own random seed. _Advanced options_: keep-subject hint (prefixes the prompt so the reference is respected), guidance; for SD 1.5: strength, steps (≤ 20), negative prompt. The app resizes the reference to ≤ 512 px (FLUX requirement) and asks for the output at the chosen ratio and size (256–1920, multiples of 16). The model list is filtered by what your account can actually run.
 
 ## Using Gemini
 

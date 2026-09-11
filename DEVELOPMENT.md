@@ -46,13 +46,15 @@ Mobile OAuth clients (Android/iOS types, custom-scheme/App Links redirects) are 
 
 ## Cloudflare Workers AI notes
 
-Verified 2026-09-11 against https://developers.cloudflare.com/workers-ai/ (model page, REST API, pricing, limits) and the model JSON schemas in `cloudflare/cloudflare-docs`.
+Verified 2026-09-12 against https://developers.cloudflare.com/workers-ai/ (model pages, launch changelogs, REST API, pricing, limits, error codes) and the model JSON schemas in `cloudflare/cloudflare-docs`.
 
-- REST: `POST https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}` with `Authorization: Bearer <token>`. Image models answer with **raw PNG bytes** (`contentType: image/png`), errors with the v4 envelope `{ success:false, errors:[{code,message}] }` (bad token = HTTP 400/401 code 9106/10000; bad account id = 404 code 7003).
-- Input schema (SD img2img family): `prompt` (required), `negative_prompt`, `image_b64`, `width`/`height` 256–2048, `num_steps` ≤ 20, `strength` 0–1, `guidance`, `seed`. Catalogue + option specs: `src/infrastructure/providers/cloudflare/CloudflareModels.ts`.
-- **No CORS** on `api.cloudflare.com` (OPTIONS → 405): direct mode is desktop-only; the web build uses the user's Worker (`cloudflare-worker/`). New hosts are covered by `ALLOWED_HOSTS` + `allowHost()` (worker host), the Tauri `http` scope (`https://api.cloudflare.com/*`, `https://*.workers.dev/*`) and the CSP. A Worker on a custom domain needs its host added to the Tauri scope.
-- Pricing: the four models are `$0.00 per step` (beta). Everything else in Workers AI is billed in neurons (10,000/day free). Cloudflare can change this; the UI shows "Free (beta models)" and links the pricing.
-- Secrets: `cloudflare_api_token` and `cloudflare_worker_secret` (allowlisted in `SecretStore.ts` and `secrets.rs`). The account ID and Worker URL are not secrets and live in `metadata/cloudflare-config.json`.
+- REST: `POST https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}` with `Authorization: Bearer <token>`. Errors use the v4 envelope `{ success:false, errors:[{code,message}] }`: bad token = 400/401 code 9106/10000, bad account id = 404 code 7003, **5018 = account not allowed for a private model**, **3030 = invalid model input** (e.g. the model has no image tensor), 3036 = daily neurons exhausted (429).
+- **FLUX.2 [klein]** (`@cf/black-forest-labs/flux-2-klein-4b`, `-9b`): `multipart/form-data` with `prompt`, `input_image_0..3` (PNG/JPEG, "smaller than 512×512"), `width`/`height` 256–1920, `seed`, `guidance`; steps fixed at 4. Answer: JSON envelope with `result.image` (base64). Pricing 4B: $0.000059 per input tile + $0.000287 per output 512×512 tile ⇒ ≈110 neurons per 1K image.
+- **Stable Diffusion 1.5 img2img**: JSON body `prompt`, `image_b64`, `width/height` 256–2048, `num_steps` ≤ 20, `strength`, `guidance`, `negative_prompt`, `seed`; answer = raw PNG bytes. SDXL base/lightning and DreamShaper are _not_ img2img despite the shared schema (3030).
+- Model availability: `GET /accounts/{id}/ai/models/search?task=Text-to-Image` (direct) or `GET /models` on the Worker (`env.AI.models()`); catalogue entries missing from the list are greyed out.
+- **No CORS** on `api.cloudflare.com` (OPTIONS → 405): direct mode is desktop-only; the web build uses the user's Worker (`cloudflare-worker/`). Hosts: `ALLOWED_HOSTS` + `allowHost()` (worker host), Tauri `http` scope (`https://api.cloudflare.com/*`, `https://*.workers.dev/*`), CSP `connect-src`. A Worker on a custom domain needs its host added to the Tauri scope.
+- Secrets: `cloudflare_api_token`, `cloudflare_worker_secret` (allowlisted in `SecretStore.ts` and `secrets.rs`). Account ID and Worker URL live in `metadata/cloudflare-config.json`.
+- Catalogue and option specs: `src/infrastructure/providers/cloudflare/CloudflareModels.ts`.
 
 ## Gemini API notes
 

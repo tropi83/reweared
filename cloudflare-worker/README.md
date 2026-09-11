@@ -26,8 +26,8 @@ Optional: restrict browser callers by editing `ALLOWED_ORIGINS` in `wrangler.tom
 | `GET /models`       | image models your account is allowed to run (`env.AI.models()`), used to grey out private/restricted models |
 | `POST /run/<model>` | same JSON body as the Workers AI REST API; answers with PNG bytes                                           |
 
-Allowed models: `@cf/runwayml/stable-diffusion-v1-5-img2img`, `@cf/lykon/dreamshaper-8-lcm`, `@cf/stabilityai/stable-diffusion-xl-base-1.0`, `@cf/bytedance/stable-diffusion-xl-lightning`. Bodies are validated (prompt 1–2000 chars, `num_steps` ≤ 20, `strength` 0–1, sizes 256–2048) and capped at 12 MB.
+Allowed models: `@cf/black-forest-labs/flux-2-klein-4b`, `@cf/black-forest-labs/flux-2-klein-9b` (multipart: `prompt`, `input_image_0..3`, `width`, `height`, `seed`, `guidance`) and `@cf/runwayml/stable-diffusion-v1-5-img2img` (JSON). Inputs are validated (prompt length, sizes 256–1920 / 256–2048, `num_steps` ≤ 20, `strength` 0–1, reference images PNG/JPEG under 4 MB) and bodies are capped at 12 MB.
 
 ## Costs
 
-The four models are billed at $0 per step while in beta (Workers AI pricing, checked 2026-09-11). The Workers free plan includes 100,000 requests/day. Cloudflare may change either; check your dashboard.
+Workers AI includes 10,000 neurons per day at no charge. FLUX.2 [klein] 4B costs ≈110 neurons per 1K image (about 90 images/day free); Stable Diffusion 1.5 img2img is $0 per step while in beta but restricted on many accounts. The Workers free plan includes 100,000 requests/day. Cloudflare may change any of this; check your dashboard.

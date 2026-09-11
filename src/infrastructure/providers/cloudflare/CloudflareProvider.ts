@@ -5,7 +5,7 @@ import { createLogger } from "@/lib/logger";
 import type { GeminiUsageSink } from "../gemini/GeminiProvider";
 import type { CloudflareAuth } from "./CloudflareAuth";
 import { cloudflareMessageFor, mapCloudflareEnvelopeError, mapCloudflareHttpError } from "./CloudflareErrors";
-import { toCloudflareBody, type CloudflareErrorBody } from "./CloudflareMapper";
+import { decodeImageResponse, toCloudflareRequest, type CloudflareErrorBody } from "./CloudflareMapper";
 import { CLOUDFLARE_IMAGE_MODELS, findCloudflareModel } from "./CloudflareModels";
 
 const log = createLogger("cloudflare");
@@ -122,14 +122,15 @@ export class CloudflareProvider implements ImageProvider {
     if (!request.sourceImage) throw new AppError("INVALID_REQUEST", "This model needs a source image.");
     const { url, headers } = await this.auth.resolveEndpoint(request.model);
     allowHost(new URL(url).host);
-    const body = await toCloudflareBody(request);
+    const prepared = await toCloudflareRequest(request);
 
     let response: Response;
     try {
       response = await httpFetch(url, {
         method: "POST",
-        headers: { ...headers, "Content-Type": "application/json", Accept: "image/png, application/json" },
-        body: JSON.stringify(body),
+        // For multipart the browser/Tauri Request sets the boundary Content-Type itself.
+        headers: { ...headers, Accept: "image/png, application/json", ...(prepared.kind === "json" ? { "Content-Type": "application/json" } : {}) },
+        body: prepared.kind === "json" ? JSON.stringify(prepared.body) : prepared.form,
         signal,
       });
     } catch (err) {
@@ -138,25 +139,17 @@ export class CloudflareProvider implements ImageProvider {
     }
     if (!response.ok) throw await this.toError(response, request.model);
 
-    const contentType = response.headers.get("content-type") ?? "";
-    if (contentType.includes("application/json")) {
-      // Workers AI answers image models with raw PNG; JSON on a 200 means the v4 envelope carried an error.
-      const envelope = (await response.json().catch(() => ({}))) as CloudflareErrorBody;
+    const decoded = await decodeImageResponse(response);
+    if ("envelope" in decoded) {
       this.track(request.model, "error");
-      throw mapCloudflareEnvelopeError(envelope);
+      throw mapCloudflareEnvelopeError(decoded.envelope);
     }
-    const bytes = await response.arrayBuffer();
-    if (bytes.byteLength === 0 || bytes.byteLength > MAX_RESPONSE_BYTES) {
+    if (decoded.blob.size === 0 || decoded.blob.size > MAX_RESPONSE_BYTES) {
       this.track(request.model, "error");
       throw new AppError("NO_IMAGE_RETURNED", "Cloudflare returned an empty or oversized image.");
     }
-    const mime = contentType.includes("image/jpeg") ? "image/jpeg" : "image/png";
     this.track(request.model, "ok");
-    return {
-      image: new Blob([bytes], { type: mime }),
-      mimeType: mime,
-      providerMeta: { ...(body.seed !== undefined ? { seed: body.seed } : {}), strength: body.strength ?? 1, steps: body.num_steps ?? 20 },
-    };
+    return { image: decoded.blob, mimeType: decoded.mimeType, providerMeta: prepared.meta };
   }
 
   private track(model: string, outcome: "ok" | "rate_limited" | "quota" | "error") {

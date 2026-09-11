@@ -5,11 +5,12 @@ import { inputPreparationFor } from "@/domain/services/image-provider";
 import { computeGeometry } from "@/infrastructure/image/image-processing";
 import { CloudflareAuth, normalizeWorkerUrl, type MetaStore } from "./CloudflareAuth";
 import { mapCloudflareEnvelopeError, mapCloudflareHttpError } from "./CloudflareErrors";
-import { normalizeCloudflareOptions, randomSeed, toCloudflareBody } from "./CloudflareMapper";
+import { FLUX_KEEP_SUBJECT_HINT, fluxOutputSize, normalizeCloudflareOptions, randomSeed, toCloudflareBody, toCloudflareRequest } from "./CloudflareMapper";
 import { CLOUDFLARE_IMAGE_MODELS, DEFAULT_CLOUDFLARE_MODEL_ID } from "./CloudflareModels";
 import { CloudflareProvider } from "./CloudflareProvider";
 
 const ACCOUNT = "0123456789abcdef0123456789abcdef";
+const SD_MODEL_ID = "@cf/runwayml/stable-diffusion-v1-5-img2img";
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 
 function meta(): MetaStore & { data: Record<string, unknown> } {
@@ -149,7 +150,7 @@ describe("CloudflareProvider", () => {
     const result = await provider.generate(
       {
         prompt: "p",
-        model: DEFAULT_CLOUDFLARE_MODEL_ID,
+        model: SD_MODEL_ID,
         sourceImage: { blob: new Blob([PNG], { type: "image/png" }), mimeType: "image/png", width: 512, height: 512 },
         seed: 42,
       },
@@ -158,11 +159,11 @@ describe("CloudflareProvider", () => {
     expect(result.mimeType).toBe("image/png");
     expect(result.image.size).toBe(PNG.length);
     expect(result.providerMeta).toMatchObject({ seed: 42, strength: 0.6, steps: 20 });
-    expect(calls[0]?.url).toBe(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/ai/run/${DEFAULT_CLOUDFLARE_MODEL_ID}`);
+    expect(calls[0]?.url).toBe(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/ai/run/${SD_MODEL_ID}`);
     const headers = calls[0]?.init?.headers as Record<string, string>;
     expect(headers.Authorization).toMatch(/^Bearer /);
     expect(JSON.parse(String(calls[0]?.init?.body))).toMatchObject({ prompt: "p", width: 512, height: 512, seed: 42 });
-    expect(events).toEqual([{ provider: "cloudflare", model: DEFAULT_CLOUDFLARE_MODEL_ID, outcome: "ok" }]);
+    expect(events).toEqual([{ provider: "cloudflare", model: SD_MODEL_ID, outcome: "ok" }]);
   });
 
   it("treats a JSON body on 200 as an envelope error", async () => {
@@ -176,7 +177,7 @@ describe("CloudflareProvider", () => {
     const { provider } = await directProvider();
     await expect(
       provider.generate(
-        { prompt: "p", model: DEFAULT_CLOUDFLARE_MODEL_ID, sourceImage: { blob: new Blob([PNG]), mimeType: "image/png" } },
+        { prompt: "p", model: SD_MODEL_ID, sourceImage: { blob: new Blob([PNG]), mimeType: "image/png" } },
         { signal: new AbortController().signal },
       ),
     ).rejects.toMatchObject({ code: "CONTENT_REJECTED" });
@@ -189,7 +190,7 @@ describe("CloudflareProvider", () => {
     const { provider, auth } = await directProvider();
     await expect(
       provider.generate(
-        { prompt: "p", model: DEFAULT_CLOUDFLARE_MODEL_ID, sourceImage: { blob: new Blob([PNG]), mimeType: "image/png" } },
+        { prompt: "p", model: SD_MODEL_ID, sourceImage: { blob: new Blob([PNG]), mimeType: "image/png" } },
         { signal: new AbortController().signal },
       ),
     ).rejects.toMatchObject({ code: "INVALID_CREDENTIAL" });
@@ -241,7 +242,8 @@ describe("CloudflareProvider", () => {
 });
 
 describe("input preparation for diffusion models", () => {
-  const sd15 = CLOUDFLARE_IMAGE_MODELS[0]!;
+  const flux = CLOUDFLARE_IMAGE_MODELS.find((m) => m.id === DEFAULT_CLOUDFLARE_MODEL_ID)!;
+  const sd15 = CLOUDFLARE_IMAGE_MODELS.find((m) => m.id === SD_MODEL_ID)!;
 
   it("derives crop/resize/rounding from the model capabilities", () => {
     expect(inputPreparationFor(sd15, { aspectRatio: "original" }, 3072)).toEqual({ maxDimension: 512, multipleOf: 64, format: "image/png" });
@@ -252,6 +254,8 @@ describe("input preparation for diffusion models", () => {
       format: "image/png",
     });
     expect(inputPreparationFor(sd15, { aspectRatio: "1:1", imageSize: "4K" }, 3072).maxDimension).toBe(1024);
+    // FLUX reference images stay ≤ 512 whatever the output size and are never cropped (the output ratio is set explicitly).
+    expect(inputPreparationFor(flux, { aspectRatio: "16:9", imageSize: "1K" }, 3072)).toEqual({ maxDimension: 512, multipleOf: 16, format: "image/png" });
   });
 
   it("computeGeometry centre-crops, fits and rounds to multiples of 64", () => {
@@ -286,7 +290,7 @@ describe("private / restricted models (error 5018)", () => {
     const provider = new CloudflareProvider(auth);
     await expect(
       provider.generate(
-        { prompt: "p", model: DEFAULT_CLOUDFLARE_MODEL_ID, sourceImage: { blob: new Blob([PNG]), mimeType: "image/png" } },
+        { prompt: "p", model: SD_MODEL_ID, sourceImage: { blob: new Blob([PNG]), mimeType: "image/png" } },
         { signal: new AbortController().signal },
       ),
     ).rejects.toMatchObject({ code: "MODEL_NOT_IN_PLAN", retryable: false });
@@ -302,7 +306,7 @@ describe("private / restricted models (error 5018)", () => {
       return new Response(
         JSON.stringify({
           success: true,
-          result: [{ name: "@cf/stabilityai/stable-diffusion-xl-base-1.0" }, { name: "@cf/black-forest-labs/flux-1-schnell" }],
+          result: [{ name: DEFAULT_CLOUDFLARE_MODEL_ID }, { name: "@cf/black-forest-labs/flux-1-schnell" }],
           result_info: { total_pages: 1 },
         }),
         {
@@ -312,11 +316,11 @@ describe("private / restricted models (error 5018)", () => {
     });
     const provider = new CloudflareProvider(auth);
     const models = await provider.getModels();
-    expect(models.find((m) => m.id === "@cf/stabilityai/stable-diffusion-xl-base-1.0")?.available).toBe(true);
-    expect(models.find((m) => m.id === DEFAULT_CLOUDFLARE_MODEL_ID)?.available).toBe(false);
+    expect(models.find((m) => m.id === DEFAULT_CLOUDFLARE_MODEL_ID)?.available).toBe(true);
+    expect(models.find((m) => m.id === SD_MODEL_ID)?.available).toBe(false);
     // Cached for the same configuration.
     __setFetchOverride(async () => new Response("{}", { status: 500 }));
-    expect((await provider.getModels()).find((m) => m.id === DEFAULT_CLOUDFLARE_MODEL_ID)?.available).toBe(false);
+    expect((await provider.getModels()).find((m) => m.id === SD_MODEL_ID)?.available).toBe(false);
   });
 
   it("falls back to the full catalogue when listing fails or no configuration exists", async () => {
@@ -325,5 +329,69 @@ describe("private / restricted models (error 5018)", () => {
     await configured.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
     expect((await new CloudflareProvider(configured).getModels()).every((m) => m.available)).toBe(true);
     expect((await new CloudflareProvider(makeAuth()).getModels()).every((m) => m.available)).toBe(true);
+  });
+});
+
+describe("FLUX.2 [klein] requests", () => {
+  it("sends multipart with the reference image and decodes the base64 answer", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const b64 = btoa(String.fromCharCode(...PNG));
+    __setFetchOverride(async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({ success: true, result: { image: b64 } }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    const auth = makeAuth();
+    await auth.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
+    const provider = new CloudflareProvider(auth);
+    const result = await provider.generate(
+      {
+        prompt: "make it studio",
+        model: DEFAULT_CLOUDFLARE_MODEL_ID,
+        sourceImage: { blob: new Blob([PNG], { type: "image/png" }), mimeType: "image/png", width: 384, height: 512 },
+        aspectRatio: "4:5",
+        imageSize: "1K",
+        seed: 7,
+        options: { guidance: 3 },
+      },
+      { signal: new AbortController().signal },
+    );
+    expect(result.mimeType).toBe("image/png");
+    expect(result.image.size).toBe(PNG.length);
+    expect(result.providerMeta).toMatchObject({ width: 816, height: 1024, seed: 7, guidance: 3 });
+    expect(calls[0]?.url).toBe(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/ai/run/${DEFAULT_CLOUDFLARE_MODEL_ID}`);
+    const init = calls[0]!.init!;
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+    const form = init.body as FormData;
+    expect(String(form.get("prompt"))).toBe(`${FLUX_KEEP_SUBJECT_HINT} make it studio`);
+    expect(form.get("input_image_0")).toBeInstanceOf(Blob);
+    expect(form.get("width")).toBe("816");
+    expect(form.get("height")).toBe("1024");
+    expect(form.get("seed")).toBe("7");
+    expect(form.get("guidance")).toBe("3");
+  });
+
+  it("omits the subject hint and guidance when disabled", async () => {
+    const req = await toCloudflareRequest({
+      prompt: "p",
+      model: DEFAULT_CLOUDFLARE_MODEL_ID,
+      sourceImage: { blob: new Blob([PNG]), mimeType: "image/png" },
+      options: { keep_subject: false, guidance: 0 },
+    });
+    expect(req.kind).toBe("multipart");
+    if (req.kind !== "multipart") return;
+    expect(req.form.get("prompt")).toBe("p");
+    expect(req.form.get("guidance")).toBeNull();
+  });
+
+  it("computes output sizes from the ratio or the source, in multiples of 16 within 256-1920", () => {
+    expect(fluxOutputSize({ prompt: "p", model: "m", aspectRatio: "16:9" })).toEqual({ width: 1024, height: 576 });
+    expect(fluxOutputSize({ prompt: "p", model: "m", aspectRatio: "9:16", imageSize: "512px" })).toEqual({ width: 288, height: 512 });
+    expect(fluxOutputSize({ prompt: "p", model: "m", sourceImage: { blob: new Blob(), mimeType: "image/png", width: 3000, height: 4000 } })).toEqual({
+      width: 768,
+      height: 1024,
+    });
+    expect(fluxOutputSize({ prompt: "p", model: "m" })).toEqual({ width: 1024, height: 1024 });
+    expect(fluxOutputSize({ prompt: "p", model: "m", aspectRatio: "21:9", imageSize: "512px" }).height).toBeGreaterThanOrEqual(256);
   });
 });
