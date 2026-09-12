@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, GitBranch, Pencil, RefreshCw, RotateCw, Sparkles, Square, Trash2 } from "lucide-react";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
@@ -19,6 +19,7 @@ export function GenerationFeed() {
   const doc = useProjectsStore((s) => s.current);
   const filter = useUiStore((s) => s.filter);
   const generations = useMemo(() => (doc ? Object.values(doc.generations).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : []), [doc]);
+  useScrollToNewGeneration(doc?.project.id, generations);
 
   if (!doc) return null;
   if (generations.length === 0) {
@@ -31,6 +32,26 @@ export function GenerationFeed() {
       ))}
     </div>
   );
+}
+
+const generationDomId = (id: string) => `generation-${id}`;
+
+/**
+ * On phones the feed sits under the listing card, so a run that starts is out of sight: scroll its card
+ * into view once. Generations already there when the project opens are left alone.
+ */
+function useScrollToNewGeneration(projectId: string | undefined, generations: Generation[]): void {
+  const seen = useRef<{ projectId: string | undefined; ids: Set<string> } | null>(null);
+  useEffect(() => {
+    const ids = new Set(generations.map((g) => g.id));
+    const previous = seen.current;
+    seen.current = { projectId, ids };
+    if (!previous || previous.projectId !== projectId) return;
+    const fresh = generations.find((g) => !previous.ids.has(g.id));
+    if (!fresh) return;
+    const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(generationDomId(fresh.id))?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  }, [projectId, generations]);
 }
 
 function GenerationCard({ generation, doc, toPostOnly }: { generation: Generation; doc: ProjectDocument; toPostOnly: boolean }) {
@@ -97,7 +118,11 @@ function GenerationCard({ generation, doc, toPostOnly }: { generation: Generatio
   };
 
   return (
-    <article className="fade-in rounded-2xl border border-border bg-bg-elevated/60 p-3 md:p-4" aria-label={generation.prompt}>
+    <article
+      id={generationDomId(generation.id)}
+      className="fade-in scroll-mt-4 rounded-2xl border border-border bg-bg-elevated/60 p-3 md:p-4"
+      aria-label={generation.prompt}
+    >
       <header className="mb-3 flex flex-wrap items-start gap-2">
         <div className="min-w-[14rem] flex-1">
           <button type="button" className="w-full text-left" onClick={() => setExpanded((v) => !v)} title={generation.prompt}>
