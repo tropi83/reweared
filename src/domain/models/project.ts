@@ -14,6 +14,10 @@ export interface Project {
   coverImageId?: string;
   /** Marketplace taxonomy chosen for this item. */
   listing?: ListingSelection;
+  /** Brand typed by the seller (raw, max 60 chars); trimmed when used. Absent = no brand stated. */
+  brand?: string;
+  /** "My mannequin" toggle for this project's photos with a person. */
+  useMannequin?: boolean;
   /** Title/description generated from the original photo, edited by the user. */
   copy?: ListingCopy;
   createdAt: string;

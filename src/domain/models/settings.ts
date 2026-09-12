@@ -1,4 +1,5 @@
 import type { AspectRatio, ImageSize } from "./generation";
+import type { Mannequin } from "./mannequin";
 
 export type ThemePreference = "system" | "dark" | "light";
 export type Locale = "en" | "fr";
@@ -34,6 +35,8 @@ export interface AppSettings {
   adsEnabled: boolean;
   /** The user read the Vinted terms warning before the first automated pre-fill. */
   vintedAutomationAcknowledged: boolean;
+  /** The seller's mannequin for photos with a person; absent until created (listing card or Settings → Mannequin). */
+  mannequin?: Mannequin | undefined;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
