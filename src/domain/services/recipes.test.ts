@@ -22,7 +22,7 @@ describe("recipes", () => {
       expect(recipe.category).toBe("listing");
       expect(recipe.shots!.length).toBeGreaterThanOrEqual(4);
       expect(recipe.shots!.length).toBeLessThanOrEqual(5);
-      expect(recipe.listing).toBeDefined();
+      expect(recipe.pack).toBeDefined();
       expect(recipe.promptTemplate.length).toBeGreaterThan(20);
       expect(recipe.builtIn).toBe(true);
     }

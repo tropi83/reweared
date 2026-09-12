@@ -23,8 +23,8 @@ import { __setServices, createServices, getServices } from "./services";
 import { useAuthStore } from "./stores/auth-store";
 import { useComposerStore } from "./stores/composer-store";
 import { applyJobUpdate, buildRequestForJob, persistJobResult, useGenerationStore } from "./stores/generation-store";
-import { useListingStore } from "./stores/listing-store";
-import { useProjectsStore } from "./stores/projects-store";
+import { useListingSetupStore } from "./stores/listing-setup-store";
+import { useListingsStore } from "./stores/listings-store";
 import { useSettingsStore } from "./stores/settings-store";
 
 const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])], { type: "image/png" });
@@ -56,9 +56,9 @@ async function waitFor(predicate: () => boolean, timeoutMs = 5000) {
   }
 }
 
-const jobsOf = () => Object.values(useProjectsStore.getState().current?.jobs ?? {}) as GenerationJob[];
+const jobsOf = () => Object.values(useListingsStore.getState().current?.jobs ?? {}) as GenerationJob[];
 
-describe("createListing", () => {
+describe("generateListing", () => {
   const storage = new IndexedDbStorage("listing-flow-test");
   let copy: ReturnType<typeof fakeCopy>;
 
@@ -74,8 +74,8 @@ describe("createListing", () => {
     __setServices({ ...getServices(), copyProviders: new Map([["gemini", copy.provider]]) });
     useAuthStore.setState({ providerStatus: { gemini: { state: "authenticated", kind: "api_key" } } });
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, copyProviderId: "gemini", mannequin: undefined } });
-    await useProjectsStore.getState().createFromFile(PNG, "baskets.png");
-    useListingStore.getState().setListing({ categoryId: "men", subcategoryId: "shoes" });
+    await useListingsStore.getState().createFromFile(PNG, "baskets.png");
+    useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" });
     useComposerStore.getState().setProvider("mock");
     await useGenerationStore.getState().loadModels("mock", true);
     useComposerStore.getState().setModel("mock-fast");
@@ -86,15 +86,15 @@ describe("createListing", () => {
   });
 
   it("creates photos and text in parallel, forces the seller's brand and applies the mannequin", async () => {
-    useListingStore.getState().setBrand("  Nike  ");
-    useListingStore.getState().setUseMannequin(true);
+    useListingSetupStore.getState().setBrand("  Nike  ");
+    useListingSetupStore.getState().setUseMannequin(true);
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, mannequin: { build: "S", pose: "sitting", skinTone: "olive" } } });
 
-    const report = await useListingStore.getState().createListing();
+    const report = await useListingSetupStore.getState().generateListing();
 
     expect(report).toEqual({ photos: "done", text: "done" });
     expect(copy.requests[0]?.brand).toBe("Nike");
-    expect(useProjectsStore.getState().current?.project.copy?.brand).toBe("Nike");
+    expect(useListingsStore.getState().current?.listing.copy?.brand).toBe("Nike");
     const worn = jobsOf().find((j) => j.shotId === "worn");
     expect(worn?.prompt).toContain("worn by a man with a slim build and olive skin, sitting on a stool,");
     expect(jobsOf().find((j) => j.shotId === "studio")?.prompt).not.toContain("olive skin");
@@ -102,20 +102,20 @@ describe("createListing", () => {
 
   it("does not apply the mannequin when the toggle is off", async () => {
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, mannequin: { build: "L", pose: "arched", skinTone: "deep" } } });
-    await useListingStore.getState().createListing();
+    await useListingSetupStore.getState().generateListing();
     expect(jobsOf().find((j) => j.shotId === "worn")?.prompt).toContain("worn by a man, standing, cropped");
   });
 
   it("writes the text only when no image provider is usable", async () => {
     useComposerStore.getState().setProvider("cloudflare");
-    const report = await useListingStore.getState().createListing();
+    const report = await useListingSetupStore.getState().generateListing();
     expect(report).toEqual({ photos: "skipped-provider", text: "done" });
     expect(jobsOf()).toHaveLength(0);
   });
 
   it("makes the photos only when the copy provider is not connected", async () => {
     useAuthStore.setState({ providerStatus: {} });
-    const report = await useListingStore.getState().createListing();
+    const report = await useListingSetupStore.getState().generateListing();
     expect(report).toEqual({ photos: "done", text: "skipped-provider" });
     expect(copy.requests).toHaveLength(0);
     expect(jobsOf().length).toBeGreaterThanOrEqual(4);
@@ -124,19 +124,19 @@ describe("createListing", () => {
   it("a text failure does not cancel the photos", async () => {
     copy = fakeCopy(new AppError("INVALID_CREDENTIAL", "bad key"));
     __setServices({ ...getServices(), copyProviders: new Map([["gemini", copy.provider]]) });
-    const report = await useListingStore.getState().createListing();
+    const report = await useListingSetupStore.getState().generateListing();
     expect(report?.photos).toBe("done");
     expect(report?.text).toMatchObject({ error: { code: "INVALID_CREDENTIAL" } });
     expect(jobsOf().length).toBeGreaterThanOrEqual(4);
   });
 
   it("refuses without a complete selection and caps the brand", async () => {
-    useListingStore.getState().setListing(undefined);
-    expect(await useListingStore.getState().createListing()).toBeNull();
-    useListingStore.getState().setBrand("x".repeat(80));
-    expect(useProjectsStore.getState().current?.project.brand).toHaveLength(60);
-    useListingStore.getState().setBrand("   ");
-    expect(useProjectsStore.getState().current?.project.brand).toBeUndefined();
+    useListingSetupStore.getState().setCategory(undefined);
+    expect(await useListingSetupStore.getState().generateListing()).toBeNull();
+    useListingSetupStore.getState().setBrand("x".repeat(80));
+    expect(useListingsStore.getState().current?.listing.brand).toHaveLength(60);
+    useListingSetupStore.getState().setBrand("   ");
+    expect(useListingsStore.getState().current?.listing.brand).toBeUndefined();
   });
 });
 

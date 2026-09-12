@@ -6,7 +6,7 @@ import type { ImageGenerationResult, ImageProvider } from "./image-provider";
 function makeJob(index: number, overrides: Partial<GenerationJob> = {}): GenerationJob {
   return {
     id: `job_${index}`,
-    projectId: "prj_1",
+    listingId: "prj_1",
     generationId: "gen_1",
     sourceImageId: "img_src",
     index,

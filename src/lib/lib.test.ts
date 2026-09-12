@@ -5,7 +5,7 @@ import { computeBackoffMs, sleep, withTimeout } from "./retry";
 
 describe("ids", () => {
   it("creates prefixed ids that pass the safety pattern", () => {
-    for (const prefix of ["prj", "img", "gen", "job", "rcp"] as const) {
+    for (const prefix of ["lst", "img", "gen", "job", "rcp"] as const) {
       const id = createId(prefix);
       expect(id.startsWith(`${prefix}_`)).toBe(true);
       expect(SAFE_ID_PATTERN.test(id)).toBe(true);

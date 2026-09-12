@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, Copy, ExternalLink, FolderDown, Send, X } from "lucide-react";
 import { getServices } from "@/app/services";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { postEligibility, usePublishStore } from "@/app/stores/publish-store";
 import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
@@ -31,10 +31,10 @@ function ResultRow({ label, value }: { label: string; value: FieldFillResult }) 
   );
 }
 
-/** Replaces the workspace column while the Vinted window is open for the current project. */
+/** Replaces the workspace column while the Vinted window is open for the current listing. */
 export function PublishPanel() {
   const t = useT();
-  const doc = useProjectsStore((s) => s.current);
+  const doc = useListingsStore((s) => s.current);
   const session = usePublishStore((s) => s.session);
   const focus = usePublishStore((s) => s.focus);
   const openForm = usePublishStore((s) => s.openForm);
@@ -42,10 +42,10 @@ export function PublishPanel() {
   const finish = usePublishStore((s) => s.finish);
   const [exporting, setExporting] = useState(false);
 
-  if (!doc || session.stage === "closed" || session.projectId !== doc.project.id) return null;
+  if (!doc || session.stage === "closed" || session.listingId !== doc.listing.id) return null;
   const count = orderedPhotoIds(doc).length;
   const postable = postEligibility(doc).ok;
-  const copy = doc.project.copy;
+  const copy = doc.listing.copy;
   const report = session.report;
   const incomplete = !!report && (report.title !== "filled" || report.description !== "filled" || report.photos.attached < report.photos.requested);
   const onForm = session.stage === "form" || session.stage === "filled";
@@ -67,10 +67,10 @@ export function PublishPanel() {
       const items: ExportItem[] = [];
       for (const id of orderedPhotoIds(doc)) {
         const asset = doc.images[id];
-        const blob = asset && (await storage.readImage(doc.project.id, asset.kind, asset.id));
-        if (blob) items.push({ blob, name: `${doc.project.name}-${items.length + 1}` });
+        const blob = asset && (await storage.readImage(doc.listing.id, asset.kind, asset.id));
+        if (blob) items.push({ blob, name: `${doc.listing.name}-${items.length + 1}` });
       }
-      if (await exportMany(items, { type: "image/jpeg", quality: 0.92 }, `${doc.project.name}-vinted`)) {
+      if (await exportMany(items, { type: "image/jpeg", quality: 0.92 }, `${doc.listing.name}-vinted`)) {
         toast.info(t("gallery.exported", { count: items.length }));
       }
     } catch (err) {

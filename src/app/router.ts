@@ -1,13 +1,14 @@
 import { useSyncExternalStore } from "react";
 
-export type Route = { name: "home" } | { name: "project"; id: string } | { name: "settings"; section?: string } | { name: "recipes" };
+export type Route = { name: "home" } | { name: "listing"; id: string } | { name: "settings"; section?: string } | { name: "recipes" };
 
 function parse(hash: string): Route {
   const path = hash.replace(/^#\/?/, "");
   const [head, ...rest] = path.split("/");
   switch (head) {
-    case "project":
-      return rest[0] ? { name: "project", id: rest[0] } : { name: "home" };
+    case "listing":
+    case "project": // hashes from before the "project" → "listing" rename (bookmarks, history)
+      return rest[0] ? { name: "listing", id: rest[0] } : { name: "home" };
     case "settings":
       return rest[0] ? { name: "settings", section: rest[0] } : { name: "settings" };
     case "recipes":
@@ -19,8 +20,8 @@ function parse(hash: string): Route {
 
 export function toHash(route: Route): string {
   switch (route.name) {
-    case "project":
-      return `#/project/${route.id}`;
+    case "listing":
+      return `#/listing/${route.id}`;
     case "settings":
       return route.section ? `#/settings/${route.section}` : "#/settings";
     case "recipes":

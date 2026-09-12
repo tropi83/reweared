@@ -1,4 +1,4 @@
-import type { ProjectDocument } from "@/domain/models";
+import type { ListingDocument } from "@/domain/models";
 
 /** One photo sent to the injected script (base64 bytes, ≤ PUBLISH_LIMITS.photoBytes decoded). */
 export interface PublishPhoto {
@@ -105,16 +105,16 @@ export function isFillReport(value: unknown): value is FillReport {
 }
 
 /** Marked photos in posting order: the original first, then generations by creation time; unknown ids dropped, capped. */
-export function orderedPhotoIds(doc: ProjectDocument): string[] {
+export function orderedPhotoIds(doc: ListingDocument): string[] {
   const assets = doc.toPost.map((id) => doc.images[id]).filter((a): a is NonNullable<typeof a> => !!a);
   assets.sort((a, b) => (a.kind === b.kind ? a.createdAt.localeCompare(b.createdAt) : a.kind === "original" ? -1 : 1));
   return assets.slice(0, PUBLISH_LIMITS.photos).map((a) => a.id);
 }
 
-export function canPost(doc: ProjectDocument | null | undefined, platform: { desktop: boolean }): { ok: boolean; reasons: PublishBlocker[] } {
+export function canPost(doc: ListingDocument | null | undefined, platform: { desktop: boolean }): { ok: boolean; reasons: PublishBlocker[] } {
   const reasons: PublishBlocker[] = [];
   if (!doc || orderedPhotoIds(doc).length === 0) reasons.push("noPhotos");
-  const copy = doc?.project.copy;
+  const copy = doc?.listing.copy;
   if (!copy || !copy.title.trim() || !copy.description.trim()) reasons.push("noCopy");
   if (!platform.desktop) reasons.push("desktopOnly");
   return { ok: reasons.length === 0, reasons };

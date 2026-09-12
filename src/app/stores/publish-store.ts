@@ -1,11 +1,11 @@
 import { create } from "zustand";
-import { AppError, toGenerationError, type GenerationError, type ProjectDocument } from "@/domain/models";
+import { AppError, toGenerationError, type GenerationError, type ListingDocument } from "@/domain/models";
 import { canPost, stageForUrl, VINTED_SELL_PATH, type FillReport, type PublishBlocker, type PublishStage } from "@/domain/services/publish";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { createLogger } from "@/lib/logger";
 import { buildPublishPayload } from "../publish-payload";
 import { getServices } from "../services";
-import { useProjectsStore } from "./projects-store";
+import { useListingsStore } from "./listings-store";
 import { useSettingsStore } from "./settings-store";
 
 const log = createLogger("publish");
@@ -18,8 +18,8 @@ export const POLL_TIMEOUT_MS = 20_000;
  */
 export interface PublishSession {
   stage: PublishStage;
-  /** The project whose photos and copy this session posts; other projects never fill through it. */
-  projectId?: string;
+  /** The listing whose photos and copy this session posts; other listings never fill through it. */
+  listingId?: string;
   url?: string;
   busy: boolean;
   report?: FillReport;
@@ -68,7 +68,7 @@ function sleep(ms: number) {
 }
 
 /** Whether `doc` can be posted from this platform (single source for the store, the button and the panel). */
-export function postEligibility(doc: ProjectDocument | null | undefined): { ok: boolean; reasons: PublishBlocker[] } {
+export function postEligibility(doc: ListingDocument | null | undefined): { ok: boolean; reasons: PublishBlocker[] } {
   const platform = getPlatform();
   return canPost(doc, { desktop: platform.isTauri && !platform.isMobile });
 }
@@ -77,10 +77,10 @@ export const usePublishStore = create<PublishState>((set, get) => ({
   session: CLOSED,
 
   async start(options) {
-    const doc = useProjectsStore.getState().current;
+    const doc = useListingsStore.getState().current;
     const acknowledged = options?.acknowledgedOnce || useSettingsStore.getState().settings.vintedAutomationAcknowledged;
     if (!doc || !acknowledged || !postEligibility(doc).ok) return;
-    const projectId = doc.project.id;
+    const listingId = doc.listing.id;
     const bridge = getServices().publish;
     endSession();
     const session = epoch;
@@ -91,13 +91,13 @@ export const usePublishStore = create<PublishState>((set, get) => ({
     });
     const offClosed = bridge.onClosed(() => {
       endSession();
-      set({ session: { ...CLOSED, projectId, error: { code: "CANCELLED", message: "Vinted window closed.", retryable: false } } });
+      set({ session: { ...CLOSED, listingId, error: { code: "CANCELLED", message: "Vinted window closed.", retryable: false } } });
     });
     unsubscribe = () => {
       offPage();
       offClosed();
     };
-    set({ session: { stage: "browsing", busy: false, projectId } });
+    set({ session: { stage: "browsing", busy: false, listingId } });
     try {
       await bridge.open();
     } catch (err) {
@@ -105,7 +105,7 @@ export const usePublishStore = create<PublishState>((set, get) => ({
       log.warn("open failed", error.code);
       if (session !== epoch) return;
       endSession();
-      set({ session: { ...CLOSED, projectId, error } });
+      set({ session: { ...CLOSED, listingId, error } });
     }
   },
 
@@ -122,16 +122,16 @@ export const usePublishStore = create<PublishState>((set, get) => ({
   },
 
   async fill() {
-    const doc = useProjectsStore.getState().current;
+    const doc = useListingsStore.getState().current;
     const current = get().session;
-    // Only the project the session was opened for, and only while it is still postable (marks/copy may have changed).
-    if (!doc || current.stage === "closed" || current.busy || doc.project.id !== current.projectId || !postEligibility(doc).ok) return;
+    // Only the listing the session was opened for, and only while it is still postable (marks/copy may have changed).
+    if (!doc || current.stage === "closed" || current.busy || doc.listing.id !== current.listingId || !postEligibility(doc).ok) return;
     const session = epoch;
     const stale = () => session !== epoch;
     const { publish, storage } = getServices();
     set((s) => ({ session: { ...s.session, busy: true, error: undefined, report: undefined } }));
     try {
-      const payload = await buildPublishPayload(doc, (asset) => storage.readImage(doc.project.id, asset.kind, asset.id));
+      const payload = await buildPublishPayload(doc, (asset) => storage.readImage(doc.listing.id, asset.kind, asset.id));
       if (stale()) return;
       await publish.prefill(payload);
       const started = Date.now();

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, Columns2, Download, GitBranch, Info, Sparkles, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { getServices } from "@/app/services";
@@ -16,13 +16,13 @@ import { cn } from "@/lib/cn";
 export function Lightbox() {
   const t = useT();
   const locale = useLocale();
-  const doc = useProjectsStore((s) => s.current);
+  const doc = useListingsStore((s) => s.current);
   const assetId = useUiStore((s) => s.lightboxAssetId);
   const close = useUiStore((s) => s.closeLightbox);
   const open = useUiStore((s) => s.openLightbox);
   const compare = useUiStore((s) => s.compareMode);
   const setCompare = useUiStore((s) => s.setCompareMode);
-  const toggleToPost = useProjectsStore((s) => s.toggleToPost);
+  const toggleToPost = useListingsStore((s) => s.toggleToPost);
   const setSource = useComposerStore((s) => s.setSource);
   const loadFromGeneration = useComposerStore((s) => s.loadFromGeneration);
   const [info, setInfo] = useState(false);
@@ -39,8 +39,8 @@ export function Lightbox() {
   const job = asset?.jobId ? doc?.jobs[asset.jobId] : undefined;
   const generation = asset?.generationId ? doc?.generations[asset.generationId] : undefined;
   const sourceAsset = generation ? doc?.images[generation.sourceImageId] : undefined;
-  const url = useImageUrl(doc?.project.id, asset?.kind ?? "generation", asset?.id);
-  const sourceUrl = useImageUrl(doc?.project.id, sourceAsset?.kind ?? "original", compare ? sourceAsset?.id : undefined);
+  const url = useImageUrl(doc?.listing.id, asset?.kind ?? "generation", asset?.id);
+  const sourceUrl = useImageUrl(doc?.listing.id, sourceAsset?.kind ?? "original", compare ? sourceAsset?.id : undefined);
   const isToPost = !!asset && !!doc && doc.toPost.includes(asset.id);
 
   const go = useCallback(
@@ -101,8 +101,8 @@ export function Lightbox() {
   };
 
   const download = async () => {
-    const blob = await getServices().storage.readImage(doc.project.id, asset.kind, asset.id);
-    if (blob) await exportSingle({ blob, name: `${doc.project.name}-${job?.index ?? "original"}` }, { type: asset.mimeType });
+    const blob = await getServices().storage.readImage(doc.listing.id, asset.kind, asset.id);
+    if (blob) await exportSingle({ blob, name: `${doc.listing.name}-${job?.index ?? "original"}` }, { type: asset.mimeType });
   };
 
   const imageStyle = { transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, cursor: zoom > 1 ? "grab" : "zoom-in" } as const;
@@ -226,7 +226,7 @@ export function Lightbox() {
               {sourceAsset && (
                 <Meta label={t("gallery.metadata.source")}>
                   <button type="button" className="text-accent hover:underline" onClick={() => open(sourceAsset.id)}>
-                    {sourceAsset.id === doc.project.originalImageId
+                    {sourceAsset.id === doc.listing.originalImageId
                       ? t("gallery.original")
                       : t("generation.variation", { index: doc.jobs[sourceAsset.jobId ?? ""]?.index ?? "?" })}
                   </button>

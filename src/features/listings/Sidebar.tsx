@@ -2,13 +2,13 @@ import { useState } from "react";
 import { BookOpen, Images, MoreHorizontal, Plus, Settings, Sparkles } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { navigate, useRoute } from "@/app/router";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
-import type { ProjectSummary } from "@/domain/models";
+import type { ListingSummary } from "@/domain/models";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/cn";
@@ -17,7 +17,7 @@ import { importImageFile, pickImageFile } from "../workspace/useImageImport";
 export function Sidebar() {
   const t = useT();
   const route = useRoute();
-  const summaries = useProjectsStore((s) => s.summaries);
+  const summaries = useListingsStore((s) => s.summaries);
 
   return (
     <div className="flex h-full flex-col">
@@ -47,12 +47,12 @@ export function Sidebar() {
             if (file) await importImageFile(file);
           }}
         >
-          {t("nav.newProject")}
+          {t("nav.newListing")}
         </Button>
       </div>
 
       <nav className="mt-3 px-3">
-        <NavItem active={route.name === "home"} icon={<Images className="size-4" />} label={t("nav.projects")} onClick={() => navigate({ name: "home" })} />
+        <NavItem active={route.name === "home"} icon={<Images className="size-4" />} label={t("nav.listings")} onClick={() => navigate({ name: "home" })} />
         <NavItem
           active={route.name === "recipes"}
           icon={<BookOpen className="size-4" />}
@@ -73,9 +73,9 @@ export function Sidebar() {
       </div>
       <ul className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
         {summaries.map((p) => (
-          <ProjectRow key={p.id} project={p} active={route.name === "project" && route.id === p.id} />
+          <ListingRow key={p.id} listing={p} active={route.name === "listing" && route.id === p.id} />
         ))}
-        {summaries.length === 0 && <li className="px-2 py-6 text-center text-xs text-fg-subtle">{t("projects.empty.title")}</li>}
+        {summaries.length === 0 && <li className="px-2 py-6 text-center text-xs text-fg-subtle">{t("listings.empty.title")}</li>}
       </ul>
     </div>
   );
@@ -98,20 +98,20 @@ function NavItem({ active, icon, label, onClick }: { active: boolean; icon: Reac
   );
 }
 
-function ProjectRow({ project, active }: { project: ProjectSummary; active: boolean }) {
+function ListingRow({ listing, active }: { listing: ListingSummary; active: boolean }) {
   const t = useT();
-  const url = useImageUrl(project.id, "thumbnail", project.coverImageId);
+  const url = useImageUrl(listing.id, "thumbnail", listing.coverImageId);
   const [menu, setMenu] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [name, setName] = useState(project.name);
-  const { rename, remove, duplicate } = useProjectsStore.getState();
+  const [name, setName] = useState(listing.name);
+  const { rename, remove, duplicate } = useListingsStore.getState();
 
   return (
     <li className="group relative">
       <button
         type="button"
-        onClick={() => navigate({ name: "project", id: project.id })}
+        onClick={() => navigate({ name: "listing", id: listing.id })}
         aria-current={active ? "page" : undefined}
         className={cn(
           "flex w-full items-center gap-3 rounded-lg p-1.5 pr-9 text-left transition-colors",
@@ -122,8 +122,8 @@ function ProjectRow({ project, active }: { project: ProjectSummary; active: bool
           {url && <img src={url} alt="" className="size-full object-cover" loading="lazy" decoding="async" />}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{project.name}</div>
-          <div className="truncate text-[11px] text-fg-subtle">{t("projects.imageCount", { count: project.imageCount })}</div>
+          <div className="truncate text-sm font-medium">{listing.name}</div>
+          <div className="truncate text-[11px] text-fg-subtle">{t("listings.imageCount", { count: listing.imageCount })}</div>
         </div>
       </button>
       <button
@@ -145,7 +145,7 @@ function ProjectRow({ project, active }: { project: ProjectSummary; active: bool
               label={t("common.rename")}
               onClick={() => {
                 setMenu(false);
-                setName(project.name);
+                setName(listing.name);
                 setRenaming(true);
               }}
             />
@@ -153,8 +153,8 @@ function ProjectRow({ project, active }: { project: ProjectSummary; active: bool
               label={t("common.duplicate")}
               onClick={async () => {
                 setMenu(false);
-                const copy = await duplicate(project.id);
-                if (copy) navigate({ name: "project", id: copy.project.id });
+                const copy = await duplicate(listing.id);
+                if (copy) navigate({ name: "listing", id: copy.listing.id });
               }}
             />
             <MenuItem
@@ -171,7 +171,7 @@ function ProjectRow({ project, active }: { project: ProjectSummary; active: bool
       <Dialog
         open={renaming}
         onClose={() => setRenaming(false)}
-        title={t("projects.rename.title")}
+        title={t("listings.rename.title")}
         size="sm"
         footer={
           <>
@@ -181,7 +181,7 @@ function ProjectRow({ project, active }: { project: ProjectSummary; active: bool
             <Button
               variant="primary"
               onClick={async () => {
-                await rename(project.id, name);
+                await rename(listing.id, name);
                 setRenaming(false);
               }}
             >
@@ -193,7 +193,7 @@ function ProjectRow({ project, active }: { project: ProjectSummary; active: bool
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            await rename(project.id, name);
+            await rename(listing.id, name);
             setRenaming(false);
           }}
         >
@@ -203,15 +203,15 @@ function ProjectRow({ project, active }: { project: ProjectSummary; active: bool
       <ConfirmDialog
         open={deleting}
         onClose={() => setDeleting(false)}
-        title={t("projects.delete.title")}
-        body={t("projects.delete.body", { name: project.name })}
+        title={t("listings.delete.title")}
+        body={t("listings.delete.body", { name: listing.name })}
         confirmLabel={t("common.delete")}
         danger
         onConfirm={async () => {
           setDeleting(false);
           if (active) navigate({ name: "home" });
-          await remove(project.id);
-          toast.info(t("projects.deleted"));
+          await remove(listing.id);
+          toast.info(t("listings.deleted"));
         }}
       />
     </li>

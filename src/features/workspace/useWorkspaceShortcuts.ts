@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { useUiStore } from "@/app/stores/ui-store";
 
 function isEditable(target: EventTarget | null): boolean {
@@ -17,7 +17,7 @@ export function useWorkspaceShortcuts() {
       const ui = useUiStore.getState();
       if (ui.lightboxAssetId) return;
       if (isEditable(e.target)) return;
-      const doc = useProjectsStore.getState().current;
+      const doc = useListingsStore.getState().current;
       if (!doc) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
         e.preventDefault();

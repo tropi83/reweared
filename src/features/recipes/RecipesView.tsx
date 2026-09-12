@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/Misc";
 import { RECIPE_CATEGORIES, type Recipe, type RecipeCategory } from "@/domain/models";
 import { BUILT_IN_RECIPES, extractVariables } from "@/domain/services/recipes";
 import { useLocale, useT, type MessageKey } from "@/i18n";
-import { findSubcategory } from "@/domain/services/listing-catalog";
+import { findSubcategory } from "@/domain/services/catalog";
 
 type Draft = { id?: string; name: string; description: string; promptTemplate: string; category: RecipeCategory };
 
@@ -28,7 +28,7 @@ export function RecipesView() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 md:px-5">
-        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSidebarOpen(true)} aria-label={t("nav.projects")}>
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSidebarOpen(true)} aria-label={t("nav.listings")}>
           <Menu className="size-5" />
         </Button>
         <h1 className="text-base font-semibold">{t("recipes.title")}</h1>
@@ -144,7 +144,7 @@ function RecipeGroup({
   const t = useT();
   const locale = useLocale();
   const displayName = (r: Recipe) => {
-    const found = r.listing ? findSubcategory(r.listing) : undefined;
+    const found = r.pack ? findSubcategory(r.pack) : undefined;
     return found ? `${found.category.label[locale]} › ${found.subcategory.label[locale]}` : r.name;
   };
   const displayDescription = (r: Recipe) => (r.shots ? r.shots.map((s) => s.label[locale]).join(" · ") : r.description);

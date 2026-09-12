@@ -1,4 +1,4 @@
-import type { ImageAsset, ProjectDocument } from "@/domain/models";
+import type { ImageAsset, ListingDocument } from "@/domain/models";
 import { orderedPhotoIds, PUBLISH_LIMITS, type PublishPayload, type PublishPhoto } from "@/domain/services/publish";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { blobToBase64 } from "@/infrastructure/providers/gemini/GeminiMapper";
@@ -11,8 +11,8 @@ const PHOTO_MAX_DIMENSION = 2048;
  * limits and the marked photos (posting order) re-encoded and base64'd. Unreadable or
  * oversized photos are skipped rather than failing the whole fill.
  */
-export async function buildPublishPayload(doc: ProjectDocument, readImage: (asset: ImageAsset) => Promise<Blob | null>): Promise<PublishPayload> {
-  const copy = doc.project.copy;
+export async function buildPublishPayload(doc: ListingDocument, readImage: (asset: ImageAsset) => Promise<Blob | null>): Promise<PublishPayload> {
+  const copy = doc.listing.copy;
   const photos: PublishPhoto[] = [];
   for (const [index, id] of orderedPhotoIds(doc).entries()) {
     const asset = doc.images[id];

@@ -6,16 +6,16 @@ import { getServices } from "@/app/services";
 import { useAuthStore } from "@/app/stores/auth-store";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
-import { BRAND_MAX_LENGTH, photoPartReady, textPartReady, useListingStore, type ListingRunReport } from "@/app/stores/listing-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { BRAND_MAX_LENGTH, photoPartReady, textPartReady, useListingSetupStore, type ListingRunReport } from "@/app/stores/listing-setup-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { useRecipesStore } from "@/app/stores/recipes-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Input, Label, Switch } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import type { ListingCategoryId } from "@/domain/models";
-import { buildListingShots, LISTING_CATEGORIES } from "@/domain/services/listing-catalog";
+import type { CategoryId } from "@/domain/models";
+import { buildShots, CATEGORIES } from "@/domain/services/catalog";
 import { mannequinApplies, normalizeMannequin } from "@/domain/services/mannequin";
 import { interpolate } from "@/domain/services/recipes";
 import { useLocale, useT } from "@/i18n";
@@ -29,10 +29,10 @@ import { useComposerDefaults } from "./useComposerDefaults";
 export function ListingSetupCard() {
   const t = useT();
   const locale = useLocale();
-  const doc = useProjectsStore((s) => s.current);
-  const creating = useListingStore((s) => s.creating);
-  const copyBusy = useListingStore((s) => s.copyBusy);
-  const lastRun = useListingStore((s) => (s.lastRunProjectId === doc?.project.id ? s.lastRun : null));
+  const doc = useListingsStore((s) => s.current);
+  const creating = useListingSetupStore((s) => s.creating);
+  const copyBusy = useListingSetupStore((s) => s.copyBusy);
+  const lastRun = useListingSetupStore((s) => (s.lastRunListingId === doc?.listing.id ? s.lastRun : null));
   const settings = useSettingsStore((s) => s.settings);
   const composerProviderId = useComposerStore((s) => s.providerId);
   // Subscriptions that change readiness (photoPartReady/textPartReady read these stores).
@@ -48,17 +48,17 @@ export function ListingSetupCard() {
   const [enableAfterSave, setEnableAfterSave] = useState(false);
   const [confirmRecreate, setConfirmRecreate] = useState(false);
 
-  if (!doc?.project.originalImageId) return null;
-  const { setListing, setBrand, setUseMannequin, createListing, cancelListing } = useListingStore.getState();
-  const selection = doc.project.listing;
-  const category = LISTING_CATEGORIES.find((c) => c.id === selection?.categoryId);
+  if (!doc?.listing.originalImageId) return null;
+  const { setCategory, setBrand, setUseMannequin, generateListing, cancelListingRun } = useListingSetupStore.getState();
+  const selection = doc.listing.category;
+  const category = CATEGORIES.find((c) => c.id === selection?.categoryId);
   const mannequin = normalizeMannequin(settings.mannequin);
   const applies = !selection || mannequinApplies(selection.categoryId);
-  const mannequinOn = !!doc.project.useMannequin && applies && !!mannequin;
-  const shots = selection ? buildListingShots(selection, mannequinOn && mannequin ? { mannequin } : {}) : [];
+  const mannequinOn = !!doc.listing.useMannequin && applies && !!mannequin;
+  const shots = selection ? buildShots(selection, mannequinOn && mannequin ? { mannequin } : {}) : [];
   const customRecipe = customRecipes.find((r) => r.id === customRecipeId);
   const readiness = listingReadiness({ hasImage: true, hasSelection: !!selection, photosReady: photoPartReady(), textReady: textPartReady() });
-  const alreadyCreated = !!doc.project.copy || Object.keys(doc.generations).length > 0;
+  const alreadyCreated = !!doc.listing.copy || Object.keys(doc.generations).length > 0;
   const activeJobs = Object.values(doc.jobs).filter((j) => j.status === "queued" || j.status === "generating");
   const activeGeneration = activeJobs[0] ? doc.generations[activeJobs[0].generationId] : undefined;
   const activeDone = activeGeneration ? activeGeneration.jobIds.filter((id) => doc.jobs[id]?.status === "completed").length : 0;
@@ -77,7 +77,7 @@ export function ListingSetupCard() {
             : t("listing.create", { count: photoCount });
 
   const run = () =>
-    void createListing({
+    void generateListing({
       promptOverrides,
       ...(customRecipe ? { customRecipe: { id: customRecipe.id, prompt: interpolate(customRecipe.promptTemplate, {}) } } : {}),
     });
@@ -97,7 +97,7 @@ export function ListingSetupCard() {
         </Label>
         <Input
           id="listing-brand"
-          value={doc.project.brand ?? ""}
+          value={doc.listing.brand ?? ""}
           maxLength={BRAND_MAX_LENGTH}
           placeholder={t("listing.brandPlaceholder")}
           autoComplete="off"
@@ -107,20 +107,20 @@ export function ListingSetupCard() {
 
       <div className="space-y-1.5">
         <Label htmlFor="category">{t("listing.category")}</Label>
-        <Select<ListingCategoryId | "">
+        <Select<CategoryId | "">
           id="category"
           value={selection?.categoryId ?? ""}
           placeholder={t("listing.chooseCategory")}
-          options={LISTING_CATEGORIES.map((c) => ({
+          options={CATEGORIES.map((c) => ({
             value: c.id,
             label: c.label[locale],
             description: c.subcategories.map((s) => s.label[locale]).join(" · "),
           }))}
           onChange={(id) => {
             setPromptOverrides({});
-            if (!id) return setListing(undefined);
-            const first = LISTING_CATEGORIES.find((c) => c.id === id)?.subcategories[0];
-            if (first) setListing({ categoryId: id, subcategoryId: first.id });
+            if (!id) return setCategory(undefined);
+            const first = CATEGORIES.find((c) => c.id === id)?.subcategories[0];
+            if (first) setCategory({ categoryId: id, subcategoryId: first.id });
           }}
         />
       </div>
@@ -136,7 +136,7 @@ export function ListingSetupCard() {
                 aria-checked={selection?.subcategoryId === s.id}
                 onClick={() => {
                   setPromptOverrides({});
-                  setListing({ categoryId: category.id, subcategoryId: s.id });
+                  setCategory({ categoryId: category.id, subcategoryId: s.id });
                 }}
                 className={cn(
                   "inline-flex h-8 items-center rounded-md border px-2.5 text-xs font-medium transition-colors",
@@ -213,7 +213,7 @@ export function ListingSetupCard() {
                 </div>
               )}
             </div>
-            <Button variant="danger" size="lg" leftIcon={<Square className="size-4" />} onClick={cancelListing} aria-label={t("generation.cancelAll")}>
+            <Button variant="danger" size="lg" leftIcon={<Square className="size-4" />} onClick={cancelListingRun} aria-label={t("generation.cancelAll")}>
               {t("common.cancel")}
             </Button>
           </div>

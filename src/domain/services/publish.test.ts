@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectDocument } from "@/domain/models";
+import type { ListingDocument } from "@/domain/models";
 import { canPost, isFillReport, isVintedLoginUrl, isVintedSellFormUrl, orderedPhotoIds, PUBLISH_LIMITS, stageForUrl } from "./publish";
 
-function doc(over: Partial<ProjectDocument> = {}): ProjectDocument {
+function doc(over: Partial<ListingDocument> = {}): ListingDocument {
   const img = (id: string, kind: "original" | "generation", createdAt: string, generationId?: string) => ({
     id,
-    projectId: "prj_1",
+    listingId: "prj_1",
     kind,
     mimeType: "image/png" as const,
     width: 10,
@@ -17,7 +17,7 @@ function doc(over: Partial<ProjectDocument> = {}): ProjectDocument {
   return {
     schemaVersion: 2,
     appVersion: "0",
-    project: {
+    listing: {
       id: "prj_1",
       name: "p",
       originalImageId: "orig",
@@ -35,7 +35,7 @@ function doc(over: Partial<ProjectDocument> = {}): ProjectDocument {
     jobs: {},
     toPost: ["g2", "orig", "g1"],
     ...over,
-  } as ProjectDocument;
+  } as ListingDocument;
 }
 
 describe("canPost", () => {
@@ -43,7 +43,7 @@ describe("canPost", () => {
   it("lists every blocker", () => {
     expect(canPost(doc({ toPost: [] }), { desktop: true }).reasons).toEqual(["noPhotos"]);
     const noCopy = doc();
-    delete noCopy.project.copy;
+    delete noCopy.listing.copy;
     expect(canPost(noCopy, { desktop: true }).reasons).toEqual(["noCopy"]);
     expect(canPost(doc(), { desktop: false }).reasons).toEqual(["desktopOnly"]);
     expect(canPost(null, { desktop: true }).reasons).toEqual(["noPhotos", "noCopy"]);
@@ -51,7 +51,7 @@ describe("canPost", () => {
   it("ignores marked ids whose image no longer exists and empty copy", () => {
     expect(canPost(doc({ toPost: ["ghost"] }), { desktop: true }).reasons).toEqual(["noPhotos"]);
     const blank = doc();
-    blank.project.copy!.title = "  ";
+    blank.listing.copy!.title = "  ";
     expect(canPost(blank, { desktop: true }).reasons).toEqual(["noCopy"]);
   });
 });
@@ -61,11 +61,11 @@ describe("orderedPhotoIds", () => {
     expect(orderedPhotoIds(doc({ toPost: ["g2", "ghost", "orig", "g3", "g1"] }))).toEqual(["orig", "g1", "g3", "g2"]);
   });
   it("caps at PUBLISH_LIMITS.photos", () => {
-    const many: Record<string, ProjectDocument["images"][string]> = {};
+    const many: Record<string, ListingDocument["images"][string]> = {};
     for (let i = 0; i < 25; i++)
       many[`g${i}`] = {
         id: `g${i}`,
-        projectId: "prj_1",
+        listingId: "prj_1",
         kind: "generation",
         mimeType: "image/png",
         width: 1,

@@ -1,5 +1,6 @@
 /** Prefixed, URL/filename-safe unique ids. */
-export function createId(prefix: "prj" | "img" | "gen" | "job" | "rcp"): string {
+/** `lst` = listing (ids created before 2026-09-13 carry the former `prj` prefix and stay valid). */
+export function createId(prefix: "lst" | "img" | "gen" | "job" | "rcp"): string {
   const uuid =
     typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
   return `${prefix}_${uuid.replace(/-/g, "")}`;

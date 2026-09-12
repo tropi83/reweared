@@ -2,24 +2,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, GitBranch, Pencil, RefreshCw, RotateCw, Sparkles, Square, Trash2 } from "lucide-react";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Badge, EmptyState } from "@/components/ui/Misc";
-import type { Generation, GenerationJob, ProjectDocument } from "@/domain/models";
+import type { Generation, GenerationJob, ListingDocument } from "@/domain/models";
 import { useLocale, useT } from "@/i18n";
-import { findSubcategory } from "@/domain/services/listing-catalog";
+import { findSubcategory } from "@/domain/services/catalog";
 import { formatRelative } from "@/lib/format";
 import { VariationTile } from "./VariationTile";
 
 export function GenerationFeed() {
   const t = useT();
-  const doc = useProjectsStore((s) => s.current);
+  const doc = useListingsStore((s) => s.current);
   const filter = useUiStore((s) => s.filter);
   const generations = useMemo(() => (doc ? Object.values(doc.generations).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : []), [doc]);
-  useScrollToNewGeneration(doc?.project.id, generations);
+  useScrollToNewGeneration(doc?.listing.id, generations);
 
   if (!doc) return null;
   if (generations.length === 0) {
@@ -38,30 +38,30 @@ const generationDomId = (id: string) => `generation-${id}`;
 
 /**
  * On phones the feed sits under the listing card, so a run that starts is out of sight: scroll its card
- * into view once. Generations already there when the project opens are left alone.
+ * into view once. Generations already there when the listing opens are left alone.
  */
-function useScrollToNewGeneration(projectId: string | undefined, generations: Generation[]): void {
-  const seen = useRef<{ projectId: string | undefined; ids: Set<string> } | null>(null);
+function useScrollToNewGeneration(listingId: string | undefined, generations: Generation[]): void {
+  const seen = useRef<{ listingId: string | undefined; ids: Set<string> } | null>(null);
   useEffect(() => {
     const ids = new Set(generations.map((g) => g.id));
     const previous = seen.current;
-    seen.current = { projectId, ids };
-    if (!previous || previous.projectId !== projectId) return;
+    seen.current = { listingId, ids };
+    if (!previous || previous.listingId !== listingId) return;
     const fresh = generations.find((g) => !previous.ids.has(g.id));
     if (!fresh) return;
     const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     document.getElementById(generationDomId(fresh.id))?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
-  }, [projectId, generations]);
+  }, [listingId, generations]);
 }
 
-function GenerationCard({ generation, doc, toPostOnly }: { generation: Generation; doc: ProjectDocument; toPostOnly: boolean }) {
+function GenerationCard({ generation, doc, toPostOnly }: { generation: Generation; doc: ListingDocument; toPostOnly: boolean }) {
   const t = useT();
   const locale = useLocale();
-  const listing = generation.listing ? findSubcategory(generation.listing) : undefined;
-  const title = listing ? `${t("listing.pack")} · ${listing.category.label[locale]} › ${listing.subcategory.label[locale]}` : generation.prompt;
+  const pack = generation.category ? findSubcategory(generation.category) : undefined;
+  const title = pack ? `${t("listing.pack")} · ${pack.category.label[locale]} › ${pack.subcategory.label[locale]}` : generation.prompt;
   const composer = useComposerStore();
   const { retryFailed, cancelGeneration, start } = useGenerationStore.getState();
-  const deleteGeneration = useProjectsStore((s) => s.deleteGeneration);
+  const deleteGeneration = useListingsStore((s) => s.deleteGeneration);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -73,13 +73,13 @@ function GenerationCard({ generation, doc, toPostOnly }: { generation: Generatio
   const failed = jobs.filter((j) => j.status === "failed" || j.status === "cancelled").length;
   const active = generation.status === "active";
   const source = doc.images[generation.sourceImageId];
-  const fromOriginal = generation.sourceImageId === doc.project.originalImageId;
+  const fromOriginal = generation.sourceImageId === doc.listing.originalImageId;
   const parent = generation.parentGenerationId ? doc.generations[generation.parentGenerationId] : undefined;
   const parentJob = source?.jobId ? doc.jobs[source.jobId] : undefined;
 
   const regenerate = async () => {
     // Listing packs re-run the same shots (prompts live on the jobs), free prompts re-run as before.
-    const packShots = generation.listing
+    const packShots = generation.category
       ? generation.jobIds
           .map((id) => doc.jobs[id])
           .filter((j): j is GenerationJob => !!j)
@@ -89,7 +89,7 @@ function GenerationCard({ generation, doc, toPostOnly }: { generation: Generatio
       await start({
         sourceImageId: generation.sourceImageId,
         prompt: generation.prompt,
-        ...(packShots ? { shots: packShots, listing: generation.listing } : {}),
+        ...(packShots ? { shots: packShots, category: generation.category } : {}),
         providerId: generation.settings.providerId,
         modelId: generation.settings.modelId,
         aspectRatio: generation.settings.aspectRatio,
@@ -127,7 +127,7 @@ function GenerationCard({ generation, doc, toPostOnly }: { generation: Generatio
         <div className="min-w-[14rem] flex-1">
           <button type="button" className="w-full text-left" onClick={() => setExpanded((v) => !v)} title={generation.prompt}>
             <p className={expanded ? "text-sm leading-relaxed" : "line-clamp-2 text-sm leading-relaxed"}>{title}</p>
-            {expanded && listing && (
+            {expanded && pack && (
               <ol className="mt-2 space-y-1 text-xs text-fg-muted">
                 {generation.jobIds.map((id) => {
                   const job = doc.jobs[id];
@@ -175,7 +175,7 @@ function GenerationCard({ generation, doc, toPostOnly }: { generation: Generatio
               >
                 <span className="hidden sm:inline">{t("generation.regenerate")}</span>
               </Button>
-              {!generation.listing && (
+              {!generation.category && (
                 <Button variant="ghost" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={editPrompt} title={t("generation.editPrompt")}>
                   <span className="hidden sm:inline">{t("generation.editPrompt")}</span>
                 </Button>

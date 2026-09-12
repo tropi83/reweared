@@ -1,98 +1,59 @@
-import type { Locale } from "./settings";
+import type { Generation, GenerationJob } from "./generation";
+import type { ImageAsset } from "./image";
+import type { ListingCopy, CategorySelection } from "./catalog";
 
-/** Short localized string kept in data files (catalogue labels), as opposed to UI strings in i18n/. */
-export type Localized = Record<Locale, string>;
+/** Bump when the on-disk shape of ListingDocument changes; add a migration in storage/migrations.ts. */
+export const CURRENT_SCHEMA_VERSION = 3;
 
-export type ListingCategoryId = "women" | "men" | "kids" | "home" | "electronics" | "entertainment" | "hobbies" | "sport" | "pets" | "luxury";
+export interface Listing {
+  id: string;
+  name: string;
+  /** Imported original. Undefined for an empty listing. */
+  originalImageId?: string;
+  /** Asset shown as listing cover in the sidebar. */
+  coverImageId?: string;
+  /** Marketplace taxonomy chosen for this item. */
+  category?: CategorySelection;
+  /** Brand typed by the seller (raw, max 60 chars); trimmed when used. Absent = no brand stated. */
+  brand?: string;
+  /** "My mannequin" toggle for this listing's photos with a person. */
+  useMannequin?: boolean;
+  /** Title/description generated from the original photo, edited by the user. */
+  copy?: ListingCopy;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
- * What the object physically is. Drives the 4-shot plan: a shirt is photographed worn and folded,
- * a phone in hand and from the back, a trading card in a sleeve with its corners in focus.
+ * Everything about one listing, persisted as a single `listing.json`.
+ * Image bytes are stored separately (see StorageProvider).
  */
-export type ProductKind =
-  | "garment"
-  | "footwear"
-  | "bag"
-  | "accessory"
-  | "jewelry"
-  | "watch"
-  | "beauty"
-  | "toy"
-  | "childcare"
-  | "stationery"
-  | "decor"
-  | "home-textile"
-  | "kitchenware"
-  | "tableware"
-  | "storage"
-  | "furniture"
-  | "phone"
-  | "computer"
-  | "audio"
-  | "camera"
-  | "gaming"
-  | "smart-device"
-  | "book"
-  | "board-game"
-  | "video-game"
-  | "disc"
-  | "vinyl"
-  | "trading-card"
-  | "figurine"
-  | "collectible"
-  | "instrument"
-  | "sport-gear"
-  | "outdoor"
-  | "bike"
-  | "pet-clothing"
-  | "pet-toy"
-  | "pet-accessory"
-  | "pet-bedding"
-  | "pet-carrier"
-  | "leather-goods";
+export interface ListingDocument {
+  schemaVersion: number;
+  appVersion: string;
+  listing: Listing;
+  images: Record<string, ImageAsset>;
+  generations: Record<string, Generation>;
+  jobs: Record<string, GenerationJob>;
+  /** Asset ids the user marked "À publier" (photos to post on the marketplace). */
+  toPost: string[];
+}
 
-export interface ListingSubcategory {
+export interface ListingSummary {
   id: string;
-  label: Localized;
-  kind: ProductKind;
-  /** English noun phrase injected into prompts and copy requests ("women's shirt or top"). */
-  subject: string;
+  name: string;
+  coverImageId?: string;
+  imageCount: number;
+  updatedAt: string;
 }
 
-export interface ListingCategory {
-  id: ListingCategoryId;
-  label: Localized;
-  /** Who wears/uses the item in "in use" shots ("a woman", "a child (face not visible)"). */
-  wearer: string;
-  subcategories: ListingSubcategory[];
-}
-
-/** One of the photos of a listing pack (four, plus a mirror selfie for fashion items). */
-export interface ShotSpec {
-  /** Stable id inside the plan ("retouch", "studio", "worn", "folded"…). */
-  id: string;
-  label: Localized;
-  /** Final English prompt (subject/wearer already interpolated). */
-  prompt: string;
-}
-
-export interface ListingSelection {
-  categoryId: ListingCategoryId;
-  subcategoryId: string;
-}
-
-export type ListingCondition = "new_with_tags" | "new" | "very_good" | "good" | "satisfactory";
-
-/** Title + description generated from the original photo. Editable by the user, stored in the project. */
-export interface ListingCopy {
-  title: string;
-  description: string;
-  condition?: ListingCondition;
-  brand?: string;
-  color?: string;
-  keywords: string[];
-  language: Locale;
-  generatedAt: string;
-  provider: string;
-  model: string;
+export function summarize(doc: ListingDocument): ListingSummary {
+  const cover = doc.listing.coverImageId ?? doc.listing.originalImageId;
+  return {
+    id: doc.listing.id,
+    name: doc.listing.name,
+    ...(cover ? { coverImageId: cover } : {}),
+    imageCount: Object.values(doc.images).filter((i) => i.kind === "generation").length,
+    updatedAt: doc.listing.updatedAt,
+  };
 }

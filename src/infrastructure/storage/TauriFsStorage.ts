@@ -1,7 +1,7 @@
-import { summarize, type AppSettings, type ProjectDocument, type ProjectSummary, type Recipe } from "@/domain/models";
+import { summarize, type AppSettings, type ListingDocument, type ListingSummary, type Recipe } from "@/domain/models";
 import { assertSafeId } from "@/lib/ids";
 import { createLogger } from "@/lib/logger";
-import { migrateProjectDocument, migrateSettings } from "./migrations";
+import { migrateListingDocument, migrateSettings } from "./migrations";
 import type { ImageBucket, StorageProvider, StorageUsage } from "./StorageProvider";
 
 const log = createLogger("fs-storage");
@@ -20,10 +20,10 @@ function extFor(mime: string): (typeof EXTENSIONS)[number] {
 /**
  * Desktop / mobile storage on the real filesystem, under the Tauri app-data directory:
  *
- *   projects/<projectId>/project.json
- *   projects/<projectId>/original/<assetId>.<ext>
- *   projects/<projectId>/generations/<assetId>.<ext>
- *   projects/<projectId>/thumbnails/<assetId>.<ext>
+ *   listings/<listingId>/listing.json
+ *   listings/<listingId>/original/<assetId>.<ext>
+ *   listings/<listingId>/generations/<assetId>.<ext>
+ *   listings/<listingId>/thumbnails/<assetId>.<ext>
  *   recipes/<recipeId>.json
  *   settings.json
  *
@@ -43,9 +43,28 @@ export class TauriFsStorage implements StorageProvider {
     this.fs = fs;
     this.base = fs.BaseDirectory.AppData;
     this.locationLabel = await path.appDataDir();
-    await fs.mkdir("projects", { baseDir: this.base, recursive: true });
+    await this.migrateLayout();
+    await fs.mkdir("listings", { baseDir: this.base, recursive: true });
     await fs.mkdir("recipes", { baseDir: this.base, recursive: true });
     await fs.mkdir("metadata", { baseDir: this.base, recursive: true });
+  }
+
+  /**
+   * 2026-09-13: `projects/<id>/project.json` became `listings/<id>/listing.json`. Runs once, before the
+   * directories are created; the JSON content itself is migrated on read (schema v3).
+   */
+  private async migrateLayout(): Promise<void> {
+    const fs = this.api;
+    if (!(await fs.exists("projects", this.opts())) || (await fs.exists("listings", this.opts()))) return;
+    log.info("migrating storage layout projects/ -> listings/");
+    await fs.rename("projects", "listings", { oldPathBaseDir: this.base, newPathBaseDir: this.base });
+    for (const entry of await fs.readDir("listings", this.opts())) {
+      if (!entry.isDirectory) continue;
+      const dir = `listings/${assertSafeId(entry.name)}`;
+      if (await fs.exists(`${dir}/project.json`, this.opts())) {
+        await fs.rename(`${dir}/project.json`, `${dir}/listing.json`, { oldPathBaseDir: this.base, newPathBaseDir: this.base });
+      }
+    }
   }
 
   private get api(): FsModule {
@@ -57,8 +76,8 @@ export class TauriFsStorage implements StorageProvider {
     return { baseDir: this.base };
   }
 
-  private projectDir(projectId: string): string {
-    return `projects/${assertSafeId(projectId)}`;
+  private listingDir(listingId: string): string {
+    return `listings/${assertSafeId(listingId)}`;
   }
 
   private async writeJsonAtomic(path: string, value: unknown): Promise<void> {
@@ -68,13 +87,13 @@ export class TauriFsStorage implements StorageProvider {
     await this.api.rename(tmp, path, { oldPathBaseDir: this.base, newPathBaseDir: this.base });
   }
 
-  async listProjects(): Promise<ProjectSummary[]> {
-    const entries = await this.api.readDir("projects", this.opts());
-    const summaries: ProjectSummary[] = [];
+  async listListings(): Promise<ListingSummary[]> {
+    const entries = await this.api.readDir("listings", this.opts());
+    const summaries: ListingSummary[] = [];
     for (const entry of entries) {
       if (!entry.isDirectory) continue;
-      const doc = await this.getProject(entry.name).catch((err) => {
-        log.warn("unreadable project", entry.name, err);
+      const doc = await this.getListing(entry.name).catch((err) => {
+        log.warn("unreadable listing", entry.name, err);
         return null;
       });
       if (doc) summaries.push(summarize(doc));
@@ -82,26 +101,26 @@ export class TauriFsStorage implements StorageProvider {
     return summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  async getProject(projectId: string): Promise<ProjectDocument | null> {
-    const file = `${this.projectDir(projectId)}/project.json`;
+  async getListing(listingId: string): Promise<ListingDocument | null> {
+    const file = `${this.listingDir(listingId)}/listing.json`;
     if (!(await this.api.exists(file, this.opts()))) return null;
     const text = await this.api.readTextFile(file, this.opts());
-    return migrateProjectDocument(JSON.parse(text));
+    return migrateListingDocument(JSON.parse(text));
   }
 
-  async saveProject(doc: ProjectDocument): Promise<void> {
-    const dir = this.projectDir(doc.project.id);
+  async saveListing(doc: ListingDocument): Promise<void> {
+    const dir = this.listingDir(doc.listing.id);
     await this.api.mkdir(dir, { ...this.opts(), recursive: true });
-    await this.writeJsonAtomic(`${dir}/project.json`, doc);
+    await this.writeJsonAtomic(`${dir}/listing.json`, doc);
   }
 
-  async deleteProject(projectId: string): Promise<void> {
-    const dir = this.projectDir(projectId);
+  async deleteListing(listingId: string): Promise<void> {
+    const dir = this.listingDir(listingId);
     if (await this.api.exists(dir, this.opts())) await this.api.remove(dir, { ...this.opts(), recursive: true });
   }
 
-  private async findImagePath(projectId: string, bucket: ImageBucket, assetId: string): Promise<string | null> {
-    const dir = `${this.projectDir(projectId)}/${BUCKET_DIR[bucket]}`;
+  private async findImagePath(listingId: string, bucket: ImageBucket, assetId: string): Promise<string | null> {
+    const dir = `${this.listingDir(listingId)}/${BUCKET_DIR[bucket]}`;
     for (const ext of EXTENSIONS) {
       const candidate = `${dir}/${assertSafeId(assetId)}.${ext}`;
       if (await this.api.exists(candidate, this.opts())) return candidate;
@@ -109,17 +128,17 @@ export class TauriFsStorage implements StorageProvider {
     return null;
   }
 
-  async writeImage(projectId: string, bucket: ImageBucket, assetId: string, blob: Blob): Promise<void> {
-    const dir = `${this.projectDir(projectId)}/${BUCKET_DIR[bucket]}`;
+  async writeImage(listingId: string, bucket: ImageBucket, assetId: string, blob: Blob): Promise<void> {
+    const dir = `${this.listingDir(listingId)}/${BUCKET_DIR[bucket]}`;
     await this.api.mkdir(dir, { ...this.opts(), recursive: true });
-    const existing = await this.findImagePath(projectId, bucket, assetId);
+    const existing = await this.findImagePath(listingId, bucket, assetId);
     if (existing) await this.api.remove(existing, this.opts());
     const target = `${dir}/${assertSafeId(assetId)}.${extFor(blob.type)}`;
     await this.api.writeFile(target, new Uint8Array(await blob.arrayBuffer()), this.opts());
   }
 
-  async readImage(projectId: string, bucket: ImageBucket, assetId: string): Promise<Blob | null> {
-    const path = await this.findImagePath(projectId, bucket, assetId);
+  async readImage(listingId: string, bucket: ImageBucket, assetId: string): Promise<Blob | null> {
+    const path = await this.findImagePath(listingId, bucket, assetId);
     if (!path) return null;
     const bytes = await this.api.readFile(path, this.opts());
     const ext = path.slice(path.lastIndexOf(".") + 1);
@@ -127,16 +146,16 @@ export class TauriFsStorage implements StorageProvider {
     return new Blob([bytes], { type });
   }
 
-  async deleteImage(projectId: string, bucket: ImageBucket, assetId: string): Promise<void> {
-    const path = await this.findImagePath(projectId, bucket, assetId);
+  async deleteImage(listingId: string, bucket: ImageBucket, assetId: string): Promise<void> {
+    const path = await this.findImagePath(listingId, bucket, assetId);
     if (path) await this.api.remove(path, this.opts());
   }
 
-  async cleanupOrphans(projectId: string): Promise<number> {
-    const doc = await this.getProject(projectId);
+  async cleanupOrphans(listingId: string): Promise<number> {
+    const doc = await this.getListing(listingId);
     let removed = 0;
     for (const bucket of Object.values(BUCKET_DIR)) {
-      const dir = `${this.projectDir(projectId)}/${bucket}`;
+      const dir = `${this.listingDir(listingId)}/${bucket}`;
       if (!(await this.api.exists(dir, this.opts()))) continue;
       for (const entry of await this.api.readDir(dir, this.opts())) {
         if (!entry.isFile) continue;
@@ -206,12 +225,12 @@ export class TauriFsStorage implements StorageProvider {
 
   async getUsage(): Promise<StorageUsage> {
     let imageBytes = 0;
-    let projectCount = 0;
-    for (const project of await this.api.readDir("projects", this.opts())) {
-      if (!project.isDirectory) continue;
-      projectCount++;
+    let listingCount = 0;
+    for (const listing of await this.api.readDir("listings", this.opts())) {
+      if (!listing.isDirectory) continue;
+      listingCount++;
       for (const bucket of Object.values(BUCKET_DIR)) {
-        const dir = `projects/${project.name}/${bucket}`;
+        const dir = `listings/${listing.name}/${bucket}`;
         if (!(await this.api.exists(dir, this.opts()))) continue;
         for (const file of await this.api.readDir(dir, this.opts())) {
           if (!file.isFile) continue;
@@ -220,12 +239,12 @@ export class TauriFsStorage implements StorageProvider {
         }
       }
     }
-    return { projectCount, imageBytes, location: this.locationLabel };
+    return { listingCount, imageBytes, location: this.locationLabel };
   }
 
   async clearAll(): Promise<void> {
-    for (const entry of await this.api.readDir("projects", this.opts())) {
-      await this.api.remove(`projects/${entry.name}`, { ...this.opts(), recursive: true });
+    for (const entry of await this.api.readDir("listings", this.opts())) {
+      await this.api.remove(`listings/${entry.name}`, { ...this.opts(), recursive: true });
     }
     for (const entry of await this.api.readDir("recipes", this.opts())) {
       await this.api.remove(`recipes/${entry.name}`, this.opts());

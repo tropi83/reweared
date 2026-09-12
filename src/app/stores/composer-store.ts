@@ -2,9 +2,9 @@ import { create } from "zustand";
 import type { AspectRatio, ImageSize } from "@/domain/models";
 
 interface ComposerState {
-  projectId: string | null;
+  listingId: string | null;
   prompt: string;
-  /** null = the project's original image. */
+  /** null = the listing's original image. */
   sourceImageId: string | null;
   variationCount: number;
   aspectRatio: AspectRatio;
@@ -28,8 +28,8 @@ interface ComposerState {
   setModel(modelId: string | null): void;
   setRecipe(recipeId: string | null, values?: Record<string, string>): void;
   setRecipeValue(name: string, value: string): void;
-  /** Called when a project opens; resets per-project state but keeps generation preferences. */
-  bindProject(projectId: string | null): void;
+  /** Called when a listing opens; resets per-listing state but keeps generation preferences. */
+  bindListing(listingId: string | null): void;
   loadFromGeneration(input: {
     prompt: string;
     sourceImageId: string | null;
@@ -44,7 +44,7 @@ interface ComposerState {
 }
 
 export const useComposerStore = create<ComposerState>((set, get) => ({
-  projectId: null,
+  listingId: null,
   prompt: "",
   sourceImageId: null,
   variationCount: 4,
@@ -72,9 +72,9 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   setModel: (modelId) => set({ modelId }),
   setRecipe: (recipeId, values = {}) => set({ recipeId, recipeValues: values }),
   setRecipeValue: (name, value) => set({ recipeValues: { ...get().recipeValues, [name]: value } }),
-  bindProject: (projectId) => {
-    if (projectId === get().projectId) return;
-    set({ projectId, prompt: "", sourceImageId: null, recipeId: null, recipeValues: {}, editingGenerationId: null });
+  bindListing: (listingId) => {
+    if (listingId === get().listingId) return;
+    set({ listingId, prompt: "", sourceImageId: null, recipeId: null, recipeValues: {}, editingGenerationId: null });
   },
   loadFromGeneration: (input) =>
     set({

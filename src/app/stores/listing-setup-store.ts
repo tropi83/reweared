@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { AppError, toGenerationError, type GenerationError, type ListingCopy, type ListingSelection, type ProjectDocument } from "@/domain/models";
-import { buildListingShots, listingRecipeId } from "@/domain/services/listing-catalog";
+import { AppError, toGenerationError, type GenerationError, type ListingCopy, type CategorySelection, type ListingDocument } from "@/domain/models";
+import { buildShots, catalogRecipeId } from "@/domain/services/catalog";
 import { normalizeMannequin } from "@/domain/services/mannequin";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { MOCK_PROVIDER_ID } from "@/infrastructure/providers/mock/MockImageProvider";
@@ -11,7 +11,7 @@ import { getServices } from "../services";
 import { useAuthStore } from "./auth-store";
 import { useComposerStore } from "./composer-store";
 import { useGenerationStore } from "./generation-store";
-import { useProjectsStore } from "./projects-store";
+import { useListingsStore } from "./listings-store";
 import { useSettingsStore } from "./settings-store";
 
 const log = createLogger("listing");
@@ -25,7 +25,7 @@ export interface ListingRunReport {
   photos: ListingPartOutcome;
   text: ListingPartOutcome;
 }
-export interface CreateListingOptions {
+export interface GenerateListingOptions {
   /** Per-shot prompt overrides from "Edit prompts" (shot id → prompt). */
   promptOverrides?: Record<string, string>;
   /** A custom recipe (one prompt × 4) instead of the listing pack. */
@@ -39,17 +39,17 @@ interface ListingState {
   creating: boolean;
   /** Outcome of the last run, per part (UI summary). */
   lastRun: ListingRunReport | null;
-  /** Project the last run belongs to (the report is not shown on another project). */
-  lastRunProjectId: string | null;
-  setListing(selection: ListingSelection | undefined): void;
+  /** Listing the last run belongs to (the report is not shown on another listing). */
+  lastRunListingId: string | null;
+  setCategory(selection: CategorySelection | undefined): void;
   /** Stores the brand as typed (max 60 chars); blank removes it. */
   setBrand(raw: string): void;
   setUseMannequin(on: boolean): void;
   /** Generates title/description from the original photo with the copy provider/model chosen in settings. */
   generateCopy(): Promise<ListingCopy | null>;
   /** The main button: photos and text in parallel, each part skipped when its provider is not usable. */
-  createListing(options?: CreateListingOptions): Promise<ListingRunReport | null>;
-  cancelListing(): void;
+  generateListing(options?: GenerateListingOptions): Promise<ListingRunReport | null>;
+  cancelListingRun(): void;
   updateCopy(patch: Partial<Pick<ListingCopy, "title" | "description" | "keywords" | "brand" | "color" | "condition">>): void;
   cancelCopy(): void;
 }
@@ -71,16 +71,16 @@ export function textPartReady(): boolean {
 }
 
 async function startPhotos(
-  doc: ProjectDocument,
-  selection: ListingSelection,
+  doc: ListingDocument,
+  selection: CategorySelection,
   sourceImageId: string,
-  options: CreateListingOptions,
+  options: GenerateListingOptions,
 ): Promise<ListingPartOutcome> {
   const composer = useComposerStore.getState();
   const settings = useSettingsStore.getState().settings;
   const modelId = composer.modelId;
   if (!modelId) return "skipped-provider";
-  const mannequin = doc.project.useMannequin ? normalizeMannequin(settings.mannequin) : undefined;
+  const mannequin = doc.listing.useMannequin ? normalizeMannequin(settings.mannequin) : undefined;
   const providerOptions = composer.providerOptions[composer.providerId] ?? {};
   const common = {
     sourceImageId,
@@ -94,13 +94,13 @@ async function startPhotos(
     if (options.customRecipe) {
       await useGenerationStore.getState().start({ ...common, prompt: options.customRecipe.prompt, variationCount: 4, recipeId: options.customRecipe.id });
     } else {
-      const shots = buildListingShots(selection, mannequin ? { mannequin } : {}).map((s) => ({
+      const shots = buildShots(selection, mannequin ? { mannequin } : {}).map((s) => ({
         ...s,
         prompt: options.promptOverrides?.[s.id]?.trim() || s.prompt,
       }));
       await useGenerationStore
         .getState()
-        .start({ ...common, prompt: "", variationCount: shots.length, recipeId: listingRecipeId(selection), listing: selection, shots });
+        .start({ ...common, prompt: "", variationCount: shots.length, recipeId: catalogRecipeId(selection), category: selection, shots });
     }
     if (settings.lastModelByProvider[composer.providerId] !== modelId) {
       void useSettingsStore.getState().update({ lastModelByProvider: { ...settings.lastModelByProvider, [composer.providerId]: modelId } });
@@ -113,39 +113,39 @@ async function startPhotos(
   }
 }
 
-export const useListingStore = create<ListingState>((set, get) => ({
+export const useListingSetupStore = create<ListingState>((set, get) => ({
   copyBusy: false,
   copyError: null,
   creating: false,
   lastRun: null,
-  lastRunProjectId: null,
+  lastRunListingId: null,
 
-  setListing(selection) {
-    useProjectsStore.getState().commit((doc) => {
-      if (selection) doc.project.listing = selection;
-      else delete doc.project.listing;
+  setCategory(selection) {
+    useListingsStore.getState().commit((doc) => {
+      if (selection) doc.listing.category = selection;
+      else delete doc.listing.category;
     });
   },
 
   setBrand(raw) {
     const value = raw.slice(0, BRAND_MAX_LENGTH);
-    useProjectsStore.getState().commit((doc) => {
-      if (value.trim()) doc.project.brand = value;
-      else delete doc.project.brand;
+    useListingsStore.getState().commit((doc) => {
+      if (value.trim()) doc.listing.brand = value;
+      else delete doc.listing.brand;
     });
   },
 
   setUseMannequin(on) {
-    useProjectsStore.getState().commit((doc) => {
-      if (on) doc.project.useMannequin = true;
-      else delete doc.project.useMannequin;
+    useListingsStore.getState().commit((doc) => {
+      if (on) doc.listing.useMannequin = true;
+      else delete doc.listing.useMannequin;
     });
   },
 
   async generateCopy() {
-    const projects = useProjectsStore.getState();
-    const doc = projects.current;
-    const originalId = doc?.project.originalImageId;
+    const listings = useListingsStore.getState();
+    const doc = listings.current;
+    const originalId = doc?.listing.originalImageId;
     if (!doc || !originalId) return null;
     const asset = doc.images[originalId];
     const { copyProviderId: providerId, copyModelByProvider } = useSettingsStore.getState().settings;
@@ -159,16 +159,16 @@ export const useListingStore = create<ListingState>((set, get) => ({
     const { signal } = copyController;
     set({ copyBusy: true, copyError: null });
     try {
-      const blob = await getServices().storage.readImage(doc.project.id, asset.kind, asset.id);
+      const blob = await getServices().storage.readImage(doc.listing.id, asset.kind, asset.id);
       if (!blob) throw new AppError("INVALID_IMAGE", "The original image file is missing.");
       const prepared = await prepareForProvider(blob, asset.mimeType, { maxDimension: COPY_IMAGE_MAX_DIMENSION, format: "image/jpeg" });
       const language = useSettingsStore.getState().settings.locale;
       // The seller's brand wins over whatever the model reads (or invents) on the photo.
-      const brand = doc.project.brand?.trim();
+      const brand = doc.listing.brand?.trim();
       const result = await provider.describeListing(
         {
           image: { blob: prepared.blob, mimeType: prepared.mimeType },
-          ...(doc.project.listing ? { listing: doc.project.listing } : {}),
+          ...(doc.listing.category ? { category: doc.listing.category } : {}),
           language,
           ...(brand ? { brand } : {}),
         },
@@ -183,9 +183,9 @@ export const useListingStore = create<ListingState>((set, get) => ({
         provider: providerId,
         model: String(result.providerMeta?.model ?? ""),
       };
-      useProjectsStore.getState().commit(
+      useListingsStore.getState().commit(
         (draft) => {
-          draft.project.copy = copy;
+          draft.listing.copy = copy;
         },
         { immediate: true },
       );
@@ -203,18 +203,18 @@ export const useListingStore = create<ListingState>((set, get) => ({
     }
   },
 
-  async createListing(options = {}) {
-    const doc = useProjectsStore.getState().current;
-    const selection = doc?.project.listing;
-    const sourceImageId = useComposerStore.getState().sourceImageId ?? doc?.project.originalImageId;
+  async generateListing(options = {}) {
+    const doc = useListingsStore.getState().current;
+    const selection = doc?.listing.category;
+    const sourceImageId = useComposerStore.getState().sourceImageId ?? doc?.listing.originalImageId;
     const readiness = listingReadiness({
-      hasImage: !!doc?.project.originalImageId && !!sourceImageId,
+      hasImage: !!doc?.listing.originalImageId && !!sourceImageId,
       hasSelection: !!selection,
       photosReady: photoPartReady(),
       textReady: textPartReady(),
     });
     if (!doc || !selection || !sourceImageId || !readiness.canCreate || get().creating) return null;
-    set({ creating: true, lastRun: null, lastRunProjectId: doc.project.id });
+    set({ creating: true, lastRun: null, lastRunListingId: doc.listing.id });
     const photos = readiness.skipped.includes("photos")
       ? Promise.resolve<ListingPartOutcome>("skipped-provider")
       : startPhotos(doc, selection, sourceImageId, options);
@@ -234,15 +234,15 @@ export const useListingStore = create<ListingState>((set, get) => ({
     return report;
   },
 
-  cancelListing() {
+  cancelListingRun() {
     useGenerationStore.getState().cancelAll();
     get().cancelCopy();
   },
 
   updateCopy(patch) {
-    useProjectsStore.getState().commit((doc) => {
-      if (!doc.project.copy) return;
-      doc.project.copy = { ...doc.project.copy, ...patch };
+    useListingsStore.getState().commit((doc) => {
+      if (!doc.listing.copy) return;
+      doc.listing.copy = { ...doc.listing.copy, ...patch };
     });
   },
 

@@ -13,7 +13,7 @@ afterEach(() => __setFetchOverride(undefined));
 
 describe("listing copy prompt & parsing", () => {
   it("includes the taxonomy, the language and the JSON contract", () => {
-    const prompt = buildListingCopyPrompt({ image, listing: { categoryId: "women", subcategoryId: "clothing" }, language: "fr" });
+    const prompt = buildListingCopyPrompt({ image, category: { categoryId: "women", subcategoryId: "clothing" }, language: "fr" });
     expect(prompt).toContain("Women › Clothing");
     expect(prompt).toContain("Write in French");
     expect(prompt).toContain('"keywords"');
@@ -105,7 +105,7 @@ describe("CloudflareListingCopyProvider", () => {
     });
     const provider = new CloudflareListingCopyProvider(auth);
     const result = await provider.describeListing(
-      { image, language: "en", listing: { categoryId: "men", subcategoryId: "clothing" } },
+      { image, language: "en", category: { categoryId: "men", subcategoryId: "clothing" } },
       { signal: new AbortController().signal },
     );
     expect(result.copy.title).toBe("Blue shirt");

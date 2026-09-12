@@ -11,7 +11,7 @@ import { navigate } from "@/app/router";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Sidebar } from "./Sidebar";
 
-describe("Sidebar › New project", () => {
+describe("Sidebar › New listing", () => {
   beforeEach(() => {
     navigate({ name: "settings" });
     useUiStore.setState({ sidebarOpen: true });
@@ -24,14 +24,14 @@ describe("Sidebar › New project", () => {
 
   it("opens the file picker on desktop", async () => {
     render(<Sidebar />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "New project" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "New listing" }));
     expect(pickImageFile).toHaveBeenCalledTimes(1);
   });
 
   it("on a phone goes to the import screen (gallery / camera choice) instead of opening the gallery", async () => {
     platform = { isMobile: true, nativeDialogs: true };
     render(<Sidebar />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "New project" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "New listing" }));
     expect(pickImageFile).not.toHaveBeenCalled();
     expect(window.location.hash).toBe("#/");
     expect(useUiStore.getState().sidebarOpen).toBe(false);

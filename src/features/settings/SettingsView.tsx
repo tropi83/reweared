@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Copy, Menu, Trash2 } from "lucide-react";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
@@ -55,7 +55,7 @@ export function SettingsView({ section }: { section?: string }) {
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 md:px-5">
-        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSidebarOpen(true)} aria-label={t("nav.projects")}>
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSidebarOpen(true)} aria-label={t("nav.listings")}>
           <Menu className="size-5" />
         </Button>
         <h1 className="text-base font-semibold">{t("settings.title")}</h1>
@@ -225,7 +225,7 @@ function StorageSection() {
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
-  const summaries = useProjectsStore((s) => s.summaries);
+  const summaries = useListingsStore((s) => s.summaries);
   const platform = getPlatform();
 
   useEffect(() => {
@@ -253,7 +253,7 @@ function StorageSection() {
       await auth.apiKey.revoke();
       await auth.oauth.revoke().catch(() => undefined);
       auth.setActiveKind("none");
-      useProjectsStore.setState({ current: null, summaries: [] });
+      useListingsStore.setState({ current: null, summaries: [] });
       navigate({ name: "home" });
       location.reload();
     } finally {
@@ -271,7 +271,7 @@ function StorageSection() {
           </code>
         </Field>
         <Field label={t("settings.section.storage")}>
-          <span className="text-sm">{usage ? t("storage.usage", { count: usage.projectCount, size: formatBytes(usage.imageBytes) }) : "…"}</span>
+          <span className="text-sm">{usage ? t("storage.usage", { count: usage.listingCount, size: formatBytes(usage.imageBytes) }) : "…"}</span>
         </Field>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => void cleanup()} loading={busy}>
@@ -313,7 +313,7 @@ function PrivacySection() {
 
 function DiagnosticsSection() {
   const t = useT();
-  const doc = useProjectsStore((s) => s.current);
+  const doc = useListingsStore((s) => s.current);
   const settings = useSettingsStore((s) => s.settings);
   const platform = getPlatform();
   const { appVersion, queue } = getServices();

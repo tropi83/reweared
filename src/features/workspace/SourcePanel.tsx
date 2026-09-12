@@ -1,7 +1,7 @@
 import { CheckCircle2, GitBranch, Maximize2, RotateCcw } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Misc";
@@ -12,16 +12,16 @@ import { ImportDropzone } from "./HomeView";
 /** Shows the image that will be sent with the next generation (original or a chosen variation). */
 export function SourcePanel() {
   const t = useT();
-  const doc = useProjectsStore((s) => s.current);
+  const doc = useListingsStore((s) => s.current);
   const sourceImageId = useComposerStore((s) => s.sourceImageId);
   const setSource = useComposerStore((s) => s.setSource);
   const openLightbox = useUiStore((s) => s.openLightbox);
-  const toggleToPost = useProjectsStore((s) => s.toggleToPost);
+  const toggleToPost = useListingsStore((s) => s.toggleToPost);
 
-  const originalId = doc?.project.originalImageId;
+  const originalId = doc?.listing.originalImageId;
   const effectiveId = sourceImageId && doc?.images[sourceImageId] ? sourceImageId : originalId;
   const asset = effectiveId ? doc?.images[effectiveId] : undefined;
-  const url = useImageUrl(doc?.project.id, "thumbnail", effectiveId);
+  const url = useImageUrl(doc?.listing.id, "thumbnail", effectiveId);
   const isOriginal = effectiveId === originalId;
   const parentGeneration = asset?.generationId ? doc?.generations[asset.generationId] : undefined;
 

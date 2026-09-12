@@ -3,11 +3,11 @@ import { AlertTriangle, Check, CheckCircle2, Download, ExternalLink, GitBranch, 
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { getServices } from "@/app/services";
-import type { GenerationJob, ProjectDocument } from "@/domain/models";
+import type { GenerationJob, ListingDocument } from "@/domain/models";
 import { exportSingle } from "@/infrastructure/image/export";
 import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
 import { openExternal } from "@/lib/open-external";
@@ -17,7 +17,7 @@ import { cn } from "@/lib/cn";
 
 interface Props {
   job: GenerationJob;
-  doc: ProjectDocument;
+  doc: ListingDocument;
 }
 
 const QUOTA_CODES = new Set(["RATE_LIMITED", "QUOTA_EXCEEDED", "MODEL_NOT_IN_PLAN", "FREE_TIER_NO_ACCESS"]);
@@ -27,11 +27,11 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
   const locale = useLocale();
   const shotName = job.shotLabel?.[locale] ?? t("generation.variation", { index: job.index });
   const asset = job.resultImageId ? doc.images[job.resultImageId] : undefined;
-  const url = useImageUrl(doc.project.id, "thumbnail", asset?.id);
+  const url = useImageUrl(doc.listing.id, "thumbnail", asset?.id);
   const selected = useUiStore((s) => (asset ? s.selection.has(asset.id) : false));
   const toggleSelected = useUiStore((s) => s.toggleSelected);
   const openLightbox = useUiStore((s) => s.openLightbox);
-  const toggleToPost = useProjectsStore((s) => s.toggleToPost);
+  const toggleToPost = useListingsStore((s) => s.toggleToPost);
   const isToPost = !!asset && doc.toPost.includes(asset.id);
   const retryJob = useGenerationStore((s) => s.retryJob);
   const cancel = () => getServices().queue.cancel(job.id);
@@ -98,8 +98,8 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
             <UseAsSourceButton assetId={asset.id} />
             <TileButton
               onClick={async () => {
-                const blob = await getServices().storage.readImage(doc.project.id, "generation", asset.id);
-                if (blob) await exportSingle({ blob, name: `${doc.project.name}-${job.index}` }, { type: asset.mimeType });
+                const blob = await getServices().storage.readImage(doc.listing.id, "generation", asset.id);
+                if (blob) await exportSingle({ blob, name: `${doc.listing.name}-${job.index}` }, { type: asset.mimeType });
               }}
               label={t("common.download")}
             >

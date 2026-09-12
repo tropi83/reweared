@@ -1,4 +1,4 @@
-import type { ListingCategory, ListingCategoryId, ListingSelection, ListingSubcategory, Localized, Mannequin, ProductKind, ShotSpec } from "@/domain/models";
+import type { Category, CategoryId, CategorySelection, Subcategory, Localized, Mannequin, ProductKind, ShotSpec } from "@/domain/models";
 import { describeWearer, mannequinApplies, posePhrase } from "./mannequin";
 
 /**
@@ -19,7 +19,7 @@ interface ShotTemplate {
   /** May use {{subject}}, {{wearer}} and {{pose|default}}. */
   template: string;
   /** Categories for which this shot is skipped (a mirror selfie makes no sense for kids' items). */
-  excludeCategories?: ListingCategoryId[];
+  excludeCategories?: CategoryId[];
 }
 
 /** Fidelity rules shared by every shot. */
@@ -353,9 +353,9 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
   ],
 };
 
-const sub = (id: string, label: Localized, kind: ProductKind, subject: string): ListingSubcategory => ({ id, label, kind, subject });
+const sub = (id: string, label: Localized, kind: ProductKind, subject: string): Subcategory => ({ id, label, kind, subject });
 
-export const LISTING_CATEGORIES: ListingCategory[] = [
+export const CATEGORIES: Category[] = [
   {
     id: "women",
     label: L("Women", "Femme"),
@@ -484,11 +484,11 @@ export const LISTING_CATEGORIES: ListingCategory[] = [
   },
 ];
 
-export function findCategory(id: string): ListingCategory | undefined {
-  return LISTING_CATEGORIES.find((c) => c.id === id);
+export function findCategory(id: string): Category | undefined {
+  return CATEGORIES.find((c) => c.id === id);
 }
 
-export function findSubcategory(selection: ListingSelection): { category: ListingCategory; subcategory: ListingSubcategory } | undefined {
+export function findSubcategory(selection: CategorySelection): { category: Category; subcategory: Subcategory } | undefined {
   const category = findCategory(selection.categoryId);
   const subcategory = category?.subcategories.find((s) => s.id === selection.subcategoryId);
   return category && subcategory ? { category, subcategory } : undefined;
@@ -510,7 +510,7 @@ export function interpolateShot(template: string, vars: { subject: string; weare
 }
 
 /** The prompts of a listing pack, fully interpolated; `mannequin` replaces the generic person where it applies. */
-export function buildListingShots(selection: ListingSelection, options: { mannequin?: Mannequin } = {}): ShotSpec[] {
+export function buildShots(selection: CategorySelection, options: { mannequin?: Mannequin } = {}): ShotSpec[] {
   const found = findSubcategory(selection);
   if (!found) throw new Error(`Unknown listing selection ${selection.categoryId}/${selection.subcategoryId}`);
   const { category, subcategory } = found;
@@ -527,14 +527,14 @@ export function buildListingShots(selection: ListingSelection, options: { manneq
 }
 
 /** Stable id for the built-in recipe of a subcategory. */
-export function listingRecipeId(selection: ListingSelection): string {
+export function catalogRecipeId(selection: CategorySelection): string {
   return `rcp_listing_${selection.categoryId}_${selection.subcategoryId.replace(/-/g, "")}`;
 }
 
-export function listingSelectionFromRecipeId(id: string): ListingSelection | undefined {
+export function categorySelectionFromRecipeId(id: string): CategorySelection | undefined {
   const m = /^rcp_listing_([a-z]+)_([a-z0-9]+)$/.exec(id);
   if (!m) return undefined;
-  const categoryId = m[1] as ListingCategoryId;
+  const categoryId = m[1] as CategoryId;
   const category = findCategory(categoryId);
   const subcategory = category?.subcategories.find((s) => s.id.replace(/-/g, "") === m[2]);
   return category && subcategory ? { categoryId, subcategoryId: subcategory.id } : undefined;

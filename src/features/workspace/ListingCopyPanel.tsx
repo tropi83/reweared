@@ -3,8 +3,8 @@ import { Check, Copy, FileText, RefreshCw, Settings2, Square } from "lucide-reac
 import { navigate } from "@/app/router";
 import { getServices } from "@/app/services";
 import { useAuthStore } from "@/app/stores/auth-store";
-import { useListingStore } from "@/app/stores/listing-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingSetupStore } from "@/app/stores/listing-setup-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
@@ -18,20 +18,20 @@ import { errorMessage } from "@/i18n/errors";
 /** Title + description generated from the original photo, editable and copyable. */
 export function ListingCopyPanel() {
   const t = useT();
-  const doc = useProjectsStore((s) => s.current);
+  const doc = useListingsStore((s) => s.current);
   const providerStatus = useAuthStore((s) => s.providerStatus);
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.update);
-  const busy = useListingStore((s) => s.copyBusy);
-  const error = useListingStore((s) => s.copyError);
-  const generateCopy = useListingStore((s) => s.generateCopy);
-  const updateCopy = useListingStore((s) => s.updateCopy);
-  const cancelCopy = useListingStore((s) => s.cancelCopy);
+  const busy = useListingSetupStore((s) => s.copyBusy);
+  const error = useListingSetupStore((s) => s.copyError);
+  const generateCopy = useListingSetupStore((s) => s.generateCopy);
+  const updateCopy = useListingSetupStore((s) => s.updateCopy);
+  const cancelCopy = useListingSetupStore((s) => s.cancelCopy);
   const [copied, setCopied] = useState<"title" | "description" | "all" | null>(null);
   const [showModel, setShowModel] = useState(false);
 
-  if (!doc?.project.originalImageId) return null;
-  const copy = doc.project.copy;
+  if (!doc?.listing.originalImageId) return null;
+  const copy = doc.listing.copy;
   const copyProviders = [...getServices().copyProviders.values()];
   const copyProviderId = settings.copyProviderId;
   const provider = getServices().copyProviders.get(copyProviderId) ?? copyProviders[0];

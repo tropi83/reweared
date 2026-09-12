@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { navigate } from "@/app/router";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
 import { MAX_IMPORT_BYTES, toGenerationError } from "@/domain/models";
 import { t } from "@/i18n";
@@ -8,11 +8,11 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger("import");
 
-/** Creates a project from a file and navigates to it. Shared by every import entry point. */
+/** Creates a listing from a file and navigates to it. Shared by every import entry point. */
 export async function importImageFile(file: Blob, fileName?: string): Promise<boolean> {
   try {
-    const doc = await useProjectsStore.getState().createFromFile(file, fileName ?? (file instanceof File ? file.name : undefined));
-    navigate({ name: "project", id: doc.project.id });
+    const doc = await useListingsStore.getState().createFromFile(file, fileName ?? (file instanceof File ? file.name : undefined));
+    navigate({ name: "listing", id: doc.listing.id });
     return true;
   } catch (err) {
     const error = toGenerationError(err);

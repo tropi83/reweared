@@ -34,16 +34,25 @@ describe("i18n", () => {
 describe("router", () => {
   it("serializes and parses routes", () => {
     expect(toHash({ name: "home" })).toBe("#/");
-    expect(toHash({ name: "project", id: "prj_1" })).toBe("#/project/prj_1");
+    expect(toHash({ name: "listing", id: "prj_1" })).toBe("#/listing/prj_1");
     expect(toHash({ name: "settings", section: "providers" })).toBe("#/settings/providers");
     const { result } = renderHook(() => useRoute());
     act(() => navigate({ name: "settings", section: "storage" }));
     expect(result.current).toEqual({ name: "settings", section: "storage" });
-    act(() => navigate({ name: "project", id: "prj_2" }));
-    expect(result.current).toEqual({ name: "project", id: "prj_2" });
-    expect(location.hash).toBe("#/project/prj_2");
+    act(() => navigate({ name: "listing", id: "prj_2" }));
+    expect(result.current).toEqual({ name: "listing", id: "prj_2" });
+    expect(location.hash).toBe("#/listing/prj_2");
     act(() => navigate({ name: "home" }, true));
     expect(result.current).toEqual({ name: "home" });
+  });
+
+  it("still opens the old #/project/:id hashes (bookmarks from before the rename)", () => {
+    const { result } = renderHook(() => useRoute());
+    act(() => {
+      location.hash = "#/project/prj_3";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(result.current).toEqual({ name: "listing", id: "prj_3" });
   });
 });
 
@@ -69,18 +78,18 @@ describe("ui store", () => {
 });
 
 describe("composer store", () => {
-  it("clamps variation count and resets per-project state", () => {
+  it("clamps variation count and resets per-listing state", () => {
     const c = useComposerStore.getState();
     c.setVariationCount(99);
     expect(useComposerStore.getState().variationCount).toBe(8);
     c.setVariationCount(0);
     expect(useComposerStore.getState().variationCount).toBe(1);
-    c.bindProject("prj_a");
+    c.bindListing("prj_a");
     c.setPrompt("hello");
     c.setSource("img_1");
-    c.bindProject("prj_a");
+    c.bindListing("prj_a");
     expect(useComposerStore.getState().prompt).toBe("hello");
-    c.bindProject("prj_b");
+    c.bindListing("prj_b");
     expect(useComposerStore.getState().prompt).toBe("");
     expect(useComposerStore.getState().sourceImageId).toBeNull();
   });

@@ -13,7 +13,7 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
 
 import { __setServices, createServices } from "@/app/services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { ListingCopyPanel } from "./ListingCopyPanel";
 
@@ -27,7 +27,7 @@ describe("ListingCopyPanel", () => {
     await storage.init();
   });
   beforeEach(async () => {
-    await useProjectsStore.getState().createFromFile(PNG, "item.png");
+    await useListingsStore.getState().createFromFile(PNG, "item.png");
   });
   afterEach(() => {
     cleanup();
@@ -36,8 +36,8 @@ describe("ListingCopyPanel", () => {
 
   it("labels the attribute badges and hashes only the keywords", () => {
     act(() => {
-      useProjectsStore.getState().commit((d) => {
-        d.project.copy = {
+      useListingsStore.getState().commit((d) => {
+        d.listing.copy = {
           title: "T",
           description: "D",
           condition: "very_good",

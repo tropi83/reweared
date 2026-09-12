@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { Camera, ImagePlus, Images, Menu, Upload } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { navigate } from "@/app/router";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
-import { MAX_IMPORT_BYTES, type ProjectSummary } from "@/domain/models";
+import { MAX_IMPORT_BYTES, type ListingSummary } from "@/domain/models";
 import { useT } from "@/i18n";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { cn } from "@/lib/cn";
@@ -75,18 +75,18 @@ export function ImportDropzone({ compact = false, className }: { compact?: boole
   );
 }
 
-/** "Projects" screen: every project on this device as a card, plus the import entry point. */
+/** "Listings" screen: every listing on this device as a card, plus the import entry point. */
 export function HomeView() {
   const t = useT();
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
-  const summaries = useProjectsStore((s) => s.summaries);
-  const loadingList = useProjectsStore((s) => s.loadingList);
+  const summaries = useListingsStore((s) => s.summaries);
+  const loadingList = useListingsStore((s) => s.loadingList);
   const empty = !loadingList && summaries.length === 0;
 
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-14 items-center gap-2 border-b border-border px-4 md:hidden">
-        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} aria-label={t("nav.projects")}>
+        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} aria-label={t("nav.listings")}>
           <Menu className="size-5" />
         </Button>
         <span className="font-semibold">{t("app.name")}</span>
@@ -95,8 +95,8 @@ export function HomeView() {
       {empty ? (
         <div className="flex flex-1 items-center justify-center overflow-y-auto p-6">
           <div className="w-full max-w-xl">
-            <h1 className="text-2xl font-semibold tracking-tight">{t("projects.empty.title")}</h1>
-            <p className="mt-1.5 mb-6 text-sm text-fg-muted">{t("projects.empty.body")}</p>
+            <h1 className="text-2xl font-semibold tracking-tight">{t("listings.empty.title")}</h1>
+            <p className="mt-1.5 mb-6 text-sm text-fg-muted">{t("listings.empty.body")}</p>
             <ImportDropzone />
             <p className="mt-6 text-center text-xs text-fg-subtle">{t("app.tagline")}</p>
           </div>
@@ -106,14 +106,14 @@ export function HomeView() {
           <div className="mx-auto w-full max-w-5xl">
             <div className="mb-4 flex items-end justify-between gap-3">
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight">{t("nav.projects")}</h1>
-                <p className="mt-1 text-sm text-fg-muted">{t("projects.count", { count: summaries.length })}</p>
+                <h1 className="text-2xl font-semibold tracking-tight">{t("nav.listings")}</h1>
+                <p className="mt-1 text-sm text-fg-muted">{t("listings.count", { count: summaries.length })}</p>
               </div>
             </div>
             <ImportDropzone compact className="mb-6" />
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-label={t("nav.projects")}>
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-label={t("nav.listings")}>
               {summaries.map((p) => (
-                <ProjectCard key={p.id} project={p} />
+                <ListingCard key={p.id} listing={p} />
               ))}
             </ul>
           </div>
@@ -123,15 +123,15 @@ export function HomeView() {
   );
 }
 
-function ProjectCard({ project }: { project: ProjectSummary }) {
+function ListingCard({ listing }: { listing: ListingSummary }) {
   const t = useT();
-  const url = useImageUrl(project.id, "thumbnail", project.coverImageId);
-  const updated = useMemo(() => formatRelative(project.updatedAt), [project.updatedAt]);
+  const url = useImageUrl(listing.id, "thumbnail", listing.coverImageId);
+  const updated = useMemo(() => formatRelative(listing.updatedAt), [listing.updatedAt]);
   return (
     <li>
       <button
         type="button"
-        onClick={() => navigate({ name: "project", id: project.id })}
+        onClick={() => navigate({ name: "listing", id: listing.id })}
         className="group flex w-full flex-col overflow-hidden rounded-xl border border-border bg-bg-elevated text-left shadow-sm transition-[box-shadow,border-color] hover:border-border-strong hover:shadow-app focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
       >
         <div className="checkerboard aspect-square w-full overflow-hidden bg-bg-sunken">
@@ -142,9 +142,9 @@ function ProjectCard({ project }: { project: ProjectSummary }) {
           )}
         </div>
         <div className="min-w-0 p-2.5">
-          <div className="truncate text-sm font-medium">{project.name}</div>
+          <div className="truncate text-sm font-medium">{listing.name}</div>
           <div className="mt-0.5 truncate text-[11px] text-fg-subtle">
-            {t("projects.imageCount", { count: project.imageCount })} · {t("projects.updated", { when: updated })}
+            {t("listings.imageCount", { count: listing.imageCount })} · {t("listings.updated", { when: updated })}
           </div>
         </div>
       </button>

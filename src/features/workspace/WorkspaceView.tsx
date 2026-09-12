@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, Menu } from "lucide-react";
 import { navigate } from "@/app/router";
 import { useComposerStore } from "@/app/stores/composer-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { usePublishStore } from "@/app/stores/publish-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
@@ -19,29 +19,29 @@ import { PublishPanel } from "../publish/PublishPanel";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { SourcePanel } from "./SourcePanel";
 
-export function WorkspaceView({ projectId }: { projectId: string }) {
+export function WorkspaceView({ listingId }: { listingId: string }) {
   const t = useT();
-  const current = useProjectsStore((s) => s.current);
-  const loading = useProjectsStore((s) => s.loadingProject);
-  const open = useProjectsStore((s) => s.open);
-  const bindProject = useComposerStore((s) => s.bindProject);
+  const current = useListingsStore((s) => s.current);
+  const loading = useListingsStore((s) => s.loadingListing);
+  const open = useListingsStore((s) => s.open);
+  const bindListing = useComposerStore((s) => s.bindListing);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const filter = useUiStore((s) => s.filter);
   const setFilter = useUiStore((s) => s.setFilter);
   const clearSelection = useUiStore((s) => s.clearSelection);
-  // The Vinted window is open for this project: the publication panel takes over the left column.
-  const publishing = usePublishStore((s) => s.session.stage !== "closed" && s.session.projectId === projectId);
+  // The Vinted window is open for this listing: the publication panel takes over the left column.
+  const publishing = usePublishStore((s) => s.session.stage !== "closed" && s.session.listingId === listingId);
   useWorkspaceShortcuts();
 
   useEffect(() => {
     clearSelection();
-    void open(projectId).then((doc) => {
+    void open(listingId).then((doc) => {
       if (!doc) navigate({ name: "home" }, true);
-      else bindProject(doc.project.id);
+      else bindListing(doc.listing.id);
     });
-  }, [projectId, open, bindProject, clearSelection]);
+  }, [listingId, open, bindListing, clearSelection]);
 
-  const doc = current?.project.id === projectId ? current : null;
+  const doc = current?.listing.id === listingId ? current : null;
   const generationCount = doc ? Object.keys(doc.generations).length : 0;
   const imageCount = doc ? Object.values(doc.images).filter((i) => i.kind === "generation").length : 0;
 
@@ -52,13 +52,13 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 md:px-5">
-        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSidebarOpen(true)} aria-label={t("nav.projects")}>
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSidebarOpen(true)} aria-label={t("nav.listings")}>
           <Menu className="size-5" />
         </Button>
-        <ProjectTitle name={doc.project.name} />
+        <ListingTitle name={doc.listing.name} />
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <span className="hidden text-xs text-fg-subtle sm:inline">
-            {t("history.generations", { count: generationCount })} · {t("projects.imageCount", { count: imageCount })}
+            {t("history.generations", { count: generationCount })} · {t("listings.imageCount", { count: imageCount })}
           </span>
           <Segmented
             size="sm"
@@ -107,10 +107,10 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
   );
 }
 
-function ProjectTitle({ name }: { name: string }) {
+function ListingTitle({ name }: { name: string }) {
   const t = useT();
-  const rename = useProjectsStore((s) => s.rename);
-  const current = useProjectsStore((s) => s.current);
+  const rename = useListingsStore((s) => s.rename);
+  const current = useListingsStore((s) => s.current);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(name);
   const [seenName, setSeenName] = useState(name);
@@ -123,12 +123,12 @@ function ProjectTitle({ name }: { name: string }) {
     return (
       <input
         autoFocus
-        aria-label={t("projects.rename.title")}
+        aria-label={t("listings.rename.title")}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => {
           setEditing(false);
-          if (current && value.trim() && value !== name) void rename(current.project.id, value);
+          if (current && value.trim() && value !== name) void rename(current.listing.id, value);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();

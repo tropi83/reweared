@@ -1,4 +1,4 @@
-import type { ListingSelection, ShotSpec } from "./listing";
+import type { CategorySelection, ShotSpec } from "./catalog";
 
 export type RecipeCategory = "listing" | "product" | "portrait" | "advertising" | "background" | "interior" | "social" | "ecommerce" | "custom";
 
@@ -12,8 +12,8 @@ export interface Recipe {
   promptTemplate: string;
   /** Listing packs: one job per shot, each with its own prompt. */
   shots?: ShotSpec[];
-  /** Set for built-in listing packs so the composer can preselect the taxonomy. */
-  listing?: ListingSelection;
+  /** Set for built-in catalogue packs so the composer can preselect the taxonomy. */
+  pack?: CategorySelection;
   category: RecipeCategory;
   /** Built-in recipes cannot be deleted, only duplicated. */
   builtIn?: boolean;

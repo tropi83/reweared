@@ -3,14 +3,14 @@ import {
   MANNEQUIN_BUILDS,
   MANNEQUIN_POSES,
   SKIN_TONES,
-  type ListingCategoryId,
+  type CategoryId,
   type Mannequin,
   type MannequinBuild,
   type MannequinPose,
   type SkinTone,
 } from "@/domain/models";
 
-// English: image models are prompted in English (see listing-catalog.ts).
+// English: image models are prompted in English (see catalog.ts).
 const BUILD: Record<MannequinBuild, string> = { S: "a slim build", M: "an average build", L: "a fuller, plus-size build" };
 const SKIN: Record<SkinTone, string> = {
   "very-fair": "very fair skin",
@@ -27,9 +27,9 @@ const POSE: Record<MannequinPose, string> = {
   sitting: "sitting on a stool",
 };
 /** Categories whose wearer is not an adult the seller could stand in for ("a child", "a pet"). */
-const EXCLUDED: ReadonlySet<ListingCategoryId> = new Set<ListingCategoryId>(["kids", "pets"]);
+const EXCLUDED: ReadonlySet<CategoryId> = new Set<CategoryId>(["kids", "pets"]);
 
-export function mannequinApplies(categoryId: ListingCategoryId): boolean {
+export function mannequinApplies(categoryId: CategoryId): boolean {
   return !EXCLUDED.has(categoryId);
 }
 

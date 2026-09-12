@@ -26,7 +26,7 @@ import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { __setServices, createServices, getServices } from "./services";
 import { buildPublishPayload } from "./publish-payload";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "./stores/generation-store";
-import { useProjectsStore } from "./stores/projects-store";
+import { useListingsStore } from "./stores/listings-store";
 import { useSettingsStore } from "./stores/settings-store";
 import { usePublishStore } from "./stores/publish-store";
 
@@ -85,13 +85,13 @@ function useFakePollClock() {
 const PNG_HEADER = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13];
 const PNG = new Blob([Uint8Array.from(PNG_HEADER)], { type: "image/png" });
 
-async function prepareProject() {
-  const doc = await useProjectsStore.getState().createFromFile(PNG, "chemise.png");
-  useProjectsStore.getState().toggleToPost(doc.project.originalImageId!);
-  useProjectsStore.getState().commit((d) => {
-    d.project.copy = { title: "Chemise", description: "Blanche", keywords: [], language: "fr", generatedAt: "", provider: "gemini", model: "m" };
+async function prepareListing() {
+  const doc = await useListingsStore.getState().createFromFile(PNG, "chemise.png");
+  useListingsStore.getState().toggleToPost(doc.listing.originalImageId!);
+  useListingsStore.getState().commit((d) => {
+    d.listing.copy = { title: "Chemise", description: "Blanche", keywords: [], language: "fr", generatedAt: "", provider: "gemini", model: "m" };
   });
-  return useProjectsStore.getState().current!;
+  return useListingsStore.getState().current!;
 }
 
 describe("publish-store", () => {
@@ -116,7 +116,7 @@ describe("publish-store", () => {
   });
 
   it("opens the window, follows page events and fills the form", async () => {
-    await prepareProject();
+    await prepareListing();
 
     await usePublishStore.getState().start();
     expect(bridge.calls).toEqual(["open"]);
@@ -153,7 +153,7 @@ describe("publish-store", () => {
   });
 
   it("times out when the script never reports", async () => {
-    await prepareProject();
+    await prepareListing();
     await usePublishStore.getState().start();
     bridge.emitPage("https://www.vinted.fr/items/new");
     useFakePollClock();
@@ -167,7 +167,7 @@ describe("publish-store", () => {
   });
 
   it("keeps a partial report when the text is filled but photos lag past the timeout", async () => {
-    await prepareProject();
+    await prepareListing();
     await usePublishStore.getState().start();
     bridge.emitPage("https://www.vinted.fr/items/new");
     bridge.report = { pageOk: true, title: "filled", description: "filled", photos: { requested: 1, attached: 0 } };
@@ -183,7 +183,7 @@ describe("publish-store", () => {
   });
 
   it("stays on the form when the script reports a page it does not recognise", async () => {
-    await prepareProject();
+    await prepareListing();
     await usePublishStore.getState().start();
     bridge.emitPage("https://www.vinted.fr/items/new");
     bridge.report = { pageOk: false, title: "not_found", description: "not_found", photos: { requested: 1, attached: 0 } };
@@ -192,7 +192,7 @@ describe("publish-store", () => {
   });
 
   it("drops a fill that finishes after its session was replaced", async () => {
-    await prepareProject();
+    await prepareListing();
     await usePublishStore.getState().start();
     bridge.emitPage("https://www.vinted.fr/items/new");
     const filling = usePublishStore.getState().fill();
@@ -209,37 +209,37 @@ describe("publish-store", () => {
     expect(session.report).toBeUndefined();
   });
 
-  it("binds the session to its project: another project never fills through it", async () => {
-    const first = await prepareProject();
+  it("binds the session to its listing: another listing never fills through it", async () => {
+    const first = await prepareListing();
     await usePublishStore.getState().start();
-    expect(usePublishStore.getState().session.projectId).toBe(first.project.id);
+    expect(usePublishStore.getState().session.listingId).toBe(first.listing.id);
     bridge.emitPage("https://www.vinted.fr/items/new");
 
-    // The user switches to another (postable) project while the Vinted window is still open.
-    await prepareProject();
+    // The user switches to another (postable) listing while the Vinted window is still open.
+    await prepareListing();
     await usePublishStore.getState().fill();
     expect(bridge.calls).not.toContain("prefill");
-    expect(usePublishStore.getState().session).toMatchObject({ stage: "form", busy: false, projectId: first.project.id });
+    expect(usePublishStore.getState().session).toMatchObject({ stage: "form", busy: false, listingId: first.listing.id });
   });
 
-  it("refuses to fill once the project is no longer postable", async () => {
-    const doc = await prepareProject();
+  it("refuses to fill once the listing is no longer postable", async () => {
+    const doc = await prepareListing();
     await usePublishStore.getState().start();
     bridge.emitPage("https://www.vinted.fr/items/new");
-    useProjectsStore.getState().toggleToPost(doc.project.originalImageId!);
+    useListingsStore.getState().toggleToPost(doc.listing.originalImageId!);
     await usePublishStore.getState().fill();
     expect(bridge.calls).not.toContain("prefill");
   });
 
   it("returns to closed when the Vinted window is closed", async () => {
-    await prepareProject();
+    await prepareListing();
     await usePublishStore.getState().start();
     bridge.emitClosed();
     expect(usePublishStore.getState().session).toMatchObject({ stage: "closed", error: { code: "CANCELLED" } });
   });
 
   it("refuses to start without acknowledgement or when nothing can be posted", async () => {
-    await prepareProject();
+    await prepareListing();
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, vintedAutomationAcknowledged: false } });
     await usePublishStore.getState().start();
     expect(bridge.calls).toEqual([]);
@@ -254,15 +254,15 @@ describe("publish-store", () => {
     // Nothing marked to post: refused even when acknowledged.
     bridge.calls.length = 0;
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, vintedAutomationAcknowledged: true } });
-    const current = useProjectsStore.getState().current!;
-    useProjectsStore.getState().toggleToPost(current.project.originalImageId!);
+    const current = useListingsStore.getState().current!;
+    useListingsStore.getState().toggleToPost(current.listing.originalImageId!);
     await usePublishStore.getState().start();
     expect(bridge.calls).toEqual([]);
     expect(usePublishStore.getState().session.stage).toBe("closed");
   });
 
   it("reports the open failure and drops the session", async () => {
-    await prepareProject();
+    await prepareListing();
     bridge.open = async () => {
       throw new Error("window failed");
     };
@@ -284,17 +284,17 @@ describe("buildPublishPayload", () => {
   });
 
   it("trims and caps the copy, encodes marked photos in order and skips unreadable ones", async () => {
-    const doc = await prepareProject();
-    const originalId = doc.project.originalImageId!;
-    useProjectsStore.getState().commit((d) => {
-      d.project.copy = { ...d.project.copy!, title: `  ${"T".repeat(150)}  `, description: " Blanche " };
+    const doc = await prepareListing();
+    const originalId = doc.listing.originalImageId!;
+    useListingsStore.getState().commit((d) => {
+      d.listing.copy = { ...d.listing.copy!, title: `  ${"T".repeat(150)}  `, description: " Blanche " };
       d.toPost.push("img_missing");
     });
-    const current = useProjectsStore.getState().current!;
+    const current = useListingsStore.getState().current!;
     const reads: string[] = [];
     const payload = await buildPublishPayload(current, async (asset) => {
       reads.push(asset.id);
-      return storage.readImage(current.project.id, asset.kind, asset.id);
+      return storage.readImage(current.listing.id, asset.kind, asset.id);
     });
     expect(payload.title).toBe("T".repeat(100));
     expect(payload.description).toBe("Blanche");

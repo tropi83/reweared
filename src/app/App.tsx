@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/Misc";
 import { useT } from "@/i18n";
 import { RecipesView } from "@/features/recipes/RecipesView";
 import { SettingsView } from "@/features/settings/SettingsView";
-import { Sidebar } from "@/features/projects/Sidebar";
+import { Sidebar } from "@/features/listings/Sidebar";
 import { HomeView } from "@/features/workspace/HomeView";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import { useGlobalImport } from "@/features/workspace/useImageImport";
@@ -81,7 +81,7 @@ function Shell() {
       <main id="main" className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
         {route.name === "settings" && <SettingsView section={route.section} />}
         {route.name === "recipes" && <RecipesView />}
-        {route.name === "project" && <WorkspaceView projectId={route.id} />}
+        {route.name === "listing" && <WorkspaceView listingId={route.id} />}
         {route.name === "home" && <HomeView />}
       </main>
       <Toaster />

@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **Projects are now listings.** The navigation says “Listings” / “Annonces” and “New listing”; the code follows (`Listing`, `ListingDocument`, `useListingsStore`, `#/listing/:id` — old `#/project/:id` links still open). Storage schema v3 renames the aggregate; the IndexedDB database (v2) and the desktop `projects/` directory (now `listings/`) migrate on first launch, nothing is lost. New listing ids start with `lst_`; older `prj_` ids stay valid.
 - **“Post on Vinted” moved to the workspace header**, next to the All / To post toggle: labelled from `sm`, icon + photo count below. It stays tappable while the listing is not postable and explains what is missing in a toast (a disabled button was mute on phones); the end of a Vinted session is reported the same way.
 - Phones: the feed scrolls to a run that just started, and “New project” in the drawer goes to the gallery / camera choice instead of opening the photo library.
 - Copy panel: condition, brand and colour are labelled badges; only the search keywords are hashtags (a “#” returned by the model is stripped).

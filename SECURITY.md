@@ -68,7 +68,7 @@ Other guarantees:
 
 ## Files
 
-- Project writes are atomic (`project.json.tmp` → rename).
+- Listing writes are atomic (`listing.json.tmp` → rename).
 - Temporary payloads (prepared provider images, base64 bodies) live in memory only and are dropped after the burst of jobs.
 - Cancelled jobs never write a result. `Settings → Storage → Remove orphaned files` deletes any image file not referenced by a project document.
 

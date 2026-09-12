@@ -6,8 +6,8 @@ import {
   type GenerationJob,
   type ImageAsset,
   type ImageMimeType,
-  type ProjectDocument,
-  type ProjectSummary,
+  type ListingDocument,
+  type ListingSummary,
 } from "@/domain/models";
 import { createThumbnail, decodeImage, validateImageFile } from "@/infrastructure/image/image-processing";
 import { createId, nowIso } from "@/lib/ids";
@@ -15,22 +15,22 @@ import { createLogger } from "@/lib/logger";
 import { evictImageUrls, primeImageUrl } from "../image-urls";
 import { getServices } from "../services";
 
-const log = createLogger("projects");
+const log = createLogger("listings");
 
-interface ProjectsState {
-  summaries: ProjectSummary[];
-  current: ProjectDocument | null;
+interface ListingsState {
+  summaries: ListingSummary[];
+  current: ListingDocument | null;
   loadingList: boolean;
-  loadingProject: boolean;
+  loadingListing: boolean;
   loadSummaries(): Promise<void>;
-  open(projectId: string): Promise<ProjectDocument | null>;
+  open(listingId: string): Promise<ListingDocument | null>;
   close(): void;
-  createFromFile(file: Blob, fileName?: string): Promise<ProjectDocument>;
-  rename(projectId: string, name: string): Promise<void>;
-  remove(projectId: string): Promise<void>;
-  duplicate(projectId: string): Promise<ProjectDocument | null>;
-  /** Applies a synchronous mutation to the open project and schedules a save. */
-  commit(mutator: (doc: ProjectDocument) => void, options?: { immediate?: boolean }): void;
+  createFromFile(file: Blob, fileName?: string): Promise<ListingDocument>;
+  rename(listingId: string, name: string): Promise<void>;
+  remove(listingId: string): Promise<void>;
+  duplicate(listingId: string): Promise<ListingDocument | null>;
+  /** Applies a synchronous mutation to the open listing and schedules a save. */
+  commit(mutator: (doc: ListingDocument) => void, options?: { immediate?: boolean }): void;
   flush(): Promise<void>;
   toggleToPost(assetId: string): void;
   deleteImages(assetIds: string[]): Promise<void>;
@@ -42,14 +42,14 @@ interface ProjectsState {
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let savePromise: Promise<void> | null = null;
 
-function scheduleSave(get: () => ProjectsState, immediate: boolean) {
+function scheduleSave(get: () => ListingsState, immediate: boolean) {
   if (saveTimer) clearTimeout(saveTimer);
   const run = async () => {
     saveTimer = null;
     const doc = get().current;
     if (!doc) return;
     try {
-      await getServices().storage.saveProject(doc);
+      await getServices().storage.saveListing(doc);
     } catch (err) {
       log.error("save failed", err);
     }
@@ -58,7 +58,7 @@ function scheduleSave(get: () => ProjectsState, immediate: boolean) {
     const summaries = get().summaries.some((s) => s.id === summary.id)
       ? get().summaries.map((s) => (s.id === summary.id ? summary : s))
       : [summary, ...get().summaries];
-    useProjectsStore.setState({ summaries: summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
+    useListingsStore.setState({ summaries: summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
   };
   if (immediate) {
     savePromise = run();
@@ -69,7 +69,7 @@ function scheduleSave(get: () => ProjectsState, immediate: boolean) {
   }
 }
 
-async function storeImageWithThumbnail(projectId: string, kind: ImageAsset["kind"], blob: Blob, mimeType: ImageMimeType, extra: Partial<ImageAsset>) {
+async function storeImageWithThumbnail(listingId: string, kind: ImageAsset["kind"], blob: Blob, mimeType: ImageMimeType, extra: Partial<ImageAsset>) {
   const { storage } = getServices();
   const decoded = await decodeImage(blob);
   let thumbnail: Blob;
@@ -80,7 +80,7 @@ async function storeImageWithThumbnail(projectId: string, kind: ImageAsset["kind
   }
   const asset: ImageAsset = {
     id: createId("img"),
-    projectId,
+    listingId,
     kind,
     mimeType,
     width: decoded.width,
@@ -90,39 +90,39 @@ async function storeImageWithThumbnail(projectId: string, kind: ImageAsset["kind
     ...extra,
   };
   try {
-    await storage.writeImage(projectId, kind, asset.id, blob);
-    await storage.writeImage(projectId, "thumbnail", asset.id, thumbnail);
+    await storage.writeImage(listingId, kind, asset.id, blob);
+    await storage.writeImage(listingId, "thumbnail", asset.id, thumbnail);
   } catch (err) {
-    await storage.deleteImage(projectId, kind, asset.id).catch(() => undefined);
-    await storage.deleteImage(projectId, "thumbnail", asset.id).catch(() => undefined);
+    await storage.deleteImage(listingId, kind, asset.id).catch(() => undefined);
+    await storage.deleteImage(listingId, "thumbnail", asset.id).catch(() => undefined);
     throw new AppError("STORAGE_ERROR", "The image could not be saved on this device.", { cause: err });
   }
-  primeImageUrl(projectId, kind, asset.id, blob);
-  primeImageUrl(projectId, "thumbnail", asset.id, thumbnail);
+  primeImageUrl(listingId, kind, asset.id, blob);
+  primeImageUrl(listingId, "thumbnail", asset.id, thumbnail);
   return asset;
 }
 
-export const useProjectsStore = create<ProjectsState>((set, get) => ({
+export const useListingsStore = create<ListingsState>((set, get) => ({
   summaries: [],
   current: null,
   loadingList: false,
-  loadingProject: false,
+  loadingListing: false,
 
   async loadSummaries() {
     set({ loadingList: true });
     try {
-      set({ summaries: await getServices().storage.listProjects() });
+      set({ summaries: await getServices().storage.listListings() });
     } finally {
       set({ loadingList: false });
     }
   },
 
-  async open(projectId) {
-    if (get().current?.project.id === projectId) return get().current;
+  async open(listingId) {
+    if (get().current?.listing.id === listingId) return get().current;
     await get().flush();
-    set({ loadingProject: true });
+    set({ loadingListing: true });
     try {
-      const doc = await getServices().storage.getProject(projectId);
+      const doc = await getServices().storage.getListing(listingId);
       if (doc) {
         // Jobs interrupted by a previous app close must never look alive.
         for (const job of Object.values(doc.jobs)) {
@@ -136,7 +136,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       set({ current: doc });
       return doc;
     } finally {
-      set({ loadingProject: false });
+      set({ loadingListing: false });
     }
   },
 
@@ -147,7 +147,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
 
   async createFromFile(file, fileName) {
     const validated = await validateImageFile(file);
-    const projectId = createId("prj");
+    const listingId = createId("lst");
     const mime: ImageMimeType = validated.mimeType === "image/jpeg" ? "image/jpeg" : validated.mimeType === "image/png" ? "image/png" : "image/webp";
     // Non-native formats (gif/bmp/avif) are re-encoded losslessly to PNG so every stored original is a web-safe file.
     let blob = validated.blob;
@@ -162,71 +162,71 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       }
       storedMime = "image/png";
     }
-    const asset = await storeImageWithThumbnail(projectId, "original", blob, storedMime, fileName ? { fileName } : {});
+    const asset = await storeImageWithThumbnail(listingId, "original", blob, storedMime, fileName ? { fileName } : {});
     const now = nowIso();
     const baseName = (fileName ?? "").replace(/\.[^.]+$/, "").trim();
-    const doc: ProjectDocument = {
+    const doc: ListingDocument = {
       schemaVersion: CURRENT_SCHEMA_VERSION,
       appVersion: getServices().appVersion,
-      project: { id: projectId, name: baseName || "Untitled project", originalImageId: asset.id, coverImageId: asset.id, createdAt: now, updatedAt: now },
+      listing: { id: listingId, name: baseName || "Untitled listing", originalImageId: asset.id, coverImageId: asset.id, createdAt: now, updatedAt: now },
       images: { [asset.id]: asset },
       generations: {},
       jobs: {},
       toPost: [],
     };
-    await getServices().storage.saveProject(doc);
+    await getServices().storage.saveListing(doc);
     await get().flush();
     set({ current: doc, summaries: [summarize(doc), ...get().summaries] });
     return doc;
   },
 
-  async rename(projectId, name) {
+  async rename(listingId, name) {
     const trimmed = name.trim();
     if (!trimmed) return;
-    if (get().current?.project.id === projectId) {
+    if (get().current?.listing.id === listingId) {
       get().commit((doc) => {
-        doc.project.name = trimmed;
+        doc.listing.name = trimmed;
       });
       return;
     }
-    const doc = await getServices().storage.getProject(projectId);
+    const doc = await getServices().storage.getListing(listingId);
     if (!doc) return;
-    doc.project.name = trimmed;
-    doc.project.updatedAt = nowIso();
-    await getServices().storage.saveProject(doc);
-    set({ summaries: get().summaries.map((s) => (s.id === projectId ? summarize(doc) : s)) });
+    doc.listing.name = trimmed;
+    doc.listing.updatedAt = nowIso();
+    await getServices().storage.saveListing(doc);
+    set({ summaries: get().summaries.map((s) => (s.id === listingId ? summarize(doc) : s)) });
   },
 
-  async remove(projectId) {
-    if (get().current?.project.id === projectId) {
+  async remove(listingId) {
+    if (get().current?.listing.id === listingId) {
       getServices().queue.cancelAll();
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = null;
       set({ current: null });
     }
-    await getServices().storage.deleteProject(projectId);
-    evictImageUrls(projectId);
-    set({ summaries: get().summaries.filter((s) => s.id !== projectId) });
+    await getServices().storage.deleteListing(listingId);
+    evictImageUrls(listingId);
+    set({ summaries: get().summaries.filter((s) => s.id !== listingId) });
   },
 
-  async duplicate(projectId) {
+  async duplicate(listingId) {
     const { storage } = getServices();
-    const source = await storage.getProject(projectId);
+    const source = await storage.getListing(listingId);
     if (!source) return null;
-    const newId = createId("prj");
+    const newId = createId("lst");
     const now = nowIso();
-    const doc: ProjectDocument = structuredClone(source);
-    doc.project = { ...doc.project, id: newId, name: `${source.project.name} (copy)`, createdAt: now, updatedAt: now };
-    for (const image of Object.values(doc.images)) image.projectId = newId;
-    for (const gen of Object.values(doc.generations)) gen.projectId = newId;
-    for (const job of Object.values(doc.jobs)) job.projectId = newId;
+    const doc: ListingDocument = structuredClone(source);
+    doc.listing = { ...doc.listing, id: newId, name: `${source.listing.name} (copy)`, createdAt: now, updatedAt: now };
+    for (const image of Object.values(doc.images)) image.listingId = newId;
+    for (const gen of Object.values(doc.generations)) gen.listingId = newId;
+    for (const job of Object.values(doc.jobs)) job.listingId = newId;
     for (const image of Object.values(source.images)) {
       for (const bucket of [image.kind, "thumbnail"] as const) {
-        const blob = await storage.readImage(projectId, bucket, image.id);
+        const blob = await storage.readImage(listingId, bucket, image.id);
         if (blob) await storage.writeImage(newId, bucket, image.id, blob);
       }
     }
-    await storage.saveProject(doc);
+    await storage.saveListing(doc);
     set({ summaries: [summarize(doc), ...get().summaries] });
     return doc;
   },
@@ -236,7 +236,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     if (!current) return;
     const next = structuredClone(current);
     mutator(next);
-    next.project.updatedAt = nowIso();
+    next.listing.updatedAt = nowIso();
     set({ current: next });
     scheduleSave(get, options?.immediate ?? false);
   },
@@ -248,7 +248,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       const doc = get().current;
       if (doc) {
         savePromise = getServices()
-          .storage.saveProject(doc)
+          .storage.saveListing(doc)
           .catch((err) => log.error("flush failed", err));
       }
     }
@@ -267,7 +267,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     const current = get().current;
     if (!current) return;
     const { storage, queue } = getServices();
-    const ids = new Set(assetIds.filter((id) => id !== current.project.originalImageId));
+    const ids = new Set(assetIds.filter((id) => id !== current.listing.originalImageId));
     get().commit(
       (doc) => {
         for (const id of ids) {
@@ -287,7 +287,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
               }
             }
           }
-          if (doc.project.coverImageId === id) doc.project.coverImageId = doc.project.originalImageId;
+          if (doc.listing.coverImageId === id) doc.listing.coverImageId = doc.listing.originalImageId;
         }
       },
       { immediate: true },
@@ -295,9 +295,9 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     for (const id of ids) {
       const asset = current.images[id];
       if (!asset) continue;
-      await storage.deleteImage(current.project.id, asset.kind, id).catch((err) => log.warn("delete image failed", err));
-      await storage.deleteImage(current.project.id, "thumbnail", id).catch(() => undefined);
-      evictImageUrls(current.project.id, id);
+      await storage.deleteImage(current.listing.id, asset.kind, id).catch((err) => log.warn("delete image failed", err));
+      await storage.deleteImage(current.listing.id, "thumbnail", id).catch(() => undefined);
+      evictImageUrls(current.listing.id, id);
     }
   },
 
@@ -320,10 +320,10 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
 
   async addResultImage(job, blob, mimeType) {
     const current = get().current;
-    if (!current || current.project.id !== job.projectId) {
-      throw new AppError("CANCELLED", "The project was closed before the result arrived.", { retryable: false });
+    if (!current || current.listing.id !== job.listingId) {
+      throw new AppError("CANCELLED", "The listing was closed before the result arrived.", { retryable: false });
     }
-    const asset = await storeImageWithThumbnail(job.projectId, "generation", blob, mimeType, { generationId: job.generationId, jobId: job.id });
+    const asset = await storeImageWithThumbnail(job.listingId, "generation", blob, mimeType, { generationId: job.generationId, jobId: job.id });
     get().commit((doc) => {
       doc.images[asset.id] = asset;
     });
@@ -333,6 +333,6 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
 
 if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
-    void useProjectsStore.getState().flush();
+    void useListingsStore.getState().flush();
   });
 }

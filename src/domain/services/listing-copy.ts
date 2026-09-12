@@ -1,9 +1,9 @@
-import { AppError, type AuthStatus, type ListingCondition, type ListingCopy, type ListingSelection, type Locale } from "@/domain/models";
-import { findSubcategory } from "./listing-catalog";
+import { AppError, type AuthStatus, type ListingCondition, type ListingCopy, type CategorySelection, type Locale } from "@/domain/models";
+import { findSubcategory } from "./catalog";
 
 export interface ListingCopyRequest {
   image: { blob: Blob; mimeType: "image/png" | "image/jpeg" };
-  listing?: ListingSelection;
+  category?: CategorySelection;
   language: Locale;
   /** Brand stated by the seller; when set, the model must use it verbatim. */
   brand?: string;
@@ -53,7 +53,7 @@ const LANGUAGE_NAME: Record<Locale, string> = { en: "English", fr: "French" };
 
 /** Shared instruction so every provider produces the same fields; JSON only. */
 export function buildListingCopyPrompt(request: ListingCopyRequest): string {
-  const found = request.listing ? findSubcategory(request.listing) : undefined;
+  const found = request.category ? findSubcategory(request.category) : undefined;
   const context = found
     ? `The seller filed it under "${found.category.label.en} › ${found.subcategory.label.en}" (${found.subcategory.subject}).`
     : "The category is unknown.";

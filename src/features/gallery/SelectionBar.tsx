@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Download, Trash2, X } from "lucide-react";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { getServices } from "@/app/services";
@@ -16,11 +16,11 @@ export function SelectionBar() {
   const t = useT();
   const selection = useUiStore((s) => s.selection);
   const clear = useUiStore((s) => s.clearSelection);
-  const doc = useProjectsStore((s) => s.current);
+  const doc = useListingsStore((s) => s.current);
   const [exportOpen, setExportOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
-  const deleteImages = useProjectsStore((s) => s.deleteImages);
+  const deleteImages = useListingsStore((s) => s.deleteImages);
 
   if (!doc || selection.size === 0) return null;
   const ids = [...selection].filter((id) => doc.images[id]);
@@ -73,7 +73,7 @@ export function SelectionBar() {
 
 export function ExportDialog({ open, onClose, assetIds }: { open: boolean; onClose: () => void; assetIds: string[] }) {
   const t = useT();
-  const doc = useProjectsStore((s) => s.current);
+  const doc = useListingsStore((s) => s.current);
   const [type, setType] = useState<ImageMimeType>("image/png");
   const [quality, setQuality] = useState(92);
   const [busy, setBusy] = useState(false);
@@ -87,12 +87,12 @@ export function ExportDialog({ open, onClose, assetIds }: { open: boolean; onClo
       for (const id of assetIds) {
         const asset = doc.images[id];
         if (!asset) continue;
-        const blob = await storage.readImage(doc.project.id, asset.kind, asset.id);
+        const blob = await storage.readImage(doc.listing.id, asset.kind, asset.id);
         if (!blob) continue;
         const job = asset.jobId ? doc.jobs[asset.jobId] : undefined;
-        items.push({ blob, name: `${doc.project.name}-${job ? `variation-${job.index}` : "original"}-${asset.id.slice(-6)}` });
+        items.push({ blob, name: `${doc.listing.name}-${job ? `variation-${job.index}` : "original"}-${asset.id.slice(-6)}` });
       }
-      const ok = await exportMany(items, { type, quality: quality / 100 }, doc.project.name);
+      const ok = await exportMany(items, { type, quality: quality / 100 }, doc.listing.name);
       if (ok) toast.success(t("gallery.exported", { count: items.length }));
       onClose();
     } catch {

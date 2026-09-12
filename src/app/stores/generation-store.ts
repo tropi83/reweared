@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { AppError, deriveGenerationStatus, type AspectRatio, type Generation, type GenerationJob, type ImageSize, type ModelInfo } from "@/domain/models";
-import type { ListingSelection, ShotSpec } from "@/domain/models";
+import type { CategorySelection, ShotSpec } from "@/domain/models";
 import {
   buildRequestForModel,
   inputPreparationFor,
@@ -12,7 +12,7 @@ import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { createId, nowIso } from "@/lib/ids";
 import { createLogger } from "@/lib/logger";
 import { getServices } from "../services";
-import { useProjectsStore } from "./projects-store";
+import { useListingsStore } from "./listings-store";
 import { useSettingsStore } from "./settings-store";
 
 const log = createLogger("generation");
@@ -32,7 +32,7 @@ export interface StartGenerationParams {
    * `prompt` then only serves as the generation's summary.
    */
   shots?: ShotSpec[];
-  listing?: ListingSelection;
+  category?: CategorySelection;
 }
 
 interface GenerationState {
@@ -57,15 +57,15 @@ function randomSeed(): number {
   return (buf[0] ?? 0) % 2_147_483_647;
 }
 
-function preparedKey(projectId: string, assetId: string, spec: { maxDimension: number; multipleOf?: number; cropToAspectRatio?: string; format: string }) {
-  return `${projectId}/${assetId}/${spec.maxDimension}/${spec.multipleOf ?? 0}/${spec.cropToAspectRatio ?? "-"}/${spec.format}`;
+function preparedKey(listingId: string, assetId: string, spec: { maxDimension: number; multipleOf?: number; cropToAspectRatio?: string; format: string }) {
+  return `${listingId}/${assetId}/${spec.maxDimension}/${spec.multipleOf ?? 0}/${spec.cropToAspectRatio ?? "-"}/${spec.format}`;
 }
 
 export async function buildRequestForJob(job: GenerationJob, _signal: AbortSignal): Promise<ImageGenerationRequest> {
   const { storage } = getServices();
-  const doc = useProjectsStore.getState().current;
+  const doc = useListingsStore.getState().current;
   const asset = doc?.images[job.sourceImageId];
-  if (!doc || doc.project.id !== job.projectId || !asset) {
+  if (!doc || doc.listing.id !== job.listingId || !asset) {
     throw new AppError("INVALID_IMAGE", "The source image is no longer available.", { retryable: false });
   }
   const models = useGenerationStore.getState().modelsByProvider[job.provider] ?? [];
@@ -77,11 +77,11 @@ export async function buildRequestForJob(job: GenerationJob, _signal: AbortSigna
     { aspectRatio: job.aspectRatio, ...(job.imageSize ? { imageSize: job.imageSize } : {}) },
     useSettingsStore.getState().settings.prepareMaxDimension,
   );
-  const key = preparedKey(job.projectId, job.sourceImageId, spec);
+  const key = preparedKey(job.listingId, job.sourceImageId, spec);
   let prepared = preparedCache.get(key);
   if (!prepared) {
     prepared = (async () => {
-      const blob = await storage.readImage(job.projectId, asset.kind, asset.id);
+      const blob = await storage.readImage(job.listingId, asset.kind, asset.id);
       if (!blob) throw new AppError("INVALID_IMAGE", "The source image file is missing.", { retryable: false });
       const out = await prepareForProvider(blob, asset.mimeType, {
         maxDimension: spec.maxDimension,
@@ -109,15 +109,15 @@ export async function buildRequestForJob(job: GenerationJob, _signal: AbortSigna
 }
 
 export async function persistJobResult(job: GenerationJob, result: ImageGenerationResult): Promise<string> {
-  return useProjectsStore.getState().addResultImage(job, result.image, result.mimeType);
+  return useListingsStore.getState().addResultImage(job, result.image, result.mimeType);
 }
 
 export function applyJobUpdate(job: GenerationJob): void {
-  const projects = useProjectsStore.getState();
-  const doc = projects.current;
-  if (!doc || doc.project.id !== job.projectId) return;
+  const listings = useListingsStore.getState();
+  const doc = listings.current;
+  if (!doc || doc.listing.id !== job.listingId) return;
   const terminal = job.status === "completed" || job.status === "failed" || job.status === "cancelled";
-  projects.commit(
+  listings.commit(
     (draft) => {
       draft.jobs[job.id] = job;
       const gen = draft.generations[job.generationId];
@@ -125,8 +125,8 @@ export function applyJobUpdate(job: GenerationJob): void {
       const jobs = gen.jobIds.map((id) => draft.jobs[id]).filter((j): j is GenerationJob => !!j);
       gen.status = deriveGenerationStatus(jobs);
       if (gen.status !== "active") gen.completedAt = nowIso();
-      // The newest result becomes the project cover in the sidebar.
-      if (job.status === "completed" && job.resultImageId) draft.project.coverImageId = job.resultImageId;
+      // The newest result becomes the listing cover in the sidebar.
+      if (job.status === "completed" && job.resultImageId) draft.listing.coverImageId = job.resultImageId;
     },
     { immediate: terminal },
   );
@@ -155,9 +155,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   },
 
   async start(params) {
-    const projects = useProjectsStore.getState();
-    const doc = projects.current;
-    if (!doc) throw new AppError("INVALID_REQUEST", "No open project.");
+    const listings = useListingsStore.getState();
+    const doc = listings.current;
+    if (!doc) throw new AppError("INVALID_REQUEST", "No open listing.");
     const source = doc.images[params.sourceImageId];
     if (!source) throw new AppError("INVALID_IMAGE", "Source image not found.");
     const prompt = params.prompt.trim();
@@ -172,7 +172,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     const generationId = createId("gen");
     const jobs: GenerationJob[] = Array.from({ length: count }, (_, i) => ({
       id: createId("job"),
-      projectId: doc.project.id,
+      listingId: doc.listing.id,
       generationId,
       sourceImageId: source.id,
       index: i + 1,
@@ -190,12 +190,12 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     }));
     const generation: Generation = {
       id: generationId,
-      projectId: doc.project.id,
+      listingId: doc.listing.id,
       sourceImageId: source.id,
       ...(source.generationId ? { parentGenerationId: source.generationId } : {}),
       prompt: prompt || (shots[0]?.prompt ?? ""),
       ...(params.recipeId ? { recipeId: params.recipeId } : {}),
-      ...(params.listing ? { listing: params.listing } : {}),
+      ...(params.category ? { category: params.category } : {}),
       settings: {
         providerId: params.providerId,
         modelId: params.modelId,
@@ -208,7 +208,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       jobIds: jobs.map((j) => j.id),
       createdAt: now,
     };
-    projects.commit(
+    listings.commit(
       (draft) => {
         draft.generations[generation.id] = generation;
         for (const job of jobs) draft.jobs[job.id] = job;
@@ -220,7 +220,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   },
 
   retryJob(jobId) {
-    const doc = useProjectsStore.getState().current;
+    const doc = useListingsStore.getState().current;
     const job = doc?.jobs[jobId];
     if (!job) return;
     const { queue } = getServices();
@@ -232,7 +232,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   },
 
   retryFailed(generationId) {
-    const doc = useProjectsStore.getState().current;
+    const doc = useListingsStore.getState().current;
     const gen = doc?.generations[generationId];
     if (!doc || !gen) return;
     for (const id of gen.jobIds) {

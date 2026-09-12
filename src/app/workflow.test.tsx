@@ -18,7 +18,7 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
 
 import { __setServices, createServices } from "./services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult, useGenerationStore } from "./stores/generation-store";
-import { useProjectsStore } from "./stores/projects-store";
+import { useListingsStore } from "./stores/listings-store";
 import { useComposerStore } from "./stores/composer-store";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 
@@ -44,17 +44,17 @@ describe("core workflow (mock provider)", () => {
   });
 
   it("imports, generates four variations, branches from a result and survives a reload", async () => {
-    const projects = useProjectsStore.getState();
+    const listings = useListingsStore.getState();
     const file = new File([Uint8Array.from(PNG_HEADER)], "shot.png", { type: "image/png" });
-    const doc = await projects.createFromFile(file, "shot.png");
-    expect(doc.project.name).toBe("shot");
-    expect(doc.project.originalImageId).toBeDefined();
-    expect(await storage.readImage(doc.project.id, "original", doc.project.originalImageId!)).not.toBeNull();
-    expect(await storage.readImage(doc.project.id, "thumbnail", doc.project.originalImageId!)).not.toBeNull();
+    const doc = await listings.createFromFile(file, "shot.png");
+    expect(doc.listing.name).toBe("shot");
+    expect(doc.listing.originalImageId).toBeDefined();
+    expect(await storage.readImage(doc.listing.id, "original", doc.listing.originalImageId!)).not.toBeNull();
+    expect(await storage.readImage(doc.listing.id, "thumbnail", doc.listing.originalImageId!)).not.toBeNull();
 
-    useComposerStore.getState().bindProject(doc.project.id);
+    useComposerStore.getState().bindListing(doc.listing.id);
     const generation = await useGenerationStore.getState().start({
-      sourceImageId: doc.project.originalImageId!,
+      sourceImageId: doc.listing.originalImageId!,
       prompt: "make it studio",
       providerId: "mock",
       modelId: "mock-fast",
@@ -64,14 +64,14 @@ describe("core workflow (mock provider)", () => {
     expect(generation.jobIds).toHaveLength(4);
     expect(generation.parentGenerationId).toBeUndefined();
 
-    await waitFor(() => useProjectsStore.getState().current?.generations[generation.id]?.status === "completed");
-    let current = useProjectsStore.getState().current!;
+    await waitFor(() => useListingsStore.getState().current?.generations[generation.id]?.status === "completed");
+    let current = useListingsStore.getState().current!;
     const results = generation.jobIds.map((id) => current.jobs[id]!);
     expect(results.every((j) => j.status === "completed" && j.resultImageId)).toBe(true);
     const resultAssets = results.map((j) => current.images[j.resultImageId!]!);
     expect(resultAssets.every((a) => a.kind === "generation" && a.generationId === generation.id)).toBe(true);
     for (const asset of resultAssets) {
-      expect(await storage.readImage(current.project.id, "generation", asset.id)).not.toBeNull();
+      expect(await storage.readImage(current.listing.id, "generation", asset.id)).not.toBeNull();
     }
 
     // Use a result as the source of a new branch.
@@ -85,18 +85,18 @@ describe("core workflow (mock provider)", () => {
       variationCount: 2,
     });
     expect(branch.parentGenerationId).toBe(generation.id);
-    await waitFor(() => useProjectsStore.getState().current?.generations[branch.id]?.status === "completed");
-    current = useProjectsStore.getState().current!;
+    await waitFor(() => useListingsStore.getState().current?.generations[branch.id]?.status === "completed");
+    current = useListingsStore.getState().current!;
     expect(Object.values(current.images).filter((i) => i.kind === "generation")).toHaveLength(6);
 
     // Persisted: reopen from storage.
-    await projects.flush();
-    projects.close();
-    const reopened = await projects.open(current.project.id);
+    await listings.flush();
+    listings.close();
+    const reopened = await listings.open(current.listing.id);
     expect(reopened).not.toBeNull();
     expect(Object.keys(reopened!.generations)).toHaveLength(2);
     expect(Object.values(reopened!.jobs).every((j) => j.status === "completed")).toBe(true);
-    const summaries = await storage.listProjects();
+    const summaries = await storage.listListings();
     expect(summaries[0]?.imageCount).toBe(6);
   });
 
@@ -112,9 +112,9 @@ describe("core workflow (mock provider)", () => {
       }
       return original(req, opts);
     };
-    const current = useProjectsStore.getState().current!;
+    const current = useListingsStore.getState().current!;
     const gen = await useGenerationStore.getState().start({
-      sourceImageId: current.project.originalImageId!,
+      sourceImageId: current.listing.originalImageId!,
       prompt: "partial",
       providerId: "mock",
       modelId: "mock-fast",
@@ -122,19 +122,19 @@ describe("core workflow (mock provider)", () => {
       variationCount: 3,
     });
     await waitFor(() => {
-      const g = useProjectsStore.getState().current?.generations[gen.id];
+      const g = useListingsStore.getState().current?.generations[gen.id];
       return g?.status === "partial";
     });
-    const doc = useProjectsStore.getState().current!;
+    const doc = useListingsStore.getState().current!;
     const failed = gen.jobIds.map((id) => doc.jobs[id]!).find((j) => j.status === "failed")!;
     expect(failed.error?.code).toBe("CONTENT_REJECTED");
     expect(gen.jobIds.map((id) => doc.jobs[id]!).filter((j) => j.status === "completed")).toHaveLength(2);
 
     const seedBefore = failed.seed;
     useGenerationStore.getState().retryJob(failed.id);
-    await waitFor(() => useProjectsStore.getState().current?.generations[gen.id]?.status === "completed");
+    await waitFor(() => useListingsStore.getState().current?.generations[gen.id]?.status === "completed");
     // A manual retry draws a fresh seed: a diffusion model would otherwise reproduce the same (rejected) output.
-    const retried = useProjectsStore.getState().current!.jobs[failed.id]!;
+    const retried = useListingsStore.getState().current!.jobs[failed.id]!;
     expect(retried.status).toBe("completed");
     expect(retried.seed).toBeDefined();
     expect(retried.seed).not.toBe(seedBefore);
@@ -142,58 +142,58 @@ describe("core workflow (mock provider)", () => {
   });
 
   it("deletes images and generations without leaving orphaned files", async () => {
-    const projects = useProjectsStore.getState();
-    const doc = useProjectsStore.getState().current!;
+    const listings = useListingsStore.getState();
+    const doc = useListingsStore.getState().current!;
     const genId = Object.keys(doc.generations)[0]!;
     const imageIds = doc.generations[genId]!.jobIds.map((id) => doc.jobs[id]!.resultImageId!);
-    await projects.deleteGeneration(genId);
-    const after = useProjectsStore.getState().current!;
+    await listings.deleteGeneration(genId);
+    const after = useListingsStore.getState().current!;
     expect(after.generations[genId]).toBeUndefined();
     for (const id of imageIds) {
       expect(after.images[id]).toBeUndefined();
-      expect(await storage.readImage(after.project.id, "generation", id)).toBeNull();
-      expect(await storage.readImage(after.project.id, "thumbnail", id)).toBeNull();
+      expect(await storage.readImage(after.listing.id, "generation", id)).toBeNull();
+      expect(await storage.readImage(after.listing.id, "thumbnail", id)).toBeNull();
     }
-    expect(await storage.cleanupOrphans(after.project.id)).toBe(0);
+    expect(await storage.cleanupOrphans(after.listing.id)).toBe(0);
   });
 });
 
 describe("listing packs", () => {
-  it("generates one job per shot with distinct prompts and labels, and stores the copy on the project", async () => {
-    const projects = useProjectsStore.getState();
-    const doc = projects.current!;
-    const { buildListingShots } = await import("@/domain/services/listing-catalog");
-    const listing = { categoryId: "women" as const, subcategoryId: "shoes" };
-    const shots = buildListingShots(listing);
+  it("generates one job per shot with distinct prompts and labels, and stores the copy on the listing", async () => {
+    const listings = useListingsStore.getState();
+    const doc = listings.current!;
+    const { buildShots } = await import("@/domain/services/catalog");
+    const category = { categoryId: "women" as const, subcategoryId: "shoes" };
+    const shots = buildShots(category);
     const gen = await useGenerationStore.getState().start({
-      sourceImageId: doc.project.originalImageId!,
+      sourceImageId: doc.listing.originalImageId!,
       prompt: "",
       providerId: "mock",
       modelId: "mock-fast",
       aspectRatio: "3:4",
       variationCount: 1,
-      listing,
+      category,
       shots,
       recipeId: "rcp_listing_women_shoes",
     });
     expect(gen.jobIds).toHaveLength(5);
-    expect(gen.listing).toEqual(listing);
-    await waitFor(() => useProjectsStore.getState().current?.generations[gen.id]?.status === "completed");
-    const after = useProjectsStore.getState().current!;
+    expect(gen.category).toEqual(category);
+    await waitFor(() => useListingsStore.getState().current?.generations[gen.id]?.status === "completed");
+    const after = useListingsStore.getState().current!;
     const jobs = gen.jobIds.map((id) => after.jobs[id]!);
     expect(jobs.map((j) => j.shotId)).toEqual(["retouch", "studio", "worn", "selfie", "profile"]);
     expect(new Set(jobs.map((j) => j.prompt)).size).toBe(5);
     expect(jobs[2]!.shotLabel?.fr).toBe("Portées");
     expect(new Set(jobs.map((j) => j.seed)).size).toBeGreaterThan(1);
 
-    const { useListingStore } = await import("./stores/listing-store");
-    useListingStore.getState().setListing(listing);
-    expect(useProjectsStore.getState().current?.project.listing).toEqual(listing);
+    const { useListingSetupStore } = await import("./stores/listing-setup-store");
+    useListingSetupStore.getState().setCategory(category);
+    expect(useListingsStore.getState().current?.listing.category).toEqual(category);
     // No vision model for the mock provider: a clear error, no crash.
     const { useSettingsStore } = await import("./stores/settings-store");
     expect(useSettingsStore.getState().settings.copyProviderId).toBe("gemini");
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, copyProviderId: "mock" } });
-    expect(await useListingStore.getState().generateCopy()).toBeNull();
-    expect(useListingStore.getState().copyError?.code).toBe("PROVIDER_UNAVAILABLE");
+    expect(await useListingSetupStore.getState().generateCopy()).toBeNull();
+    expect(useListingSetupStore.getState().copyError?.code).toBe("PROVIDER_UNAVAILABLE");
   });
 });

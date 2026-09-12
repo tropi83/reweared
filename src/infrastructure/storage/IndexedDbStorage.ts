@@ -1,31 +1,32 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import { summarize, type AppSettings, type ProjectDocument, type ProjectSummary, type Recipe } from "@/domain/models";
+import { summarize, type AppSettings, type ListingDocument, type ListingSummary, type Recipe } from "@/domain/models";
 import { assertSafeId } from "@/lib/ids";
-import { migrateProjectDocument, migrateSettings } from "./migrations";
+import { migrateListingDocument, migrateSettings } from "./migrations";
 import type { ImageBucket, StorageProvider, StorageUsage } from "./StorageProvider";
 
 interface Schema extends DBSchema {
-  projects: { key: string; value: ProjectDocument; indexes: { updatedAt: string } };
+  listings: { key: string; value: ListingDocument; indexes: { updatedAt: string } };
   images: {
     key: string;
     // Bytes are stored as ArrayBuffer rather than Blob: portable across engines and structured-clone safe.
-    value: { key: string; projectId: string; bucket: ImageBucket; assetId: string; bytes: ArrayBuffer; type: string; size: number };
-    indexes: { projectId: string };
+    value: { key: string; listingId: string; bucket: ImageBucket; assetId: string; bytes: ArrayBuffer; type: string; size: number };
+    indexes: { listingId: string };
   };
   settings: { key: string; value: AppSettings | unknown };
   recipes: { key: string; value: Recipe };
 }
 
 const DB_NAME = "ai-image-variations";
-const DB_VERSION = 1;
+/** v2 (2026-09-13): the "projects" store became "listings" (see migrations.ts, schema v3). */
+const DB_VERSION = 2;
 
 function assertMetaKey(key: string): string {
   if (!/^[a-z0-9_-]{1,64}$/.test(key)) throw new Error("Invalid meta key");
   return key;
 }
 
-function imageKey(projectId: string, bucket: ImageBucket, assetId: string): string {
-  return `${assertSafeId(projectId)}/${bucket}/${assertSafeId(assetId)}`;
+function imageKey(listingId: string, bucket: ImageBucket, assetId: string): string {
+  return `${assertSafeId(listingId)}/${bucket}/${assertSafeId(assetId)}`;
 }
 
 /** Web storage: metadata and blobs in IndexedDB, scoped to the site origin. */
@@ -37,13 +38,31 @@ export class IndexedDbStorage implements StorageProvider {
   async init(): Promise<void> {
     if (this.db) return;
     this.db = await openDB<Schema>(this.dbName, DB_VERSION, {
-      upgrade(db) {
-        const projects = db.createObjectStore("projects", { keyPath: "project.id" });
-        projects.createIndex("updatedAt", "project.updatedAt");
-        const images = db.createObjectStore("images", { keyPath: "key" });
-        images.createIndex("projectId", "projectId");
-        db.createObjectStore("settings");
-        db.createObjectStore("recipes", { keyPath: "id" });
+      async upgrade(db, oldVersion, _newVersion, tx) {
+        if (oldVersion < 1) {
+          const images = db.createObjectStore("images", { keyPath: "key" });
+          images.createIndex("listingId", "listingId");
+          db.createObjectStore("settings");
+          db.createObjectStore("recipes", { keyPath: "id" });
+        }
+        const listings = db.createObjectStore("listings", { keyPath: "listing.id" });
+        listings.createIndex("updatedAt", "listing.updatedAt");
+        if (oldVersion === 1) {
+          // Copy the v1 "projects" records into "listings" (migrated on read anyway) and drop the old store.
+          // Everything runs inside the versionchange transaction: either all of it lands, or nothing does.
+          const legacy = tx.objectStore("projects" as never) as unknown as { getAll(): Promise<unknown[]> };
+          for (const raw of await legacy.getAll()) await listings.put(migrateListingDocument(raw));
+          const images = tx.objectStore("images");
+          images.deleteIndex("projectId" as never);
+          images.createIndex("listingId", "listingId");
+          let cursor = await images.openCursor();
+          while (cursor) {
+            const { projectId, ...rest } = cursor.value as typeof cursor.value & { projectId?: string };
+            if (projectId !== undefined) await cursor.update({ ...rest, listingId: projectId });
+            cursor = await cursor.continue();
+          }
+          db.deleteObjectStore("projects" as never);
+        }
       },
     });
   }
@@ -53,25 +72,25 @@ export class IndexedDbStorage implements StorageProvider {
     return this.db;
   }
 
-  async listProjects(): Promise<ProjectSummary[]> {
-    const docs = await this.store.getAll("projects");
-    return docs.map((raw) => summarize(migrateProjectDocument(raw))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  async listListings(): Promise<ListingSummary[]> {
+    const docs = await this.store.getAll("listings");
+    return docs.map((raw) => summarize(migrateListingDocument(raw))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  async getProject(projectId: string): Promise<ProjectDocument | null> {
-    const raw = await this.store.get("projects", projectId);
-    return raw ? migrateProjectDocument(raw) : null;
+  async getListing(listingId: string): Promise<ListingDocument | null> {
+    const raw = await this.store.get("listings", listingId);
+    return raw ? migrateListingDocument(raw) : null;
   }
 
-  async saveProject(doc: ProjectDocument): Promise<void> {
-    await this.store.put("projects", structuredClone(doc));
+  async saveListing(doc: ListingDocument): Promise<void> {
+    await this.store.put("listings", structuredClone(doc));
   }
 
-  async deleteProject(projectId: string): Promise<void> {
-    const tx = this.store.transaction(["projects", "images"], "readwrite");
-    await tx.objectStore("projects").delete(projectId);
+  async deleteListing(listingId: string): Promise<void> {
+    const tx = this.store.transaction(["listings", "images"], "readwrite");
+    await tx.objectStore("listings").delete(listingId);
     const images = tx.objectStore("images");
-    let cursor = await images.index("projectId").openKeyCursor(projectId);
+    let cursor = await images.index("listingId").openKeyCursor(listingId);
     while (cursor) {
       await images.delete(cursor.primaryKey);
       cursor = await cursor.continue();
@@ -79,23 +98,23 @@ export class IndexedDbStorage implements StorageProvider {
     await tx.done;
   }
 
-  async writeImage(projectId: string, bucket: ImageBucket, assetId: string, blob: Blob): Promise<void> {
+  async writeImage(listingId: string, bucket: ImageBucket, assetId: string, blob: Blob): Promise<void> {
     const bytes = await blob.arrayBuffer();
-    await this.store.put("images", { key: imageKey(projectId, bucket, assetId), projectId, bucket, assetId, bytes, type: blob.type, size: bytes.byteLength });
+    await this.store.put("images", { key: imageKey(listingId, bucket, assetId), listingId, bucket, assetId, bytes, type: blob.type, size: bytes.byteLength });
   }
 
-  async readImage(projectId: string, bucket: ImageBucket, assetId: string): Promise<Blob | null> {
-    const row = await this.store.get("images", imageKey(projectId, bucket, assetId));
+  async readImage(listingId: string, bucket: ImageBucket, assetId: string): Promise<Blob | null> {
+    const row = await this.store.get("images", imageKey(listingId, bucket, assetId));
     return row ? new Blob([row.bytes], { type: row.type }) : null;
   }
 
-  async deleteImage(projectId: string, bucket: ImageBucket, assetId: string): Promise<void> {
-    await this.store.delete("images", imageKey(projectId, bucket, assetId));
+  async deleteImage(listingId: string, bucket: ImageBucket, assetId: string): Promise<void> {
+    await this.store.delete("images", imageKey(listingId, bucket, assetId));
   }
 
-  async cleanupOrphans(projectId: string): Promise<number> {
-    const doc = await this.getProject(projectId);
-    const rows = await this.store.getAllFromIndex("images", "projectId", projectId);
+  async cleanupOrphans(listingId: string): Promise<number> {
+    const doc = await this.getListing(listingId);
+    const rows = await this.store.getAllFromIndex("images", "listingId", listingId);
     let removed = 0;
     for (const row of rows) {
       const referenced = doc !== null && row.assetId in doc.images;
@@ -138,20 +157,20 @@ export class IndexedDbStorage implements StorageProvider {
   }
 
   async getUsage(): Promise<StorageUsage> {
-    const projectCount = await this.store.count("projects");
+    const listingCount = await this.store.count("listings");
     let imageBytes = 0;
     let cursor = await this.store.transaction("images").store.openCursor();
     while (cursor) {
       imageBytes += cursor.value.size;
       cursor = await cursor.continue();
     }
-    return { projectCount, imageBytes, location: "IndexedDB" };
+    return { listingCount, imageBytes, location: "IndexedDB" };
   }
 
   async clearAll(): Promise<void> {
-    const tx = this.store.transaction(["projects", "images", "settings", "recipes"], "readwrite");
+    const tx = this.store.transaction(["listings", "images", "settings", "recipes"], "readwrite");
     await Promise.all([
-      tx.objectStore("projects").clear(),
+      tx.objectStore("listings").clear(),
       tx.objectStore("images").clear(),
       tx.objectStore("settings").clear(),
       tx.objectStore("recipes").clear(),

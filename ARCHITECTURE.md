@@ -44,7 +44,7 @@ Project ─┬─ ImageAsset (kind: original | generation)
          └─ GenerationJob (generationId, sourceImageId, index, status, attempt, resultImageId, error)
 ```
 
-A `ProjectDocument` (`project.json`) holds all of a project's records plus `schemaVersion`/`appVersion`. `Generation.parentGenerationId` is the generation that produced `sourceImageId`; this is enough to rebuild the branch tree.
+A `ListingDocument` (`listing.json`) holds all of a listing's records plus `schemaVersion`/`appVersion`. The aggregate was called _project_ until 2026-09-13 (schema v3 renames it; `#/project/:id` hashes still open). `Generation.parentGenerationId` is the generation that produced `sourceImageId`; this is enough to rebuild the branch tree.
 
 ## Generation job system (`domain/services/generation-queue.ts`)
 
@@ -59,11 +59,11 @@ The queue is pure TypeScript with injectable `sleep`/`random`, covered by `gener
 
 ## Listing catalogue and packs
 
-`domain/services/listing-catalog.ts` holds the marketplace taxonomy (10 categories → 56 subcategories) and, per `ProductKind` (40 kinds: garment, footwear, bag, jewelry, phone, trading-card, pet-carrier…), a plan of `ShotSpec`s: four base shots, plus a mirror-selfie shot for wearable kinds (garment, footwear, bag, accessory, jewelry, watch, leather goods) that `buildListingShots` drops for the kids category (`excludeCategories`). Every prompt shares a fidelity preamble (keep shape, colours, pattern, logos, text) and a quality suffix; `{{subject}}` and `{{wearer}}` are interpolated from the subcategory and the category (a woman / a man / a child, face not visible / an athlete…). `domain/models/mannequin.ts` + `domain/services/mannequin.ts` describe the seller's mannequin (build S/M/L, pose, skin tone; one per device in `Settings.mannequin`, toggled per project with `Project.useMannequin`): `buildListingShots(selection, { mannequin })` rewrites `{{wearer}}` with it and fills the `{{pose|default}}` slot (or appends the pose as its own sentence when a template with a person has no slot — never two poses), only for the shots that show a person and never for the kids and pets categories (`mannequinApplies`). The brand is never put in an image prompt. Built-in recipes are generated from the catalogue (`listingRecipeId`). `GenerationQueue` is unchanged: a pack is a `Generation` with `listing` set and one job per shot, each job carrying its own `prompt`, `shotId`, `shotLabel` and seed.
+`domain/services/catalog.ts` holds the marketplace taxonomy (10 categories → 56 subcategories) and, per `ProductKind` (40 kinds: garment, footwear, bag, jewelry, phone, trading-card, pet-carrier…), a plan of `ShotSpec`s: four base shots, plus a mirror-selfie shot for wearable kinds (garment, footwear, bag, accessory, jewelry, watch, leather goods) that `buildListingShots` drops for the kids category (`excludeCategories`). Every prompt shares a fidelity preamble (keep shape, colours, pattern, logos, text) and a quality suffix; `{{subject}}` and `{{wearer}}` are interpolated from the subcategory and the category (a woman / a man / a child, face not visible / an athlete…). `domain/models/mannequin.ts` + `domain/services/mannequin.ts` describe the seller's mannequin (build S/M/L, pose, skin tone; one per device in `Settings.mannequin`, toggled per project with `Listing.useMannequin`): `buildShots(selection, { mannequin })` rewrites `{{wearer}}` with it and fills the `{{pose|default}}` slot (or appends the pose as its own sentence when a template with a person has no slot — never two poses), only for the shots that show a person and never for the kids and pets categories (`mannequinApplies`). The brand is never put in an image prompt. Built-in recipes are generated from the catalogue (`listingRecipeId`). `GenerationQueue` is unchanged: a pack is a `Generation` with `listing` set and one job per shot, each job carrying its own `prompt`, `shotId`, `shotLabel` and seed.
 
-`domain/services/listing-copy.ts` defines `ListingCopyProvider` (photo → `{ title, description, condition, brand, color, keywords }`), the shared prompt, a JSON schema for constrained output and a defensive parser. Implementations: `CloudflareListingCopyProvider` (Llama 4 Scout, `response_format: json_schema`, fallback Llama 3.2 Vision) and `GeminiListingCopyProvider` (Flash text models, Interactions API with an image part). The result is stored on `Project.copy`. `ListingCopyRequest.brand` carries the brand typed by the seller (`Project.brand`, ≤ 60 chars): the prompt then imposes it verbatim in the title and the description instead of letting the model read (or invent) one.
+`domain/services/listing-copy.ts` defines `ListingCopyProvider` (photo → `{ title, description, condition, brand, color, keywords }`), the shared prompt, a JSON schema for constrained output and a defensive parser. Implementations: `CloudflareListingCopyProvider` (Llama 4 Scout, `response_format: json_schema`, fallback Llama 3.2 Vision) and `GeminiListingCopyProvider` (Flash text models, Interactions API with an image part). The result is stored on `Project.copy`. `ListingCopyRequest.brand` carries the brand typed by the seller (`Listing.brand`, ≤ 60 chars): the prompt then imposes it verbatim in the title and the description instead of letting the model read (or invent) one.
 
-`app/stores/listing-store.ts` orchestrates one run: `createListing()` starts the photo pack and the copy in parallel (`Promise.allSettled`), skips a part whose provider is not usable (`skipped-provider`) and reports both outcomes (`ListingRunReport`, stamped with the project id); `app/listing-readiness.ts` is the pure helper behind the button (`canCreate`, first `blocker`, `skipped` parts) so the label only promises what will run. The UI is `features/workspace/ListingSetupCard.tsx` (+ `AdvancedOptions.tsx`, `useComposerDefaults.ts`) and `features/mannequin/MannequinDialog.tsx`, also mounted in Settings → Mannequin.
+`app/stores/listing-setup-store.ts` orchestrates one run: `generateListing()` starts the photo pack and the copy in parallel (`Promise.allSettled`), skips a part whose provider is not usable (`skipped-provider`) and reports both outcomes (`ListingRunReport`, stamped with the project id); `app/listing-readiness.ts` is the pure helper behind the button (`canCreate`, first `blocker`, `skipped` parts) so the label only promises what will run. The UI is `features/workspace/ListingSetupCard.tsx` (+ `AdvancedOptions.tsx`, `useComposerDefaults.ts`) and `features/mannequin/MannequinDialog.tsx`, also mounted in Settings → Mannequin.
 
 ## Providers
 
@@ -105,8 +105,8 @@ Renders a tinted, labelled copy of the source on a canvas; scenarios: `success |
 
 ```
 <app data>/
-  projects/<projectId>/
-    project.json
+  listings/<listingId>/
+    listing.json
     original/<assetId>.<ext>
     generations/<assetId>.<ext>
     thumbnails/<assetId>.webp
@@ -130,11 +130,11 @@ Image bytes are never put in the JSON. Thumbnails (WebP, 512px) drive the galler
 
 ## State
 
-Zustand stores in `app/stores`: `projects` (current `ProjectDocument` + debounced atomic saves), `generation` (models, start/retry/cancel), `composer`, `auth`, `settings`, `recipes`, `ui` (selection, lightbox, filter), `publish` (Vinted session), `toast`. `app/services.ts` is the composition root; tests build it with an in-memory IndexedDB.
+Zustand stores in `app/stores`: `listings` (current `ListingDocument` + debounced atomic saves), `listing-setup` (category, brand, mannequin, the generation run), `generation` (models, start/retry/cancel), `composer`, `auth`, `settings`, `recipes`, `ui` (selection, lightbox, filter), `publish` (Vinted session), `toast`. `app/services.ts` is the composition root; tests build it with an in-memory IndexedDB.
 
 ## Routing
 
-A tiny hash router (`app/router.ts`): `#/`, `#/project/:id`, `#/recipes`, `#/settings/:section`.
+A tiny hash router (`app/router.ts`): `#/`, `#/listing/:id` (legacy `#/project/:id` accepted), `#/recipes`, `#/settings/:section`.
 
 ## Platform capabilities
 

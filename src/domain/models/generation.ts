@@ -1,5 +1,5 @@
 import type { GenerationError } from "./errors";
-import type { ListingSelection, Localized } from "./listing";
+import type { CategorySelection, Localized } from "./catalog";
 
 export type AspectRatio = "original" | "1:1" | "2:3" | "3:2" | "3:4" | "4:3" | "4:5" | "5:4" | "9:16" | "16:9" | "21:9";
 
@@ -27,7 +27,7 @@ export type GenerationStatus = "active" | "completed" | "partial" | "failed" | "
  */
 export interface Generation {
   id: string;
-  projectId: string;
+  listingId: string;
   /** Image used as input. May be an imported original or any previous result. */
   sourceImageId: string;
   parentGenerationId?: string;
@@ -35,7 +35,7 @@ export interface Generation {
   prompt: string;
   recipeId?: string;
   /** Present for listing packs generated from the catalogue. */
-  listing?: ListingSelection;
+  category?: CategorySelection;
   settings: GenerationSettings;
   status: GenerationStatus;
   jobIds: string[];
@@ -47,7 +47,7 @@ export type JobStatus = "queued" | "generating" | "completed" | "failed" | "canc
 
 export interface GenerationJob {
   id: string;
-  projectId: string;
+  listingId: string;
   generationId: string;
   sourceImageId: string;
   /** 1-based position inside its generation, for display ("Variation 3"). */

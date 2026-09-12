@@ -13,7 +13,7 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
 
 import { __setServices, createServices } from "@/app/services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import type { Generation } from "@/domain/models";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { GenerationFeed } from "./GenerationFeed";
@@ -21,11 +21,11 @@ import { GenerationFeed } from "./GenerationFeed";
 const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])], { type: "image/png" });
 
 function addGeneration(id: string): void {
-  useProjectsStore.getState().commit((d) => {
+  useListingsStore.getState().commit((d) => {
     const gen: Generation = {
       id,
-      projectId: d.project.id,
-      sourceImageId: d.project.originalImageId!,
+      listingId: d.listing.id,
+      sourceImageId: d.listing.originalImageId!,
       prompt: `prompt ${id}`,
       settings: { providerId: "mock", modelId: "mock-fast", aspectRatio: "original", variationCount: 1 },
       status: "active",
@@ -47,11 +47,11 @@ describe("GenerationFeed › scroll to a new run", () => {
   });
   beforeEach(async () => {
     scrollIntoView.mockClear();
-    await useProjectsStore.getState().createFromFile(PNG, "item.png");
+    await useListingsStore.getState().createFromFile(PNG, "item.png");
   });
   afterEach(() => cleanup());
 
-  it("does not scroll for the generations already there when the project opens", () => {
+  it("does not scroll for the generations already there when the listing opens", () => {
     act(() => addGeneration("gen_old"));
     render(<GenerationFeed />);
     expect(screen.getByRole("article", { name: "prompt gen_old" })).toBeInTheDocument();
@@ -66,7 +66,7 @@ describe("GenerationFeed › scroll to a new run", () => {
     expect(scrollIntoView.mock.instances[0]).toBe(screen.getByRole("article", { name: "prompt gen_new" }));
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
     // A re-render with the same generations does not scroll again.
-    act(() => useProjectsStore.getState().commit((d) => void (d.project.brand = "x")));
+    act(() => useListingsStore.getState().commit((d) => void (d.listing.brand = "x")));
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 });

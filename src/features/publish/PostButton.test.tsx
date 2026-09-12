@@ -1,5 +1,5 @@
 /**
- * Entry point of the Vinted flow (header button): blocked with reasons in a toast until the project is
+ * Entry point of the Vinted flow (header button): blocked with reasons in a toast until the listing is
  * postable, then the automation warning (once, or every time until "don't show again"), then the Vinted window.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,7 +24,7 @@ vi.mock("@/infrastructure/platform/capabilities", async (importOriginal) => {
 
 import { __setServices, createServices, getServices } from "@/app/services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { usePublishStore } from "@/app/stores/publish-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { useToastStore } from "@/app/stores/toast-store";
@@ -51,10 +51,10 @@ function fakeBridge(): PublishBridge & { calls: string[] } {
 const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])], { type: "image/png" });
 
 async function makePostable() {
-  const doc = await useProjectsStore.getState().createFromFile(PNG, "chemise.png");
-  useProjectsStore.getState().toggleToPost(doc.project.originalImageId!);
-  useProjectsStore.getState().commit((d) => {
-    d.project.copy = { title: "Chemise", description: "Blanche", keywords: [], language: "fr", generatedAt: "", provider: "gemini", model: "m" };
+  const doc = await useListingsStore.getState().createFromFile(PNG, "chemise.png");
+  useListingsStore.getState().toggleToPost(doc.listing.originalImageId!);
+  useListingsStore.getState().commit((d) => {
+    d.listing.copy = { title: "Chemise", description: "Blanche", keywords: [], language: "fr", generatedAt: "", provider: "gemini", model: "m" };
   });
 }
 
@@ -79,7 +79,7 @@ describe("PostButton", () => {
     setAcknowledged(false);
     usePublishStore.setState({ session: { stage: "closed", busy: false } });
     useToastStore.setState({ toasts: [] });
-    useProjectsStore.setState({ current: null });
+    useListingsStore.setState({ current: null });
   });
 
   afterEach(cleanup);
@@ -158,11 +158,11 @@ describe("PostButton", () => {
     expect(button.querySelector("[data-count]")).toHaveTextContent("1");
   });
 
-  it("explains why the last session of this project ended", async () => {
+  it("explains why the last session of this listing ended", async () => {
     await makePostable();
-    const projectId = useProjectsStore.getState().current!.project.id;
+    const listingId = useListingsStore.getState().current!.listing.id;
     render(<PostButton />);
-    act(() => usePublishStore.setState({ session: { stage: "closed", busy: false, projectId, error: { code: "CANCELLED", message: "", retryable: false } } }));
+    act(() => usePublishStore.setState({ session: { stage: "closed", busy: false, listingId, error: { code: "CANCELLED", message: "", retryable: false } } }));
     expect(useToastStore.getState().toasts.map((x) => x.message)).toEqual(["The Vinted window was closed."]);
   });
 });

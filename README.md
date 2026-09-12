@@ -48,7 +48,7 @@ Drop the photo of an item you want to sell, pick its category (women, men, kids,
 ```
 Your device                                         Google
 ┌──────────────────────────────────────────┐        ┌──────────────────────┐
-│ Project (project.json)                   │        │                      │
+│ Listing (listing.json)                   │        │                      │
 │  ├─ original/                            │  POST  │ Gemini Interactions  │
 │  ├─ generations/  ◄── N independent jobs ├───────►│ API (your key/token) │
 │  └─ thumbnails/                          │        │                      │

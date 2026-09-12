@@ -8,7 +8,7 @@ export type ImageAssetKind = "original" | "generation";
  */
 export interface ImageAsset {
   id: string;
-  projectId: string;
+  listingId: string;
   kind: ImageAssetKind;
   mimeType: ImageMimeType;
   width: number;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AppError, deriveGenerationStatus, isGenerationError, isRetryableCode, summarize, toGenerationError, type ProjectDocument } from "./index";
+import { AppError, deriveGenerationStatus, isGenerationError, isRetryableCode, summarize, toGenerationError, type ListingDocument } from "./index";
 import { buildRequestForModel, seedForAttempt } from "@/domain/services/image-provider";
 import { GEMINI_IMAGE_MODELS } from "@/infrastructure/providers/gemini/GeminiModels";
 import { DEFAULT_SETTINGS } from "@/domain/models";
@@ -71,20 +71,20 @@ describe("deriveGenerationStatus", () => {
 describe("summarize", () => {
   it("counts generated images and picks the cover", () => {
     const now = "2026-01-01T00:00:00.000Z";
-    const doc: ProjectDocument = {
+    const doc: ListingDocument = {
       schemaVersion: 2,
       appVersion: "t",
-      project: { id: "prj_1", name: "P", originalImageId: "img_o", createdAt: now, updatedAt: now },
+      listing: { id: "prj_1", name: "P", originalImageId: "img_o", createdAt: now, updatedAt: now },
       images: {
-        img_o: { id: "img_o", projectId: "prj_1", kind: "original", mimeType: "image/png", width: 1, height: 1, byteSize: 1, createdAt: now },
-        img_g: { id: "img_g", projectId: "prj_1", kind: "generation", mimeType: "image/png", width: 1, height: 1, byteSize: 1, createdAt: now },
+        img_o: { id: "img_o", listingId: "prj_1", kind: "original", mimeType: "image/png", width: 1, height: 1, byteSize: 1, createdAt: now },
+        img_g: { id: "img_g", listingId: "prj_1", kind: "generation", mimeType: "image/png", width: 1, height: 1, byteSize: 1, createdAt: now },
       },
       generations: {},
       jobs: {},
       toPost: [],
     };
     expect(summarize(doc)).toEqual({ id: "prj_1", name: "P", coverImageId: "img_o", imageCount: 1, updatedAt: now });
-    doc.project.coverImageId = "img_g";
+    doc.listing.coverImageId = "img_g";
     expect(summarize(doc).coverImageId).toBe("img_g");
   });
 });

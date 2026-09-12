@@ -16,8 +16,8 @@ import { __setServices, createServices } from "@/app/services";
 import { useAuthStore } from "@/app/stores/auth-store";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { applyJobUpdate, buildRequestForJob, persistJobResult, useGenerationStore } from "@/app/stores/generation-store";
-import { useListingStore } from "@/app/stores/listing-store";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingSetupStore } from "@/app/stores/listing-setup-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { ListingSetupCard } from "./ListingSetupCard";
@@ -33,11 +33,11 @@ describe("ListingSetupCard", () => {
   });
   beforeEach(async () => {
     useAuthStore.setState({ providerStatus: {} });
-    useListingStore.setState({ creating: false, lastRun: null, lastRunProjectId: null, copyBusy: false, copyError: null });
+    useListingSetupStore.setState({ creating: false, lastRun: null, lastRunListingId: null, copyBusy: false, copyError: null });
     useSettingsStore.setState({
       settings: { ...useSettingsStore.getState().settings, mannequin: undefined, activeProviderId: "mock", copyProviderId: "gemini" },
     });
-    await useProjectsStore.getState().createFromFile(PNG, "item.png");
+    await useListingsStore.getState().createFromFile(PNG, "item.png");
     useComposerStore.getState().setProvider("mock");
     await useGenerationStore.getState().loadModels("mock", true);
     useComposerStore.getState().setModel("mock-fast");
@@ -47,13 +47,13 @@ describe("ListingSetupCard", () => {
     vi.restoreAllMocks();
   });
 
-  it("is disabled until the category is chosen, then runs createListing once", async () => {
+  it("is disabled until the category is chosen, then runs generateListing once", async () => {
     const user = userEvent.setup();
-    const create = vi.spyOn(useListingStore.getState(), "createListing").mockResolvedValue(null);
+    const create = vi.spyOn(useListingSetupStore.getState(), "generateListing").mockResolvedValue(null);
     render(<ListingSetupCard />);
     expect(screen.getByRole("button", { name: "Create the listing" })).toBeDisabled();
     expect(screen.getByText("Choose a category and a subcategory to generate")).toBeInTheDocument();
-    act(() => useListingStore.getState().setListing({ categoryId: "men", subcategoryId: "shoes" }));
+    act(() => useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" }));
     // No text provider connected in this test: the button says what will actually run.
     const button = await screen.findByRole("button", { name: "Create the listing · 5 photos" });
     expect(button).toBeEnabled();
@@ -64,7 +64,7 @@ describe("ListingSetupCard", () => {
 
   it("announces photos + text when both providers are usable", async () => {
     useAuthStore.setState({ providerStatus: { gemini: { state: "authenticated", kind: "api_key" } } });
-    act(() => useListingStore.getState().setListing({ categoryId: "men", subcategoryId: "shoes" }));
+    act(() => useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" }));
     render(<ListingSetupCard />);
     expect(await screen.findByRole("button", { name: "Create the listing · 5 photos + text" })).toBeEnabled();
   });
@@ -73,7 +73,7 @@ describe("ListingSetupCard", () => {
     // Cloudflare selected but not connected, and no text provider: both parts are skipped, nothing can run.
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, activeProviderId: "cloudflare" } });
     useComposerStore.getState().setProvider("cloudflare");
-    act(() => useListingStore.getState().setListing({ categoryId: "men", subcategoryId: "shoes" }));
+    act(() => useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" }));
     render(<ListingSetupCard />);
     expect(await screen.findByText("Connect an image provider or a text provider in Settings.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create the listing" })).toBeDisabled();
@@ -83,23 +83,23 @@ describe("ListingSetupCard", () => {
     const user = userEvent.setup();
     render(<ListingSetupCard />);
     await user.type(screen.getByLabelText(/Brand/), "Nike Air");
-    expect(useProjectsStore.getState().current?.project.brand).toBe("Nike Air");
+    expect(useListingsStore.getState().current?.listing.brand).toBe("Nike Air");
   });
 
   it("opens the editor when the mannequin toggle is turned on without a mannequin, then enables it", async () => {
     const user = userEvent.setup();
-    act(() => useListingStore.getState().setListing({ categoryId: "women", subcategoryId: "clothing" }));
+    act(() => useListingSetupStore.getState().setCategory({ categoryId: "women", subcategoryId: "clothing" }));
     render(<ListingSetupCard />);
     await user.click(screen.getByRole("switch", { name: "My mannequin" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("My mannequin");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(useProjectsStore.getState().current?.project.useMannequin).toBe(true);
+    expect(useListingsStore.getState().current?.listing.useMannequin).toBe(true);
     expect(useSettingsStore.getState().settings.mannequin).toBeDefined();
     expect(screen.getByRole("switch", { name: "My mannequin" })).toHaveAttribute("aria-checked", "true");
   });
 
   it("disables the mannequin for kids' items", () => {
-    act(() => useListingStore.getState().setListing({ categoryId: "kids", subcategoryId: "clothing" }));
+    act(() => useListingSetupStore.getState().setCategory({ categoryId: "kids", subcategoryId: "clothing" }));
     render(<ListingSetupCard />);
     expect(screen.getByRole("switch", { name: "My mannequin" })).toBeDisabled();
     expect(screen.getByText("Not used for kids' and pets' items.")).toBeInTheDocument();
@@ -107,11 +107,11 @@ describe("ListingSetupCard", () => {
 
   it("asks before re-creating a listing that already has text", async () => {
     const user = userEvent.setup();
-    const create = vi.spyOn(useListingStore.getState(), "createListing").mockResolvedValue(null);
+    const create = vi.spyOn(useListingSetupStore.getState(), "generateListing").mockResolvedValue(null);
     act(() => {
-      useListingStore.getState().setListing({ categoryId: "men", subcategoryId: "shoes" });
-      useProjectsStore.getState().commit((d) => {
-        d.project.copy = { title: "T", description: "D", keywords: [], language: "en", generatedAt: "", provider: "gemini", model: "m" };
+      useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" });
+      useListingsStore.getState().commit((d) => {
+        d.listing.copy = { title: "T", description: "D", keywords: [], language: "en", generatedAt: "", provider: "gemini", model: "m" };
       });
     });
     render(<ListingSetupCard />);
@@ -123,10 +123,10 @@ describe("ListingSetupCard", () => {
 
   it("shows a cancel action while a run is in progress", async () => {
     const user = userEvent.setup();
-    const cancel = vi.spyOn(useListingStore.getState(), "cancelListing").mockImplementation(() => undefined);
-    act(() => useListingStore.getState().setListing({ categoryId: "men", subcategoryId: "shoes" }));
+    const cancel = vi.spyOn(useListingSetupStore.getState(), "cancelListingRun").mockImplementation(() => undefined);
+    act(() => useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" }));
     render(<ListingSetupCard />);
-    act(() => useListingStore.setState({ creating: true }));
+    act(() => useListingSetupStore.setState({ creating: true }));
     expect(screen.getByText("Creating the listing…")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancel all" }));
     expect(cancel).toHaveBeenCalledTimes(1);

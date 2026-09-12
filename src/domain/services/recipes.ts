@@ -1,5 +1,5 @@
 import type { Recipe } from "@/domain/models";
-import { buildListingShots, LISTING_CATEGORIES, listingRecipeId } from "./listing-catalog";
+import { buildShots, CATEGORIES, catalogRecipeId } from "./catalog";
 
 const VARIABLE_PATTERN = /\{\{\s*([a-zA-Z0-9_ -]+?)\s*\}\}/g;
 
@@ -31,18 +31,18 @@ const now = "2026-09-12T00:00:00.000Z";
  * Built-in recipes are the listing packs: one per marketplace subcategory, four or five shots each.
  * They are generated from the catalogue so labels, prompts and ids have a single source of truth.
  */
-export const BUILT_IN_RECIPES: Recipe[] = LISTING_CATEGORIES.flatMap((category) =>
+export const BUILT_IN_RECIPES: Recipe[] = CATEGORIES.flatMap((category) =>
   category.subcategories.map((subcategory) => {
-    const listing = { categoryId: category.id, subcategoryId: subcategory.id };
-    const shots = buildListingShots(listing);
+    const pack = { categoryId: category.id, subcategoryId: subcategory.id };
+    const shots = buildShots(pack);
     return {
-      id: listingRecipeId(listing),
+      id: catalogRecipeId(pack),
       name: `${category.label.en} › ${subcategory.label.en}`,
       description: shots.map((s) => s.label.en).join(" · "),
       category: "listing",
       promptTemplate: shots[0]?.prompt ?? "",
       shots,
-      listing,
+      pack,
       builtIn: true,
       createdAt: now,
       updatedAt: now,

@@ -2,8 +2,8 @@ export const en = {
   // App / navigation
   "app.name": "AI Image Variations",
   "app.tagline": "A local-first visual workspace for AI image creation and variations.",
-  "nav.projects": "Projects",
-  "nav.newProject": "New project",
+  "nav.listings": "Listings",
+  "nav.newListing": "New listing",
   "nav.recent": "Recent",
   "nav.settings": "Settings",
   "nav.recipes": "Recipes",
@@ -39,17 +39,17 @@ export const en = {
   "common.no": "No",
   "common.unknown": "Unknown",
 
-  // Projects
-  "projects.empty.title": "No projects yet",
-  "projects.empty.body": "Import an image to create your first project. Everything stays on this device.",
-  "projects.untitled": "Untitled project",
-  "projects.delete.title": "Delete project?",
-  "projects.delete.body": "“{name}” and all of its images will be removed from this device. This cannot be undone.",
-  "projects.rename.title": "Rename project",
-  "projects.imageCount": "{count} images",
-  "projects.updated": "Updated {when}",
-  "projects.deleted": "Project deleted",
-  "projects.count": "{count} projects on this device",
+  // Listings
+  "listings.empty.title": "No listings yet",
+  "listings.empty.body": "Import a photo of the item to create your first listing. Everything stays on this device.",
+  "listings.untitled": "Untitled listing",
+  "listings.delete.title": "Delete listing?",
+  "listings.delete.body": "“{name}” and all of its images will be removed from this device. This cannot be undone.",
+  "listings.rename.title": "Rename listing",
+  "listings.imageCount": "{count} images",
+  "listings.updated": "Updated {when}",
+  "listings.deleted": "Listing deleted",
+  "listings.count": "{count} listings on this device",
 
   // Import
   "import.dropTitle": "Drop an image here",
@@ -262,14 +262,14 @@ export const en = {
   // Storage / privacy
   "storage.location": "Data location",
   "storage.locationWeb": "This browser's IndexedDB (origin-scoped)",
-  "storage.usage": "{count} projects · {size}",
+  "storage.usage": "{count} listings · {size}",
   "storage.clearAll": "Delete all local data",
-  "storage.clearAll.body": "Every project, image and setting on this device will be removed. Credentials are removed too.",
+  "storage.clearAll.body": "Every listing, image and setting on this device will be removed. Credentials are removed too.",
   "storage.cleanup": "Remove orphaned files",
   "storage.cleanupDone": "Removed {count} orphaned files",
-  "storage.export": "Export project archive",
+  "storage.export": "Export listing archive",
   "privacy.body":
-    "Your projects, images, prompts and history stay on this device. An image only leaves your device when you launch a generation, and it is sent directly to the AI provider you configured. No analytics send your images or prompts anywhere.",
+    "Your listings, images, prompts and history stay on this device. An image only leaves your device when you launch a generation, and it is sent directly to the AI provider you configured. No analytics send your images or prompts anywhere.",
   "privacy.ads": "Ads",
   "privacy.adsBody": "No ads are shown in this build. Images and prompts are never shared with advertising systems.",
 

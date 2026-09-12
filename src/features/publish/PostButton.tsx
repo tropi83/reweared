@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Send } from "lucide-react";
-import { useProjectsStore } from "@/app/stores/projects-store";
+import { useListingsStore } from "@/app/stores/listings-store";
 import { postEligibility, usePublishStore } from "@/app/stores/publish-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
@@ -13,16 +13,16 @@ import { TermsDialog } from "./TermsDialog";
 
 /**
  * Header entry point of the Vinted publishing flow. Compact (icon + count) on narrow screens, labelled from `sm`.
- * When the project is not postable the button stays tappable and explains why in a toast — a `disabled` button
+ * When the listing is not postable the button stays tappable and explains why in a toast — a `disabled` button
  * would be mute on a phone.
  */
 export function PostButton() {
   const t = useT();
-  const doc = useProjectsStore((s) => s.current);
+  const doc = useListingsStore((s) => s.current);
   const acknowledged = useSettingsStore((s) => s.settings.vintedAutomationAcknowledged);
   const start = usePublishStore((s) => s.start);
-  // Why the last session of this project ended (window closed, open failure); cleared by the next start.
-  const lastError = usePublishStore((s) => (s.session.stage === "closed" && s.session.projectId === doc?.project.id ? s.session.error : undefined));
+  // Why the last session of this listing ended (window closed, open failure); cleared by the next start.
+  const lastError = usePublishStore((s) => (s.session.stage === "closed" && s.session.listingId === doc?.listing.id ? s.session.error : undefined));
   const [terms, setTerms] = useState(false);
   const { ok, reasons } = postEligibility(doc);
   const count = doc ? orderedPhotoIds(doc).length : 0;
