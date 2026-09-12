@@ -51,4 +51,51 @@ describe("TauriVintedBridge", () => {
     });
     await expect(b.navigate("/")).rejects.toMatchObject({ code: "INVALID_REQUEST", detail: "path not allowed" });
   });
+
+  it("maps a poll timeout to TIMEOUT and other command failures to UNKNOWN_ERROR", async () => {
+    const timedOut = new TauriVintedBridge({
+      invoke: vi.fn(async () => {
+        throw new Error("poll timed out");
+      }),
+      listen: vi.fn(async () => () => undefined),
+    });
+    await expect(timedOut.poll()).rejects.toMatchObject({ code: "TIMEOUT" });
+
+    const notOpen = new TauriVintedBridge({
+      invoke: vi.fn(async () => {
+        throw new Error("vinted window is not open");
+      }),
+      listen: vi.fn(async () => () => undefined),
+    });
+    await expect(notOpen.close()).rejects.toMatchObject({ code: "UNKNOWN_ERROR" });
+  });
+
+  it("still unsubscribes when cancelled before listen resolves", async () => {
+    const unlisten = vi.fn();
+    let resolveListen!: (fn: () => void) => void;
+    const listen = vi.fn(() => new Promise<() => void>((resolve) => (resolveListen = resolve)));
+    const b = new TauriVintedBridge({ invoke: vi.fn(async () => undefined), listen });
+
+    const off = b.onPage(() => undefined);
+    off();
+    resolveListen(unlisten);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(unlisten).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not throw or reject when listen() itself rejects", async () => {
+    const listen = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    const b = new TauriVintedBridge({ invoke: vi.fn(async () => undefined), listen });
+
+    let off: (() => void) | undefined;
+    expect(() => (off = b.onPage(() => undefined))).not.toThrow();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(() => off?.()).not.toThrow();
+  });
 });

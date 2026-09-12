@@ -58,7 +58,8 @@ export class TauriVintedBridge implements PublishBridge {
       .then((unlisten) => {
         if (cancelled) unlisten();
         else off = unlisten;
-      });
+      })
+      .catch((err) => log.warn(event, "listen failed:", err instanceof Error ? err.message : String(err)));
     return () => {
       cancelled = true;
       off?.();
