@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
+    "build:prefill": "vite build --config vite.prefill.config.ts",
+    "prefill:verify": "node scripts/verify-prefill.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
@@ -14,7 +16,7 @@
     "lint": "eslint src",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm prefill:verify",
     "rust:check": "cd src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo test",
     "tauri": "tauri"
   },

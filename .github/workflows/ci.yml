@@ -29,6 +29,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm test:coverage
+      - name: Prefill bundle is up to date
+        run: pnpm prefill:verify
       - run: pnpm exec vite build
       - name: Upload coverage
         if: always()

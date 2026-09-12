@@ -21,6 +21,20 @@ if (typeof Blob !== "undefined" && typeof Blob.prototype.arrayBuffer !== "functi
   };
 }
 
+// jsdom has no DataTransfer; the Vinted pre-fill script builds a FileList through it.
+if (typeof DataTransfer === "undefined") {
+  class FakeDataTransfer {
+    private list: File[] = [];
+    items = { add: (f: File) => void this.list.push(f) };
+    get files() {
+      const arr = this.list.slice() as File[] & { item(i: number): File | null };
+      arr.item = (i) => arr[i] ?? null;
+      return arr as unknown as FileList;
+    }
+  }
+  Object.assign(globalThis, { DataTransfer: FakeDataTransfer });
+}
+
 // jsdom has no canvas: make getContext return null quietly so code paths fall back without noisy warnings.
 if (typeof HTMLCanvasElement !== "undefined") {
   HTMLCanvasElement.prototype.getContext = (() => null) as unknown as HTMLCanvasElement["getContext"];
