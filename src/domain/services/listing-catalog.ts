@@ -1,4 +1,5 @@
-import type { ListingCategory, ListingCategoryId, ListingSelection, ListingSubcategory, Localized, ProductKind, ShotSpec } from "@/domain/models";
+import type { ListingCategory, ListingCategoryId, ListingSelection, ListingSubcategory, Localized, Mannequin, ProductKind, ShotSpec } from "@/domain/models";
+import { describeWearer, mannequinApplies, posePhrase } from "./mannequin";
 
 /**
  * Listing catalogue: the marketplace taxonomy (10 categories, 56 subcategories) and, per
@@ -15,7 +16,7 @@ const L = (en: string, fr: string): Localized => ({ en, fr });
 interface ShotTemplate {
   id: string;
   label: Localized;
-  /** May use {{subject}} and {{wearer}}. */
+  /** May use {{subject}}, {{wearer}} and {{pose|default}}. */
   template: string;
   /** Categories for which this shot is skipped (a mirror selfie makes no sense for kids' items). */
   excludeCategories?: ListingCategoryId[];
@@ -61,7 +62,7 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
     CONTEXT(
       "worn",
       L("Worn", "Portée"),
-      "The garment worn by {{wearer}} in a natural standing pose, neutral studio background, fashion catalog photo, garment fully visible and unchanged.",
+      "The garment worn by {{wearer}}, {{pose|standing naturally}}, neutral studio background, fashion catalog photo, garment fully visible and unchanged.",
     ),
     SELFIE("wearing the garment as part of a simple everyday outfit,"),
     DETAIL(
@@ -73,7 +74,11 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
   footwear: [
     RETOUCH("the shoes cleaned, laces neat, scuffs and dust removed while keeping honest wear visible."),
     STUDIO("The pair side by side at a three-quarter angle, both shoes fully visible."),
-    CONTEXT("worn", L("Worn", "Portées"), "The shoes worn by {{wearer}}, cropped at the ankles or knees, standing on a neutral floor, natural light."),
+    CONTEXT(
+      "worn",
+      L("Worn", "Portées"),
+      "The shoes worn by {{wearer}}, {{pose|standing}}, cropped at the ankles or knees, on a neutral floor, natural light.",
+    ),
     SELFIE("wearing the shoes with a simple everyday outfit, full body visible down to the shoes,"),
     DETAIL(
       "profile",
@@ -489,21 +494,35 @@ export function findSubcategory(selection: ListingSelection): { category: Listin
   return category && subcategory ? { category, subcategory } : undefined;
 }
 
-export function interpolateShot(template: string, vars: { subject: string; wearer: string }): string {
-  return template.replace(/\{\{\s*subject\s*\}\}/g, vars.subject).replace(/\{\{\s*wearer\s*\}\}/g, vars.wearer);
+const POSE_SLOT = /\{\{\s*pose\s*(?:\|([^}]*))?\}\}/g;
+const WEARER = /\{\{\s*wearer\s*\}\}/;
+
+/**
+ * `{{pose|default}}` renders `vars.pose` or its default. When a pose is given and the template has a
+ * person but no pose slot, the pose is appended as its own sentence — a prompt never gets two poses.
+ */
+export function interpolateShot(template: string, vars: { subject: string; wearer: string; pose?: string }): string {
+  const hasSlot = /\{\{\s*pose/.test(template);
+  let out = template.replace(POSE_SLOT, (_match, fallback: string | undefined) => vars.pose ?? (fallback ?? "").trim());
+  out = out.replace(/\{\{\s*subject\s*\}\}/g, vars.subject).replace(/\{\{\s*wearer\s*\}\}/g, vars.wearer);
+  if (vars.pose && !hasSlot && WEARER.test(template)) out = `${out} The person is ${vars.pose}.`;
+  return out;
 }
 
-/** The four prompts for a listing, fully interpolated. */
-export function buildListingShots(selection: ListingSelection): ShotSpec[] {
+/** The prompts of a listing pack, fully interpolated; `mannequin` replaces the generic person where it applies. */
+export function buildListingShots(selection: ListingSelection, options: { mannequin?: Mannequin } = {}): ShotSpec[] {
   const found = findSubcategory(selection);
   if (!found) throw new Error(`Unknown listing selection ${selection.categoryId}/${selection.subcategoryId}`);
   const { category, subcategory } = found;
+  const m = options.mannequin && mannequinApplies(category.id) ? options.mannequin : undefined;
+  const wearer = m ? describeWearer(category.wearer, m) : category.wearer;
+  const pose = m ? posePhrase(m.pose) : undefined;
   return PLANS[subcategory.kind]
     .filter((s) => !s.excludeCategories?.includes(category.id))
     .map((s) => ({
       id: s.id,
       label: s.label,
-      prompt: interpolateShot(s.template, { subject: subcategory.subject, wearer: category.wearer }),
+      prompt: interpolateShot(s.template, { subject: subcategory.subject, wearer, ...(pose && WEARER.test(s.template) ? { pose } : {}) }),
     }));
 }
 

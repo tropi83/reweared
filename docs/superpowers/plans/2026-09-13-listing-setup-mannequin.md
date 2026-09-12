@@ -1658,8 +1658,8 @@ Update this section after each task (task, status, commit, deviations). A new ag
 | ----------------------------- | ------ | ----------------------------------------------- | --------------------------- |
 | Spec                          | done   | `docs: design spec for the listing setup card…` | approved in chat 2026-09-13 |
 | Plan                          | done   | (this commit)                                   |                             |
-| 1 Mannequin model + helpers   | todo   |                                                 |                             |
-| 2 Catalogue prompts           | todo   |                                                 |                             |
+| 1 Mannequin model + helpers   | done   | `208df09`                                       | as planned                  |
+| 2 Catalogue prompts           | done   | (see git log: "seller's mannequin and pose")    | as planned                  |
 | 3 Brand in copy prompt        | todo   |                                                 |                             |
 | 4 createListing orchestration | todo   |                                                 |                             |
 | 5 Mannequin dialog + settings | todo   |                                                 |                             |

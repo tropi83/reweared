@@ -68,6 +68,43 @@ describe("listing catalogue", () => {
     for (const sub of kids.subcategories) expect(hasSelfie("kids", sub.id), sub.id).toBe(false);
   });
 
+  it("keeps the default poses when no mannequin is given", () => {
+    expect(buildListingShots({ categoryId: "women", subcategoryId: "clothing" }).find((s) => s.id === "worn")?.prompt).toContain(
+      "worn by a woman, standing naturally,",
+    );
+    expect(buildListingShots({ categoryId: "men", subcategoryId: "shoes" }).find((s) => s.id === "worn")?.prompt).toContain("worn by a man, standing, cropped");
+  });
+
+  it("puts the seller's mannequin in every shot with a person, with a single pose", () => {
+    const mannequin = { build: "S", pose: "crouching", skinTone: "brown" } as const;
+    const shots = buildListingShots({ categoryId: "women", subcategoryId: "clothing" }, { mannequin });
+    const byId = Object.fromEntries(shots.map((s) => [s.id, s.prompt]));
+    expect(byId.worn).toContain("worn by a woman with a slim build and brown skin, crouching down,");
+    expect(byId.worn).not.toContain("standing naturally");
+    expect(byId.selfie).toContain("mirror selfie taken by a woman with a slim build and brown skin");
+    expect(byId.selfie).toMatch(/The person is crouching down\.$/);
+    const plain = buildListingShots({ categoryId: "women", subcategoryId: "clothing" });
+    for (const id of ["retouch", "studio", "folded"]) expect(byId[id], id).toBe(plain.find((s) => s.id === id)?.prompt);
+    for (const s of shots)
+      expect(s.prompt.match(/standing naturally|crouching down|sitting on a stool|arched back/g)?.length ?? 0, s.id).toBeLessThanOrEqual(1);
+  });
+
+  it("interpolates every subcategory with a mannequin", () => {
+    const mannequin = { build: "L", pose: "arched", skinTone: "very-fair" } as const;
+    for (const c of LISTING_CATEGORIES)
+      for (const s of c.subcategories)
+        for (const shot of buildListingShots({ categoryId: c.id, subcategoryId: s.id }, { mannequin }))
+          expect(shot.prompt, `${c.id}/${s.id}/${shot.id}`).not.toMatch(/\{\{/);
+  });
+
+  it("ignores the mannequin for kids and pets", () => {
+    const mannequin = { build: "L", pose: "sitting", skinTone: "fair" } as const;
+    for (const categoryId of ["kids", "pets"] as const) {
+      const subcategoryId = LISTING_CATEGORIES.find((c) => c.id === categoryId)!.subcategories[0]!.id;
+      expect(buildListingShots({ categoryId, subcategoryId }, { mannequin })).toEqual(buildListingShots({ categoryId, subcategoryId }));
+    }
+  });
+
   it("round-trips built-in recipe ids and rejects unknown selections", () => {
     const sel = { categoryId: "entertainment" as const, subcategoryId: "video-games" };
     const id = listingRecipeId(sel);
