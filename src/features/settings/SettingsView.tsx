@@ -8,7 +8,8 @@ import { getServices } from "@/app/services";
 import { navigate } from "@/app/router";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
-import { Input, Label, Select } from "@/components/ui/Input";
+import { Input, Label } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Segmented } from "@/components/ui/Misc";
 import { ALL_ASPECT_RATIOS, type AspectRatio, type Locale, type ThemePreference } from "@/domain/models";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
@@ -151,22 +152,20 @@ function GenerationSection() {
           />
         </Field>
         <Field label={t("settings.defaultVariations")} htmlFor="defvar">
-          <Select id="defvar" value={settings.defaultVariationCount} onChange={(e) => void update({ defaultVariationCount: Number(e.target.value) })}>
-            {[1, 2, 4, 6, 8].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="defvar"
+            value={String(settings.defaultVariationCount)}
+            options={[1, 2, 4, 6, 8].map((n) => ({ value: String(n), label: n }))}
+            onChange={(v) => void update({ defaultVariationCount: Number(v) })}
+          />
         </Field>
         <Field label={t("composer.aspectRatio")} htmlFor="defratio">
-          <Select id="defratio" value={settings.defaultAspectRatio} onChange={(e) => void update({ defaultAspectRatio: e.target.value as AspectRatio })}>
-            {ALL_ASPECT_RATIOS.map((r) => (
-              <option key={r} value={r}>
-                {r === "original" ? t("composer.aspectOriginal") : r}
-              </option>
-            ))}
-          </Select>
+          <Select<AspectRatio>
+            id="defratio"
+            value={settings.defaultAspectRatio}
+            options={ALL_ASPECT_RATIOS.map((r) => ({ value: r, label: r === "original" ? t("composer.aspectOriginal") : r }))}
+            onChange={(defaultAspectRatio) => void update({ defaultAspectRatio })}
+          />
         </Field>
       </div>
     </Section>

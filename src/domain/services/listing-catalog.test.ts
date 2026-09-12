@@ -16,13 +16,14 @@ describe("listing catalogue", () => {
     }
   });
 
-  it("produces four distinct, fully interpolated prompts for every subcategory", () => {
+  it("produces four or five distinct, fully interpolated prompts for every subcategory", () => {
     for (const c of LISTING_CATEGORIES) {
       for (const s of c.subcategories) {
         const shots = buildListingShots({ categoryId: c.id, subcategoryId: s.id });
-        expect(shots, `${c.id}/${s.id}`).toHaveLength(4);
-        expect(new Set(shots.map((x) => x.id)).size).toBe(4);
-        expect(new Set(shots.map((x) => x.prompt)).size).toBe(4);
+        expect(shots.length, `${c.id}/${s.id}`).toBeGreaterThanOrEqual(4);
+        expect(shots.length, `${c.id}/${s.id}`).toBeLessThanOrEqual(5);
+        expect(new Set(shots.map((x) => x.id)).size).toBe(shots.length);
+        expect(new Set(shots.map((x) => x.prompt)).size).toBe(shots.length);
         for (const shot of shots) {
           expect(shot.prompt).not.toMatch(/\{\{/);
           expect(shot.prompt).toContain(s.subject);
@@ -41,8 +42,26 @@ describe("listing catalogue", () => {
     expect(women.find((s) => s.id === "worn")?.prompt).toContain("worn by a woman");
     expect(kids.find((s) => s.id === "worn")?.prompt).toContain("a child, face not visible");
     expect(men.find((s) => s.id === "worn")?.prompt).toContain("worn by a man");
-    expect(women.map((s) => s.id)).toEqual(["retouch", "studio", "worn", "folded"]);
+    expect(women.map((s) => s.id)).toEqual(["retouch", "studio", "worn", "selfie", "folded"]);
+    expect(women.find((s) => s.id === "selfie")?.prompt).toContain("mirror selfie taken by a woman");
+    expect(men.map((s) => s.id)).toEqual(["retouch", "studio", "worn", "selfie", "profile"]);
     expect(buildListingShots({ categoryId: "electronics", subcategoryId: "phones" }).map((s) => s.id)).toEqual(["retouch", "studio", "hand", "back"]);
+  });
+
+  it("adds the mirror selfie only to wearable kinds and never for kids", () => {
+    const hasSelfie = (categoryId: Parameters<typeof buildListingShots>[0]["categoryId"], subcategoryId: string) =>
+      buildListingShots({ categoryId, subcategoryId }).some((s) => s.id === "selfie");
+    expect(hasSelfie("women", "bags")).toBe(true);
+    expect(hasSelfie("men", "accessories")).toBe(true);
+    expect(hasSelfie("luxury", "watches")).toBe(true);
+    expect(hasSelfie("luxury", "jewelry")).toBe(true);
+    expect(hasSelfie("kids", "clothing")).toBe(false);
+    expect(hasSelfie("kids", "shoes")).toBe(false);
+    expect(hasSelfie("home", "furniture")).toBe(false);
+    expect(hasSelfie("electronics", "phones")).toBe(false);
+    // Kids never get a selfie in any subcategory.
+    const kids = LISTING_CATEGORIES.find((c) => c.id === "kids")!;
+    for (const sub of kids.subcategories) expect(hasSelfie("kids", sub.id), sub.id).toBe(false);
   });
 
   it("round-trips built-in recipe ids and rejects unknown selections", () => {

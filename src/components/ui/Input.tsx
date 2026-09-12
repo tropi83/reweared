@@ -1,5 +1,4 @@
-import { forwardRef, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
-import { ChevronDown } from "lucide-react";
+import { forwardRef, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
 
 const base =
@@ -11,17 +10,6 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...rest }, ref) {
   return <textarea ref={ref} className={cn(base, "resize-none py-2 leading-relaxed", className)} {...rest} />;
-});
-
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
-  return (
-    <div className="relative">
-      <select ref={ref} className={cn(base, "h-9 appearance-none pr-8", className)} {...rest}>
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />
-    </div>
-  );
 });
 
 export function Label({ children, htmlFor, className, hint }: { children: React.ReactNode; htmlFor?: string; className?: string; hint?: string }) {

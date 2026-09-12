@@ -170,13 +170,13 @@ describe("listing packs", () => {
       shots,
       recipeId: "rcp_listing_women_shoes",
     });
-    expect(gen.jobIds).toHaveLength(4);
+    expect(gen.jobIds).toHaveLength(5);
     expect(gen.listing).toEqual(listing);
     await waitFor(() => useProjectsStore.getState().current?.generations[gen.id]?.status === "completed");
     const after = useProjectsStore.getState().current!;
     const jobs = gen.jobIds.map((id) => after.jobs[id]!);
-    expect(jobs.map((j) => j.shotId)).toEqual(["retouch", "studio", "worn", "profile"]);
-    expect(new Set(jobs.map((j) => j.prompt)).size).toBe(4);
+    expect(jobs.map((j) => j.shotId)).toEqual(["retouch", "studio", "worn", "selfie", "profile"]);
+    expect(new Set(jobs.map((j) => j.prompt)).size).toBe(5);
     expect(jobs[2]!.shotLabel?.fr).toBe("Portées");
     expect(new Set(jobs.map((j) => j.seed)).size).toBeGreaterThan(1);
 

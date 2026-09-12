@@ -5,7 +5,8 @@ import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
 import { getServices, MOCK_ENABLED } from "@/app/services";
 import { Button } from "@/components/ui/Button";
-import { Input, Label, Select, Switch } from "@/components/ui/Input";
+import { Input, Label, Switch } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Misc";
 import { toGenerationError, type AuthStatus } from "@/domain/models";
 import type { GoogleCloudProject } from "@/infrastructure/auth/GoogleOAuthCredentialProvider";
@@ -155,15 +156,10 @@ function GoogleCard() {
               <Select
                 id="gcp-project"
                 value={auth.oauthStatus.projectId ?? ""}
-                onChange={(e) => void auth.setProjectId(e.target.value || undefined).catch((err) => toast.error(toGenerationError(err).message))}
-              >
-                <option value="">{t("auth.google.selectProject")}</option>
-                {projects.map((p) => (
-                  <option key={p.projectId} value={p.projectId}>
-                    {p.name} ({p.projectId})
-                  </option>
-                ))}
-              </Select>
+                placeholder={t("auth.google.selectProject")}
+                options={projects.map((p) => ({ value: p.projectId, label: p.name, description: p.projectId }))}
+                onChange={(id) => void auth.setProjectId(id || undefined).catch((err) => toast.error(toGenerationError(err).message))}
+              />
             ) : (
               <form
                 className="flex gap-2"
@@ -329,13 +325,12 @@ function MockCard() {
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="mock-scenario">{t("auth.mock.scenario")}</Label>
-          <Select id="mock-scenario" value={scenario} onChange={(e) => setScenario(e.target.value as MockScenario)}>
-            {(["success", "slow", "flaky", "rate_limited", "timeout", "error", "no_image"] as MockScenario[]).map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </Select>
+          <Select<MockScenario>
+            id="mock-scenario"
+            value={scenario}
+            options={(["success", "slow", "flaky", "rate_limited", "timeout", "error", "no_image"] as MockScenario[]).map((s) => ({ value: s, label: s }))}
+            onChange={setScenario}
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="mock-latency" hint={`${latency} ms`}>

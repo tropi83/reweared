@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **Mirror selfie shot** for clothing, shoes, bags, accessories, jewelry, watches and leather goods (skipped for the kids category) — packs now have four or five photos; UI counts follow the pack.
+- **Projects page** lists every project on the device as a card (cover, image count, last update) with the import zone on top; the empty state only shows when there is nothing yet.
+- **Mobile import** (Android/iOS): "Photo library" opens the system media picker through the Tauri dialog plugin (`pickerMode: "image"`; the returned `content://` / `file://` URI is read by the fs plugin), "Take a photo" uses `<input type=file accept="image/*" capture="environment">`, which the Android WebView and iOS WKWebView open as the camera.
+- Themed `Select` component (button + portalled listbox, keyboard navigation, type-ahead, flips when there is no room below, works inside modal dialogs) replacing every native `<select>`.
+
 ### Changed
 
 - **Product pivot: listing photo studio.** The free prompt is gone; the composer asks for a category and subcategory and generates the four photos a listing needs, each with its own prompt adapted to the product kind (56 packs / 40 kinds, also exposed as built-in recipes). "Generate again" re-runs the same four shots.

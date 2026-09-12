@@ -67,7 +67,7 @@ export interface ListingCategory {
   subcategories: ListingSubcategory[];
 }
 
-/** One of the four photos of a listing pack. */
+/** One of the photos of a listing pack (four, plus a mirror selfie for fashion items). */
 export interface ShotSpec {
   /** Stable id inside the plan ("retouch", "studio", "worn", "folded"…). */
   id: string;

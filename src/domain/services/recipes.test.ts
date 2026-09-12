@@ -15,12 +15,13 @@ describe("recipes", () => {
     expect(interpolate("{{a}}   hello   {{b}} ", {})).toBe("hello");
   });
 
-  it("built-in recipes are the 56 listing packs with four shots each", () => {
+  it("built-in recipes are the 56 listing packs with four or five shots each", () => {
     expect(BUILT_IN_RECIPES.length).toBe(56);
     for (const recipe of BUILT_IN_RECIPES) {
       expect(recipe.id.startsWith("rcp_listing_")).toBe(true);
       expect(recipe.category).toBe("listing");
-      expect(recipe.shots).toHaveLength(4);
+      expect(recipe.shots!.length).toBeGreaterThanOrEqual(4);
+      expect(recipe.shots!.length).toBeLessThanOrEqual(5);
       expect(recipe.listing).toBeDefined();
       expect(recipe.promptTemplate.length).toBeGreaterThan(20);
       expect(recipe.builtIn).toBe(true);

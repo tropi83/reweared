@@ -16,7 +16,7 @@ export async function importImageFile(file: Blob, fileName?: string): Promise<bo
     return true;
   } catch (err) {
     const error = toGenerationError(err);
-    log.warn("import failed", error.code);
+    log.warn("import failed", error.code, error.detail ?? "", err instanceof Error ? err.message : "");
     const maxMb = Math.round(MAX_IMPORT_BYTES / 1024 / 1024);
     const message =
       error.detail === "TOO_LARGE"
@@ -44,26 +44,61 @@ export function firstImageFile(list: FileList | DataTransferItemList | null | un
   return null;
 }
 
-/** Opens the platform file picker (native dialog on Tauri, <input type=file> on the web). */
-export async function pickImageFile(): Promise<File | null> {
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
+const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif";
+
+/**
+ * Where an imported image comes from:
+ * - `files`: desktop file dialog (native on Tauri, `<input type=file>` on the web);
+ * - `gallery`: the phone's photo library (Tauri dialog in `image` picker mode → PHPicker on iOS,
+ *   the system media picker on Android; both return a URI the fs plugin can read);
+ * - `camera`: the phone camera through `<input type=file accept="image/*" capture>`, which both
+ *   Android WebView (wry's file chooser honours `capture`) and iOS WKWebView open as the camera;
+ * - `auto`: gallery on mobile, files elsewhere.
+ */
+export type ImportSource = "auto" | "files" | "gallery" | "camera";
+
+/** Opens the platform picker for `source` and returns the chosen image, or null when cancelled. */
+export async function pickImageFile(source: ImportSource = "auto"): Promise<File | null> {
   const { getPlatform } = await import("@/infrastructure/platform/capabilities");
-  if (getPlatform().nativeDialogs) {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const { readFile } = await import("@tauri-apps/plugin-fs");
-    const path = await open({
-      multiple: false,
-      directory: false,
-      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] }],
-    });
-    if (!path) return null;
-    const bytes = await readFile(path);
-    const name = path.split(/[\\/]/).pop() ?? "image";
-    return new File([bytes as Uint8Array<ArrayBuffer>], name);
+  const platform = getPlatform();
+  const resolved: Exclude<ImportSource, "auto"> = source === "auto" ? (platform.isMobile ? "gallery" : "files") : source;
+
+  if (resolved === "camera") return pickWithInput({ capture: "environment" });
+  if (!platform.nativeDialogs) return pickWithInput({});
+
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const { readFile } = await import("@tauri-apps/plugin-fs");
+  const path = await open({
+    multiple: false,
+    directory: false,
+    // `pickerMode` is only honoured on mobile; with image-only filters iOS/Android pick the media picker anyway.
+    ...(resolved === "gallery" ? { pickerMode: "image" as const } : {}),
+    filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }],
+  });
+  if (!path) return null;
+  // Desktop returns a filesystem path; Android/iOS return a content:// or file:// URI that the fs plugin resolves itself.
+  const bytes = await readFile(path);
+  return new File([bytes as Uint8Array<ArrayBuffer>], fileNameFromPath(path));
+}
+
+/** Last path segment; content URIs often end with an opaque id, in which case a neutral name is used. */
+export function fileNameFromPath(path: string): string {
+  let last = path.split(/[\\/]/).pop()?.split("?")[0] ?? "";
+  try {
+    last = decodeURIComponent(last);
+  } catch {
+    /* keep the raw segment */
   }
+  return /\.[a-z0-9]{2,5}$/i.test(last) ? last : "photo.jpg";
+}
+
+function pickWithInput({ capture }: { capture?: "environment" | "user" }): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif";
+    input.accept = capture ? "image/*" : IMAGE_ACCEPT;
+    if (capture) input.setAttribute("capture", capture);
     input.onchange = () => resolve(input.files?.[0] ?? null);
     input.oncancel = () => resolve(null);
     input.click();

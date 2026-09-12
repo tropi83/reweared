@@ -44,6 +44,16 @@ Verified against Google's docs on 2026-09-11 (`ai.google.dev/gemini-api/docs/oau
 
 Mobile OAuth clients (Android/iOS types, custom-scheme/App Links redirects) are not wired yet; API keys work on mobile.
 
+### Mobile image import
+
+`features/workspace/useImageImport.ts#pickImageFile(source)` picks the mechanism per platform (verified against `tauri-plugin-dialog` 2.7 / `tauri-plugin-fs` 2.5 sources):
+
+- `gallery` — `open({ pickerMode: "image", filters })`: PHPicker on iOS, the media picker (`ACTION_GET_CONTENT`, `image/*`) on Android. The result is a `content://` or `file://` URI; `readFile(uri)` resolves it through the mobile plugin (no fs scope entry needed — URL paths bypass the path scope by design). Opaque media ids become `photo.jpg`.
+- `camera` — a hidden `<input type="file" accept="image/*" capture="environment">`: wry's Android `RustWebChromeClient.onShowFileChooser` honours `capture` and launches the camera intent; WKWebView opens the camera directly. Android needs `android.permission.CAMERA` in the generated manifest if the OEM WebView requires it (add it in `src-tauri/gen/android` once the Android project is generated). Falls back to the plain file input on the web.
+- `files` / `auto` — desktop dialog or `<input type=file>`; `auto` becomes `gallery` on mobile.
+
+There is no official Tauri camera plugin (only a barcode scanner), which is why the camera path relies on the WebView's file chooser.
+
 ## Cloudflare Workers AI notes
 
 Verified 2026-09-12 against https://developers.cloudflare.com/workers-ai/ (model pages, launch changelogs, REST API, pricing, limits, error codes) and the model JSON schemas in `cloudflare/cloudflare-docs`.

@@ -11,6 +11,7 @@ import { Badge, EmptyState } from "@/components/ui/Misc";
 import type { Generation, GenerationJob, ProjectDocument } from "@/domain/models";
 import { useLocale, useT } from "@/i18n";
 import { findSubcategory } from "@/domain/services/listing-catalog";
+import { formatRelative } from "@/lib/format";
 import { VariationTile } from "./VariationTile";
 
 export function GenerationFeed() {
@@ -56,7 +57,7 @@ function GenerationCard({ generation, doc, favoritesOnly }: { generation: Genera
   const parentJob = source?.jobId ? doc.jobs[source.jobId] : undefined;
 
   const regenerate = async () => {
-    // Listing packs re-run the same four shots (prompts live on the jobs), free prompts re-run as before.
+    // Listing packs re-run the same shots (prompts live on the jobs), free prompts re-run as before.
     const packShots = generation.listing
       ? generation.jobIds
           .map((id) => doc.jobs[id])
@@ -198,17 +199,4 @@ function GenerationCard({ generation, doc, favoritesOnly }: { generation: Genera
 
 function truncate(text: string, max: number) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
-
-export function formatRelative(iso: string): string {
-  const diff = Date.now() - Date.parse(iso);
-  const minutes = Math.round(diff / 60_000);
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  if (Math.abs(minutes) < 1) return rtf.format(0, "minute").replace(/^in /, "");
-  if (Math.abs(minutes) < 60) return rtf.format(-minutes, "minute");
-  const hours = Math.round(minutes / 60);
-  if (Math.abs(hours) < 24) return rtf.format(-hours, "hour");
-  const days = Math.round(hours / 24);
-  if (Math.abs(days) < 30) return rtf.format(-days, "day");
-  return new Date(iso).toLocaleDateString();
 }

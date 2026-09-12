@@ -2,7 +2,8 @@ import type { ListingCategory, ListingCategoryId, ListingSelection, ListingSubca
 
 /**
  * Listing catalogue: the marketplace taxonomy (10 categories, 56 subcategories) and, per
- * ProductKind, the plan of four photos generated for a listing.
+ * ProductKind, the plan of photos generated for a listing (four base shots, plus a mirror selfie for
+ * wearable kinds outside the kids category).
  *
  * Every prompt starts with the same fidelity preamble so the AI keeps the *actual* item (shape,
  * colours, pattern, logos, text) and only changes presentation. Prompts are English because the
@@ -16,6 +17,8 @@ interface ShotTemplate {
   label: Localized;
   /** May use {{subject}} and {{wearer}}. */
   template: string;
+  /** Categories for which this shot is skipped (a mirror selfie makes no sense for kids' items). */
+  excludeCategories?: ListingCategoryId[];
 }
 
 /** Fidelity rules shared by every shot. */
@@ -41,6 +44,15 @@ const STUDIO = (extra: string) =>
   );
 const CONTEXT = (id: string, label: Localized, extra: string) => shot(id, label, extra);
 const DETAIL = (id: string, label: Localized, extra: string) => shot(id, label, extra);
+/** Mirror selfie — the most common second-hand marketplace photo. Skipped for kids' items. */
+const SELFIE = (extra: string): ShotTemplate => ({
+  ...shot(
+    "selfie",
+    L("Mirror selfie", "Selfie miroir"),
+    `Casual mirror selfie taken by {{wearer}} with a smartphone in front of a full-length mirror at home, ${extra} the phone partially hides the face, natural indoor light, slightly candid framing, item fully visible and unchanged.`,
+  ),
+  excludeCategories: ["kids"],
+});
 
 const PLANS: Record<ProductKind, ShotTemplate[]> = {
   garment: [
@@ -51,6 +63,7 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
       L("Worn", "Portée"),
       "The garment worn by {{wearer}} in a natural standing pose, neutral studio background, fashion catalog photo, garment fully visible and unchanged.",
     ),
+    SELFIE("wearing the garment as part of a simple everyday outfit,"),
     DETAIL(
       "folded",
       L("Folded", "Pliée"),
@@ -61,6 +74,7 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
     RETOUCH("the shoes cleaned, laces neat, scuffs and dust removed while keeping honest wear visible."),
     STUDIO("The pair side by side at a three-quarter angle, both shoes fully visible."),
     CONTEXT("worn", L("Worn", "Portées"), "The shoes worn by {{wearer}}, cropped at the ankles or knees, standing on a neutral floor, natural light."),
+    SELFIE("wearing the shoes with a simple everyday outfit, full body visible down to the shoes,"),
     DETAIL(
       "profile",
       L("Side profile", "Profil"),
@@ -71,6 +85,7 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
     RETOUCH("the bag cleaned and its shape restored, straps arranged neatly."),
     STUDIO("The bag standing upright on a white plinth, handles up, front facing the camera."),
     CONTEXT("carried", L("Carried", "Portée"), "The bag carried on the shoulder or in the hand of {{wearer}}, neutral studio background, waist-level framing."),
+    SELFIE("holding or wearing the bag,"),
     DETAIL(
       "interior",
       L("Open / interior", "Ouvert / intérieur"),
@@ -85,6 +100,7 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
       L("Worn", "Porté"),
       "The accessory worn by {{wearer}}, tight portrait framing focused on the item, face partially out of frame, neutral background.",
     ),
+    SELFIE("wearing the accessory,"),
     DETAIL(
       "detail",
       L("Material close-up", "Gros plan matière"),
@@ -99,12 +115,14 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
       L("Worn", "Porté"),
       "The piece worn by {{wearer}} — on the neck, wrist, ear or hand as appropriate — tight close-up on skin, neutral background.",
     ),
+    SELFIE("wearing the piece, framed so the jewelry is clearly visible,"),
     DETAIL("box", L("With box", "Avec écrin"), "The piece presented in an open jewelry box or on a white ring tray, top-down close-up."),
   ],
   watch: [
     RETOUCH("the case and strap cleaned, crystal free of smudges, dial clearly readable."),
     STUDIO("The watch angled at forty-five degrees on a white surface, strap forming an open loop."),
     CONTEXT("wrist", L("On the wrist", "Au poignet"), "The watch worn on the wrist of {{wearer}}, close-up, neutral background, dial facing the camera."),
+    SELFIE("wearing the watch with the wrist raised toward the mirror so the dial is visible,"),
     DETAIL("dial", L("Dial close-up", "Gros plan cadran"), "Macro close-up of the dial, hands and case finishing, sharp and evenly lit."),
   ],
   beauty: [
@@ -325,6 +343,7 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
     RETOUCH("the leather clean and conditioned, edges neat, hardware polished."),
     STUDIO("The item on a white surface, front three-quarter view."),
     CONTEXT("use", L("In use", "En usage"), "The item held or worn by {{wearer}}, close framing, neutral background."),
+    SELFIE("wearing or holding the leather item so it is clearly visible,"),
     DETAIL("grain", L("Leather close-up", "Gros plan cuir"), "Macro close-up of the leather grain, stitching and embossed logo."),
   ],
 };
@@ -479,11 +498,13 @@ export function buildListingShots(selection: ListingSelection): ShotSpec[] {
   const found = findSubcategory(selection);
   if (!found) throw new Error(`Unknown listing selection ${selection.categoryId}/${selection.subcategoryId}`);
   const { category, subcategory } = found;
-  return PLANS[subcategory.kind].map((s) => ({
-    id: s.id,
-    label: s.label,
-    prompt: interpolateShot(s.template, { subject: subcategory.subject, wearer: category.wearer }),
-  }));
+  return PLANS[subcategory.kind]
+    .filter((s) => !s.excludeCategories?.includes(category.id))
+    .map((s) => ({
+      id: s.id,
+      label: s.label,
+      prompt: interpolateShot(s.template, { subject: subcategory.subject, wearer: category.wearer }),
+    }));
 }
 
 /** Stable id for the built-in recipe of a subcategory. */

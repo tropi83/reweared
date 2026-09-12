@@ -4,7 +4,8 @@ import { useRecipesStore } from "@/app/stores/recipes-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
-import { Input, Label, Select, Textarea } from "@/components/ui/Input";
+import { Input, Label, Textarea } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Misc";
 import { RECIPE_CATEGORIES, type Recipe, type RecipeCategory } from "@/domain/models";
 import { BUILT_IN_RECIPES, extractVariables } from "@/domain/services/recipes";
@@ -85,13 +86,12 @@ export function RecipesView() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="rcat">{t("common.category")}</Label>
-              <Select id="rcat" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as RecipeCategory })}>
-                {RECIPE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {t(`recipes.category.${c}` as MessageKey)}
-                  </option>
-                ))}
-              </Select>
+              <Select<RecipeCategory>
+                id="rcat"
+                value={draft.category}
+                options={RECIPE_CATEGORIES.map((c) => ({ value: c, label: t(`recipes.category.${c}` as MessageKey) }))}
+                onChange={(category) => setDraft({ ...draft, category })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="rtpl">{t("recipes.template")}</Label>

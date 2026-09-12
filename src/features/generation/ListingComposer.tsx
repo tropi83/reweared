@@ -11,7 +11,8 @@ import { useRecipesStore } from "@/app/stores/recipes-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
-import { Input, Label, Select, Switch, Textarea } from "@/components/ui/Input";
+import { Input, Label, Switch, Textarea } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Segmented } from "@/components/ui/Misc";
 import { ALL_ASPECT_RATIOS, toGenerationError, type AspectRatio, type ImageSize, type ListingCategoryId, type ModelInfo, type ShotSpec } from "@/domain/models";
 import { buildListingShots, LISTING_CATEGORIES, listingRecipeId } from "@/domain/services/listing-catalog";
@@ -101,7 +102,7 @@ export function ListingComposer() {
 
   const authOk = isMock || authStatus?.state === "authenticated";
   const sourceId = composer.sourceImageId ?? doc?.project.originalImageId;
-  const ready = !!doc && !!sourceId && !!model?.available && authOk && (customRecipe ? true : effectiveShots.length === 4);
+  const ready = !!doc && !!sourceId && !!model?.available && authOk && (customRecipe ? true : effectiveShots.length >= 4);
   const blocker: MessageKey | null = !doc?.project.originalImageId
     ? "composer.needImage"
     : !authOk
@@ -157,24 +158,22 @@ export function ListingComposer() {
       {/* Taxonomy */}
       <div className="space-y-1.5">
         <Label htmlFor="category">{t("listing.category")}</Label>
-        <Select
+        <Select<ListingCategoryId | "">
           id="category"
           value={selection?.categoryId ?? ""}
-          onChange={(e) => {
-            const id = e.target.value as ListingCategoryId | "";
+          placeholder={t("listing.chooseCategory")}
+          options={LISTING_CATEGORIES.map((c) => ({
+            value: c.id,
+            label: c.label[locale],
+            description: c.subcategories.map((s) => s.label[locale]).join(" · "),
+          }))}
+          onChange={(id) => {
             if (!id) return setListing(undefined);
             const first = LISTING_CATEGORIES.find((c) => c.id === id)?.subcategories[0];
             if (first) setListing({ categoryId: id, subcategoryId: first.id });
             setCustomPrompts({});
           }}
-        >
-          <option value="">{t("listing.chooseCategory")}</option>
-          {LISTING_CATEGORIES.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label[locale]}
-            </option>
-          ))}
-        </Select>
+        />
       </div>
       {category && (
         <div className="space-y-1.5">
@@ -208,7 +207,7 @@ export function ListingComposer() {
       {shots.length > 0 && !customRecipe && (
         <div className="rounded-lg border border-border">
           <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-xs font-medium text-fg-muted">{t("listing.shots")}</span>
+            <span className="text-xs font-medium text-fg-muted">{t("listing.shots", { count: shots.length })}</span>
             <Switch checked={editShots} onChange={setEditShots} label={t("listing.editShots")} />
           </div>
           <ol className="divide-y divide-border border-t border-border">
@@ -237,14 +236,12 @@ export function ListingComposer() {
       {customRecipes.length > 0 && (
         <div className="space-y-1.5">
           <Label htmlFor="custom-recipe">{t("listing.customRecipe")}</Label>
-          <Select id="custom-recipe" value={recipeId} onChange={(e) => setRecipeId(e.target.value)}>
-            <option value="">{t("listing.customRecipeNone")}</option>
-            {customRecipes.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="custom-recipe"
+            value={recipeId}
+            options={[{ value: "", label: t("listing.customRecipeNone") }, ...customRecipes.map((r) => ({ value: r.id, label: r.name }))]}
+            onChange={setRecipeId}
+          />
         </div>
       )}
 
@@ -273,25 +270,27 @@ export function ListingComposer() {
         {(providers.length > 1 || MOCK_ENABLED) && (
           <div className="space-y-1.5">
             <Label htmlFor="provider">{t("composer.provider")}</Label>
-            <Select id="provider" value={providerId} onChange={(e) => changeProvider(e.target.value)}>
-              {providers.map((p) => (
-                <option key={p.info.id} value={p.info.id}>
-                  {p.info.displayName}
-                </option>
-              ))}
-            </Select>
+            <Select
+              id="provider"
+              value={providerId}
+              options={providers.map((p) => ({ value: p.info.id, label: p.info.displayName }))}
+              onChange={changeProvider}
+            />
           </div>
         )}
         <div className={cn("space-y-1.5", providers.length > 1 || MOCK_ENABLED ? "" : "col-span-2")}>
           <Label htmlFor="model">{t("composer.model")}</Label>
-          <Select id="model" value={composer.modelId ?? ""} onChange={(e) => composer.setModel(e.target.value)}>
-            {models.map((m) => (
-              <option key={m.id} value={m.id} disabled={!m.available}>
-                {t(`composer.modelTier.${m.tier}` as MessageKey)} · {modelLabel(m)}
-                {!m.available ? ` (${t("composer.modelUnavailable")})` : ""}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="model"
+            value={composer.modelId ?? ""}
+            options={models.map((m) => ({
+              value: m.id,
+              label: modelLabel(m),
+              description: `${t(`composer.modelTier.${m.tier}` as MessageKey)}${!m.available ? ` · ${t("composer.modelUnavailable")}` : ""}`,
+              disabled: !m.available,
+            }))}
+            onChange={(id) => composer.setModel(id)}
+          />
         </div>
         {sizeOptions.length > 0 && (
           <div className="col-span-2 space-y-1.5">
@@ -384,7 +383,7 @@ export function ListingComposer() {
             onClick={() => void generate()}
             leftIcon={<WandSparkles className="size-4" />}
           >
-            {customRecipe ? t("composer.generateCount", { count: 4 }) : t("listing.generatePack")}
+            {customRecipe ? t("composer.generateCount", { count: 4 }) : t("listing.generatePack", { count: effectiveShots.length })}
           </Button>
         )}
         <div className="text-xs text-fg-subtle">

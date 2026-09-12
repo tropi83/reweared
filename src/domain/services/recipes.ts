@@ -28,7 +28,7 @@ export function interpolate(template: string, values: Record<string, string>): s
 const now = "2026-09-12T00:00:00.000Z";
 
 /**
- * Built-in recipes are the listing packs: one per marketplace subcategory, four shots each.
+ * Built-in recipes are the listing packs: one per marketplace subcategory, four or five shots each.
  * They are generated from the catalogue so labels, prompts and ids have a single source of truth.
  */
 export const BUILT_IN_RECIPES: Recipe[] = LISTING_CATEGORIES.flatMap((category) =>

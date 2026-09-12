@@ -49,6 +49,7 @@ export const en = {
   "projects.imageCount": "{count} images",
   "projects.updated": "Updated {when}",
   "projects.deleted": "Project deleted",
+  "projects.count": "{count} projects on this device",
 
   // Import
   "import.dropTitle": "Drop an image here",
@@ -61,7 +62,8 @@ export const en = {
   "import.error.decode": "This image could not be decoded.",
   "import.error.generic": "Import failed.",
   "import.dropHere": "Release to import",
-  "import.camera": "Take photo",
+  "import.camera": "Take a photo",
+  "import.gallery": "Photo library",
 
   // Composer
   "composer.promptLabel": "Prompt",
@@ -375,11 +377,11 @@ export const en = {
   "listing.category": "Category",
   "listing.chooseCategory": "Choose a category…",
   "listing.subcategory": "Subcategory",
-  "listing.shots": "The 4 photos that will be generated",
+  "listing.shots": "The {count} photos that will be generated",
   "listing.editShots": "Edit prompts",
   "listing.customRecipe": "Use a custom recipe instead",
   "listing.customRecipeNone": "No — use the listing pack",
-  "listing.generatePack": "Generate the 4 listing photos",
+  "listing.generatePack": "Generate the {count} listing photos",
   "listing.needCategory": "Choose a category and a subcategory to generate",
   "listing.pack": "Listing pack",
   "listing.packHint": "One request per photo; each shot has its own prompt and seed.",
