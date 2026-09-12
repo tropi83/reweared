@@ -16,6 +16,9 @@ src-tauri/gen/schemas
 *.p12
 *.keystore
 *.jks
+*.p8
+*.mobileprovision
+keystore.properties
 client_secret*.json
 service-account*.json
 

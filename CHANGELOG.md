@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **BUILDING.md** — how to build and package on Windows (`.exe`/`.msi`), macOS (`.app`/`.dmg`, universal), Linux Debian/Ubuntu (`.deb`/AppImage/`.rpm`), Android (debug APK, signed AAB) and iOS, with versions, signing and troubleshooting. **Mobile pre-flight** (`pnpm android:doctor`, `pnpm ios:doctor`, run before `pnpm android:dev` / `android:apk` / `ios:dev`) reports missing JDK/SDK/NDK variables, Rust targets, Xcode/CocoaPods and Windows Developer Mode in a second instead of failing after minutes of compiling. The generated Android project (`src-tauri/gen/android`) is now tracked.
 - **Post on Vinted (desktop)** — a “Post N photos on Vinted” button opens Vinted in a separate window (own cookie profile, navigation allow-list, no IPC for vinted.com) and pre-fills the sell form with the photos marked “To post”, the title and the description. A publication panel follows the steps (log in → sell form → fill → check), reports what was filled and offers copy/export fallbacks. The app never clicks Vinted's “Add”. Vinted's terms forbid automated tools: a warning is shown before the first use; Settings → Publishing brings it back and erases the Vinted session. Web and mobile show the button disabled.
 - **Mirror selfie shot** for clothing, shoes, bags, accessories, jewelry, watches and leather goods (skipped for the kids category) — packs now have four or five photos; UI counts follow the pack.
 - **Projects page** lists every project on the device as a card (cover, image count, last update) with the import zone on top; the empty state only shows when there is nothing yet.
@@ -21,6 +22,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- Android/iOS builds: `keyring` was declared for mobile targets too, where keyring 4 refuses to compile without its `v1` feature; it is now a desktop-only dependency (mobile keeps session-only secrets).
 - Error messages are provider-aware (`errorMessage()` picks `error.<provider>.<code>` before the generic text): a Cloudflare quota error no longer talks about Gemini. Daily-quota messages now state when the quota resets, in local time with the remaining delay (Cloudflare Workers AI: 00:00 UTC; Gemini: midnight Pacific). Cloudflare 429 `4006` "used up your daily free allocation" is `QUOTA_EXCEEDED` (not retried), and the usage meter's "today" window follows the provider's reset time (UTC for Cloudflare) with a link to the Cloudflare dashboard.
 - Cloudflare: 403 `5018`/`3041` ("account not allowed for private model") is reported as a model-access problem, not a bad credential, and the model list is filtered by what the account can actually run (`/ai/models/search`, or `/models` on the Worker).
 

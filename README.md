@@ -60,7 +60,7 @@ No AI Image Variations server is involved at any point. See [ARCHITECTURE.md](AR
 
 ## Quick start
 
-Prerequisites: **Node ≥ 22**, **pnpm ≥ 10**, and for the desktop app **Rust ≥ 1.88** plus the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) (WebView2 on Windows, Xcode CLT on macOS, webkit2gtk on Linux).
+Prerequisites: **Node ≥ 22**, **pnpm ≥ 10**, and for the desktop app **Rust ≥ 1.88** plus the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) (WebView2 on Windows, Xcode CLT on macOS, webkit2gtk on Linux). Step-by-step builds and installers for Windows, macOS, Linux (Debian/Ubuntu), Android and iOS: **[BUILDING.md](BUILDING.md)**.
 
 ```bash
 pnpm install
@@ -157,20 +157,23 @@ src-tauri/
 
 ## Scripts
 
-| Command              | Purpose                                                      |
-| -------------------- | ------------------------------------------------------------ |
-| `pnpm dev`           | Vite dev server (web) on port 1420                           |
-| `pnpm build`         | Typecheck + production web bundle in `dist/`                 |
-| `pnpm tauri dev`     | Desktop app with hot reload                                  |
-| `pnpm tauri build`   | Desktop installers                                           |
-| `pnpm test`          | Vitest, all suites                                           |
-| `pnpm test:watch`    | Vitest in watch mode                                         |
-| `pnpm test:coverage` | Coverage report in `coverage/`                               |
-| `pnpm typecheck`     | `tsc` strict                                                 |
-| `pnpm lint`          | ESLint (`react-hooks` rules on)                              |
-| `pnpm format`        | Prettier write (`format:check` in CI)                        |
-| `pnpm check`         | typecheck + lint + format:check + test — the pre-commit gate |
-| `pnpm rust:check`    | `cargo fmt --check` + `clippy -D warnings` + `cargo test`    |
+| Command                                 | Purpose                                                                            |
+| --------------------------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm dev`                              | Vite dev server (web) on port 1420                                                 |
+| `pnpm build`                            | Typecheck + production web bundle in `dist/`                                       |
+| `pnpm tauri dev`                        | Desktop app with hot reload                                                        |
+| `pnpm tauri build`                      | Desktop installers                                                                 |
+| `pnpm test`                             | Vitest, all suites                                                                 |
+| `pnpm test:watch`                       | Vitest in watch mode                                                               |
+| `pnpm test:coverage`                    | Coverage report in `coverage/`                                                     |
+| `pnpm typecheck`                        | `tsc` strict                                                                       |
+| `pnpm lint`                             | ESLint (`react-hooks` rules on)                                                    |
+| `pnpm format`                           | Prettier write (`format:check` in CI)                                              |
+| `pnpm check`                            | typecheck + lint + format:check + test — the pre-commit gate                       |
+| `pnpm rust:check`                       | `cargo fmt --check` + `clippy -D warnings` + `cargo test`                          |
+| `pnpm android:doctor`                   | Android toolchain pre-flight (JDK, SDK, NDK, Rust targets, Windows Developer Mode) |
+| `pnpm android:dev` / `pnpm android:apk` | Pre-flight, then run on a phone with hot reload / build a debug APK                |
+| `pnpm ios:doctor` / `pnpm ios:dev`      | iOS pre-flight (macOS only), then run on a simulator or an iPhone                  |
 
 ## Tests & quality gates
 
@@ -199,12 +202,15 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push/P
 | Web                 | IndexedDB (origin-scoped) | memory, or localStorage after warning | no — API key          | drop, paste, file input    | no              |
 | Android/iOS         | app-data folder           | session-only (keystore: planned)      | no — API key          | photo library or camera    | no (planned)    |
 
+On Linux the OS credential store is the Secret Service (GNOME Keyring or KWallet must be running to remember keys). How to build each of these: [BUILDING.md](BUILDING.md).
+
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — layers, domain model, job system, storage layout, provider abstraction
 - [SECURITY.md](SECURITY.md) — threat model, credential storage, Tauri permissions, CSP, logging rules
 - [PRIVACY.md](PRIVACY.md) — what leaves your device and when
-- [DEVELOPMENT.md](DEVELOPMENT.md) — setup, OAuth client configuration, building per platform, adding a provider
+- [BUILDING.md](BUILDING.md) — build and package for Windows (`.exe`/`.msi`), macOS (`.app`/`.dmg`), Linux (`.deb`/AppImage), Android and iOS: versions, signing, troubleshooting
+- [DEVELOPMENT.md](DEVELOPMENT.md) — setup, OAuth client configuration, provider notes, Vinted pre-fill, tests, adding a provider
 - [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md) · [CLAUDE.md](CLAUDE.md) (agent instructions) · `.claude/skills/`
 
 ## Roadmap / status

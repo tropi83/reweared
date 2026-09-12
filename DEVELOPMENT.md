@@ -4,8 +4,7 @@
 
 - Node 22+ and pnpm 10
 - Rust 1.88+ (stable) and the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS (WebView2 on Windows, Xcode CLT on macOS, webkit2gtk on Linux)
-- For mobile: Android Studio / Xcode as described in the Tauri docs
-- Android on Windows, in addition: SDK Platform, Platform-Tools, Build-Tools, NDK (side by side) and Command-line Tools from Android Studio's SDK Manager; `NDK_HOME` set to the NDK folder (e.g. `%LOCALAPPDATA%\Android\Sdk\ndk\27.1.12297006`); `rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android`; and **Windows Developer Mode** (Settings → System → For developers) — `tauri android build/dev` symlinks the Rust library into `jniLibs`, which Windows refuses otherwise. A debug APK for a USB-connected phone: `pnpm tauri android build --apk --debug`, then `adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`.
+- Per-platform toolchains (C++ build tools, Xcode, WebKitGTK packages, Android SDK/NDK and Windows Developer Mode, CocoaPods…), exact versions, packaging and signing: **[BUILDING.md](BUILDING.md)**
 
 ## Commands
 
@@ -15,8 +14,11 @@ pnpm dev              # web dev server (http://localhost:1420)
 pnpm build            # typecheck + production web bundle in dist/
 pnpm tauri dev        # desktop app with hot reload
 pnpm tauri build      # desktop installers (see src-tauri/tauri.conf.json > bundle)
-pnpm tauri android init && pnpm tauri android dev
-pnpm tauri ios init && pnpm tauri ios dev
+pnpm android:doctor   # Android toolchain pre-flight (also runs before android:dev / android:apk)
+pnpm android:dev      # run on a phone or emulator with hot reload
+pnpm android:apk      # debug APK — release and signing: BUILDING.md
+pnpm ios:doctor       # iOS pre-flight (macOS only)
+pnpm ios:dev          # run on a simulator or an iPhone with hot reload
 pnpm test             # vitest (unit + integration + workflow)
 pnpm check            # typecheck + lint + format:check + test
 pnpm rust:check       # cargo fmt --check + clippy + cargo test
@@ -50,7 +52,7 @@ Mobile OAuth clients (Android/iOS types, custom-scheme/App Links redirects) are 
 `features/workspace/useImageImport.ts#pickImageFile(source)` picks the mechanism per platform (verified against `tauri-plugin-dialog` 2.7 / `tauri-plugin-fs` 2.5 sources):
 
 - `gallery` — `open({ pickerMode: "image", filters })`: PHPicker on iOS, the media picker (`ACTION_GET_CONTENT`, `image/*`) on Android. The result is a `content://` or `file://` URI; `readFile(uri)` resolves it through the mobile plugin (no fs scope entry needed — URL paths bypass the path scope by design). Opaque media ids become `photo.jpg`.
-- `camera` — a hidden `<input type="file" accept="image/*" capture="environment">`: wry's Android `RustWebChromeClient.onShowFileChooser` honours `capture` and launches the camera intent; WKWebView opens the camera directly. Android needs `android.permission.CAMERA` in the generated manifest if the OEM WebView requires it (add it in `src-tauri/gen/android` once the Android project is generated). Falls back to the plain file input on the web.
+- `camera` — a hidden `<input type="file" accept="image/*" capture="environment">`: wry's Android `RustWebChromeClient.onShowFileChooser` honours `capture` and launches the camera intent; WKWebView opens the camera directly. Android needs `android.permission.CAMERA` in the generated manifest if the OEM WebView requires it (add it to `src-tauri/gen/android/app/src/main/AndroidManifest.xml`). Falls back to the plain file input on the web.
 - `files` / `auto` — desktop dialog or `<input type=file>`; `auto` becomes `gallery` on mobile.
 
 There is no official Tauri camera plugin (only a barcode scanner), which is why the camera path relies on the WebView's file chooser.

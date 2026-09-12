@@ -31,6 +31,7 @@ Local-first AI photo studio for second-hand listings (Vinted-style): import the 
 | Permissions / CSP                                           | `src-tauri/capabilities/default.json`, `src-tauri/tauri.conf.json`                                                          |
 | Vinted publishing (domain, payload, store, UI)              | `src/domain/services/publish.ts`, `src/app/publish-payload.ts`, `src/app/stores/publish-store.ts`, `src/features/publish/*` |
 | Vinted bridge + injected script                             | `src/infrastructure/publish/*` (`vinted/` = script bundled by `pnpm build:prefill`), `src-tauri/src/vinted.rs`              |
+| Builds per platform, mobile pre-flight                      | `BUILDING.md`, `scripts/mobile-doctor.mjs` (`pnpm android:doctor`, `pnpm ios:doctor`)                                       |
 
 ## Decisions already taken (do not re-litigate without new facts)
 
@@ -45,6 +46,7 @@ Local-first AI photo studio for second-hand listings (Vinted-style): import the 
 - Variations are independent jobs; the UI shows progressive results; retry only for retryable codes.
 - Hash router (`#/project/:id`, `#/settings/:section`, `#/recipes`); zustand stores; no react-router.
 - **Post on Vinted = pre-fill, never publish** (desktop only). A second `WebviewWindow` with an isolated profile and a navigation allow-list; vinted.com never gets Tauri IPC; the script is compiled into the binary and only fills title, description and photos. DOM selectors live in one file (`src/infrastructure/publish/vinted/selectors.ts`). Vinted's terms forbid automated tools → one-time warning (`vintedAutomationAcknowledged`). Photos to post = the “À publier” marks (`ProjectDocument.toPost`, schema v2). Window-creating commands must be `async` (WebView2 deadlock in sync commands on Windows).
+- **Mobile builds**: `keyring` is a desktop-only dependency (keyring 4 refuses to compile without `v1`/`cli`, and `secrets.rs` has no mobile keychain yet). Android builds on Windows need Developer Mode (cargo-mobile2 symlinks the `.so` into `jniLibs`, no copy fallback) — never build from an elevated terminal instead. `src-tauri/gen/android` is committed; the bundle identifier (`com.aiimagevariations.app`, Tauri warns about `.app`) is kept until a data migration exists (BUILDING.md §6).
 
 ## Out of scope (MVP)
 

@@ -4,7 +4,7 @@ Thanks for helping build AI Image Variations. This page is the short version; th
 
 ## Setup
 
-See [DEVELOPMENT.md](DEVELOPMENT.md). TL;DR: `pnpm install`, then `pnpm dev` (web) or `pnpm tauri dev` (desktop). The Mock provider lets you work on the whole workflow without a Google account.
+See [DEVELOPMENT.md](DEVELOPMENT.md), and [BUILDING.md](BUILDING.md) for desktop installers, Android and iOS. TL;DR: `pnpm install`, then `pnpm dev` (web) or `pnpm tauri dev` (desktop). The Mock provider lets you work on the whole workflow without a Google account.
 
 ## Workflow
 
