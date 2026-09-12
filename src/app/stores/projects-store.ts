@@ -32,7 +32,7 @@ interface ProjectsState {
   /** Applies a synchronous mutation to the open project and schedules a save. */
   commit(mutator: (doc: ProjectDocument) => void, options?: { immediate?: boolean }): void;
   flush(): Promise<void>;
-  toggleFavorite(assetId: string): void;
+  toggleToPost(assetId: string): void;
   deleteImages(assetIds: string[]): Promise<void>;
   deleteGeneration(generationId: string): Promise<void>;
   /** Stores a generated result (full image + thumbnail) and links it to its job. */
@@ -172,7 +172,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       images: { [asset.id]: asset },
       generations: {},
       jobs: {},
-      favorites: [],
+      toPost: [],
     };
     await getServices().storage.saveProject(doc);
     await get().flush();
@@ -255,11 +255,11 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     await savePromise;
   },
 
-  toggleFavorite(assetId) {
+  toggleToPost(assetId) {
     get().commit((doc) => {
-      const idx = doc.favorites.indexOf(assetId);
-      if (idx >= 0) doc.favorites.splice(idx, 1);
-      else doc.favorites.push(assetId);
+      const idx = doc.toPost.indexOf(assetId);
+      if (idx >= 0) doc.toPost.splice(idx, 1);
+      else doc.toPost.push(assetId);
     });
   },
 
@@ -274,7 +274,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
           const asset = doc.images[id];
           if (!asset) continue;
           delete doc.images[id];
-          doc.favorites = doc.favorites.filter((f) => f !== id);
+          doc.toPost = doc.toPost.filter((f) => f !== id);
           if (asset.jobId) {
             const job = doc.jobs[asset.jobId];
             if (job) {

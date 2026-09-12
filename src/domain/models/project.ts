@@ -3,7 +3,7 @@ import type { ImageAsset } from "./image";
 import type { ListingCopy, ListingSelection } from "./listing";
 
 /** Bump when the on-disk shape of ProjectDocument changes; add a migration in storage/migrations.ts. */
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export interface Project {
   id: string;
@@ -31,8 +31,8 @@ export interface ProjectDocument {
   images: Record<string, ImageAsset>;
   generations: Record<string, Generation>;
   jobs: Record<string, GenerationJob>;
-  /** Asset ids the user marked as favourites. */
-  favorites: string[];
+  /** Asset ids the user marked "À publier" (photos to post on the marketplace). */
+  toPost: string[];
 }
 
 export interface ProjectSummary {

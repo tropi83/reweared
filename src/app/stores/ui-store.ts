@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type GalleryFilter = "all" | "favorites";
+export type GalleryFilter = "all" | "toPost";
 
 interface UiState {
   sidebarOpen: boolean;

@@ -27,13 +27,13 @@ export function GenerationFeed() {
   return (
     <div className="space-y-6 p-4 md:p-5">
       {generations.map((gen) => (
-        <GenerationCard key={gen.id} generation={gen} doc={doc} favoritesOnly={filter === "favorites"} />
+        <GenerationCard key={gen.id} generation={gen} doc={doc} toPostOnly={filter === "toPost"} />
       ))}
     </div>
   );
 }
 
-function GenerationCard({ generation, doc, favoritesOnly }: { generation: Generation; doc: ProjectDocument; favoritesOnly: boolean }) {
+function GenerationCard({ generation, doc, toPostOnly }: { generation: Generation; doc: ProjectDocument; toPostOnly: boolean }) {
   const t = useT();
   const locale = useLocale();
   const listing = generation.listing ? findSubcategory(generation.listing) : undefined;
@@ -45,8 +45,8 @@ function GenerationCard({ generation, doc, favoritesOnly }: { generation: Genera
   const [expanded, setExpanded] = useState(false);
 
   const jobs = generation.jobIds.map((id) => doc.jobs[id]).filter((j): j is GenerationJob => !!j);
-  const visibleJobs = favoritesOnly ? jobs.filter((j) => j.resultImageId && doc.favorites.includes(j.resultImageId)) : jobs;
-  if (favoritesOnly && visibleJobs.length === 0) return null;
+  const visibleJobs = toPostOnly ? jobs.filter((j) => j.resultImageId && doc.toPost.includes(j.resultImageId)) : jobs;
+  if (toPostOnly && visibleJobs.length === 0) return null;
 
   const completed = jobs.filter((j) => j.status === "completed").length;
   const failed = jobs.filter((j) => j.status === "failed" || j.status === "cancelled").length;

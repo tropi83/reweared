@@ -8,6 +8,8 @@ type ProjectMigration = (doc: Record<string, unknown>) => Record<string, unknown
  */
 const PROJECT_MIGRATIONS: Record<number, ProjectMigration> = {
   0: (doc) => ({ ...doc, schemaVersion: 1, favorites: Array.isArray(doc.favorites) ? doc.favorites : [] }),
+  // v1 -> v2: "favourites" became the "to post" marking used by the Vinted publishing flow.
+  1: ({ favorites, ...doc }) => ({ ...doc, schemaVersion: 2, toPost: Array.isArray(favorites) ? favorites : [] }),
 };
 
 export class MigrationError extends Error {
@@ -35,7 +37,7 @@ export function migrateProjectDocument(raw: unknown): ProjectDocument {
   result.images ??= {};
   result.generations ??= {};
   result.jobs ??= {};
-  result.favorites ??= [];
+  result.toPost ??= [];
   return result;
 }
 

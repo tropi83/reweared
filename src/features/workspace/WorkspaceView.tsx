@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Menu, Star } from "lucide-react";
+import { CheckCircle2, Menu } from "lucide-react";
 import { navigate } from "@/app/router";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useProjectsStore } from "@/app/stores/projects-store";
@@ -63,10 +63,10 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
             options={[
               { value: "all", label: t("gallery.filter.all") },
               {
-                value: "favorites",
+                value: "toPost",
                 label: (
                   <span className="inline-flex items-center gap-1">
-                    <Star className="size-3" /> {t("gallery.filter.favorites")}
+                    <CheckCircle2 className="size-3" /> {t("gallery.filter.toPost")}
                   </span>
                 ),
               },

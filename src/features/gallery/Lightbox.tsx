@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Columns2, Download, GitBranch, Info, Sparkles, Star, X, ZoomIn, ZoomOut } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Columns2, Download, GitBranch, Info, Sparkles, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useProjectsStore } from "@/app/stores/projects-store";
@@ -22,7 +22,7 @@ export function Lightbox() {
   const open = useUiStore((s) => s.openLightbox);
   const compare = useUiStore((s) => s.compareMode);
   const setCompare = useUiStore((s) => s.setCompareMode);
-  const toggleFavorite = useProjectsStore((s) => s.toggleFavorite);
+  const toggleToPost = useProjectsStore((s) => s.toggleToPost);
   const setSource = useComposerStore((s) => s.setSource);
   const loadFromGeneration = useComposerStore((s) => s.loadFromGeneration);
   const [info, setInfo] = useState(false);
@@ -41,7 +41,7 @@ export function Lightbox() {
   const sourceAsset = generation ? doc?.images[generation.sourceImageId] : undefined;
   const url = useImageUrl(doc?.project.id, asset?.kind ?? "generation", asset?.id);
   const sourceUrl = useImageUrl(doc?.project.id, sourceAsset?.kind ?? "original", compare ? sourceAsset?.id : undefined);
-  const isFavorite = !!asset && !!doc && doc.favorites.includes(asset.id);
+  const isToPost = !!asset && !!doc && doc.toPost.includes(asset.id);
 
   const go = useCallback(
     (delta: number) => {
@@ -72,14 +72,14 @@ export function Lightbox() {
         setZoom(1);
         setPan({ x: 0, y: 0 });
       } else if (e.key.toLowerCase() === "c" && sourceAsset) setCompare(!compare);
-      else if (e.key.toLowerCase() === "f" && asset) toggleFavorite(asset.id);
+      else if (e.key.toLowerCase() === "f" && asset) toggleToPost(asset.id);
       else if (e.key.toLowerCase() === "i") setInfo((v) => !v);
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [assetId, close, go, compare, setCompare, sourceAsset, asset, toggleFavorite]);
+  }, [assetId, close, go, compare, setCompare, sourceAsset, asset, toggleToPost]);
 
   if (!doc || !asset || !assetId) return null;
 
@@ -125,11 +125,9 @@ export function Lightbox() {
           <LbButton onClick={() => setZoom((z) => Math.min(6, z * 1.25))} label={t("gallery.zoomIn")}>
             <ZoomIn className="size-4" />
           </LbButton>
-          {asset.kind === "generation" && (
-            <LbButton onClick={() => toggleFavorite(asset.id)} label={isFavorite ? t("gallery.unfavorite") : t("gallery.favorite")}>
-              <Star className={cn("size-4", isFavorite && "fill-warning text-warning")} />
-            </LbButton>
-          )}
+          <LbButton onClick={() => toggleToPost(asset.id)} label={t(isToPost ? "gallery.unToPost" : "gallery.toPost")}>
+            <CheckCircle2 className={cn("size-4", isToPost && "fill-accent text-white")} />
+          </LbButton>
           <LbButton onClick={() => void download()} label={t("common.download")}>
             <Download className="size-4" />
           </LbButton>

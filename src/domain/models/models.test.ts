@@ -46,7 +46,7 @@ describe("summarize", () => {
   it("counts generated images and picks the cover", () => {
     const now = "2026-01-01T00:00:00.000Z";
     const doc: ProjectDocument = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       appVersion: "t",
       project: { id: "prj_1", name: "P", originalImageId: "img_o", createdAt: now, updatedAt: now },
       images: {
@@ -55,7 +55,7 @@ describe("summarize", () => {
       },
       generations: {},
       jobs: {},
-      favorites: [],
+      toPost: [],
     };
     expect(summarize(doc)).toEqual({ id: "prj_1", name: "P", coverImageId: "img_o", imageCount: 1, updatedAt: now });
     doc.project.coverImageId = "img_g";

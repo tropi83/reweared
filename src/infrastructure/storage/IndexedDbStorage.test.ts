@@ -14,7 +14,7 @@ function doc(id: string, name = "Test"): ProjectDocument {
     },
     generations: {},
     jobs: {},
-    favorites: [],
+    toPost: [],
   };
 }
 
@@ -84,7 +84,16 @@ describe("migrations", () => {
   it("upgrades a v0 document", () => {
     const migrated = migrateProjectDocument({ project: { id: "prj_1" }, images: {}, generations: {}, jobs: {} });
     expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
-    expect(migrated.favorites).toEqual([]);
+    expect(migrated.toPost).toEqual([]);
+  });
+
+  it("renames v1 favourites to toPost and is idempotent", () => {
+    const v1 = { schemaVersion: 1, project: { id: "prj_1" }, images: {}, generations: {}, jobs: {}, favorites: ["img_a", "img_b"] };
+    const migrated = migrateProjectDocument(v1);
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.toPost).toEqual(["img_a", "img_b"]);
+    expect("favorites" in migrated).toBe(false);
+    expect(migrateProjectDocument(migrated)).toEqual(migrated);
   });
 
   it("refuses documents from newer versions", () => {

@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { AlertTriangle, Check, Download, ExternalLink, GitBranch, Maximize2, RotateCw, Sparkles, Star, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Download, ExternalLink, GitBranch, Maximize2, RotateCw, Sparkles, X } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
@@ -31,8 +31,8 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
   const selected = useUiStore((s) => (asset ? s.selection.has(asset.id) : false));
   const toggleSelected = useUiStore((s) => s.toggleSelected);
   const openLightbox = useUiStore((s) => s.openLightbox);
-  const toggleFavorite = useProjectsStore((s) => s.toggleFavorite);
-  const isFavorite = !!asset && doc.favorites.includes(asset.id);
+  const toggleToPost = useProjectsStore((s) => s.toggleToPost);
+  const isToPost = !!asset && doc.toPost.includes(asset.id);
   const retryJob = useGenerationStore((s) => s.retryJob);
   const cancel = () => getServices().queue.cancel(job.id);
 
@@ -84,8 +84,8 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
         </div>
 
         <div className="absolute top-2 right-2 flex items-center gap-1">
-          <TileButton onClick={() => toggleFavorite(asset.id)} label={isFavorite ? t("gallery.unfavorite") : t("gallery.favorite")} always={isFavorite}>
-            <Star className={cn("size-3.5", isFavorite && "fill-warning text-warning")} />
+          <TileButton onClick={() => toggleToPost(asset.id)} label={t(isToPost ? "gallery.unToPost" : "gallery.toPost")} always={isToPost}>
+            <CheckCircle2 className={cn("size-3.5", isToPost && "fill-accent text-white")} />
           </TileButton>
           <TileButton onClick={() => openLightbox(asset.id)} label={t("gallery.fullscreen")}>
             <Maximize2 className="size-3.5" />
