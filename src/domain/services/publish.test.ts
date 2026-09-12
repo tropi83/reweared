@@ -101,6 +101,8 @@ describe("isFillReport", () => {
   it("accepts the script's status shape only", () => {
     expect(isFillReport({ pageOk: true, title: "filled", description: "not_found", photos: { requested: 3, attached: 2 } })).toBe(true);
     expect(isFillReport({ pageOk: true, title: "yes", description: "filled", photos: { requested: 1, attached: 1 } })).toBe(false);
+    expect(isFillReport({ pageOk: true, title: ["filled"], description: "not_found", photos: { requested: 1, attached: 1 } })).toBe(false);
+    expect(isFillReport({ pageOk: 1, title: "filled", description: "not_found", photos: { requested: 1, attached: 1 } })).toBe(false);
     expect(isFillReport(null)).toBe(false);
   });
 });

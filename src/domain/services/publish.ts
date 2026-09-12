@@ -94,8 +94,10 @@ export function isFillReport(value: unknown): value is FillReport {
   const photos = v.photos as Record<string, unknown> | undefined;
   return (
     typeof v.pageOk === "boolean" &&
-    FIELD_RESULTS.has(String(v.title)) &&
-    FIELD_RESULTS.has(String(v.description)) &&
+    typeof v.title === "string" &&
+    FIELD_RESULTS.has(v.title) &&
+    typeof v.description === "string" &&
+    FIELD_RESULTS.has(v.description) &&
     !!photos &&
     typeof photos.requested === "number" &&
     typeof photos.attached === "number"
