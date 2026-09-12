@@ -77,6 +77,7 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
               },
             ]}
           />
+          <PostButton />
         </div>
       </header>
 
@@ -93,7 +94,6 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
               <SourcePanel />
               <ListingSetupCard />
               <ListingCopyPanel />
-              <PostButton />
             </>
           )}
         </section>

@@ -1,6 +1,6 @@
 /**
- * Entry point of the Vinted flow: disabled with reasons until the project is postable, then the
- * automation warning (once, or every time until "don't show again"), then the Vinted window.
+ * Entry point of the Vinted flow (header button): blocked with reasons in a toast until the project is
+ * postable, then the automation warning (once, or every time until "don't show again"), then the Vinted window.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -27,6 +27,7 @@ import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stor
 import { useProjectsStore } from "@/app/stores/projects-store";
 import { usePublishStore } from "@/app/stores/publish-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
+import { useToastStore } from "@/app/stores/toast-store";
 import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { PostButton } from "./PostButton";
@@ -77,24 +78,27 @@ describe("PostButton", () => {
     platform.desktop = true;
     setAcknowledged(false);
     usePublishStore.setState({ session: { stage: "closed", busy: false } });
+    useToastStore.setState({ toasts: [] });
     useProjectsStore.setState({ current: null });
   });
 
   afterEach(cleanup);
 
-  it("is disabled with reasons until photos are marked and copy exists, then persists 'don't show again'", async () => {
+  it("is blocked with the reasons in a toast until photos are marked and copy exists, then persists 'don't show again'", async () => {
     const user = userEvent.setup();
     render(<PostButton />);
-    expect(screen.getByRole("button", { name: "Post on Vinted" })).toBeDisabled();
-    expect(screen.getByText(/Mark at least one photo/)).toBeInTheDocument();
-    expect(screen.getByText(/Write the title and description/)).toBeInTheDocument();
+    const blocked = screen.getByRole("button", { name: "Post on Vinted" });
+    // Not `disabled`: a tap on a phone must still explain what is missing.
+    expect(blocked).toHaveAttribute("aria-disabled", "true");
+    await user.click(blocked);
+    expect(useToastStore.getState().toasts.map((x) => x.message)).toEqual(["Mark at least one photo “To post”. Write the title and description first."]);
+    expect(screen.queryByRole("dialog")).toBeNull();
 
     await act(async () => {
       await makePostable();
     });
     const post = await screen.findByRole("button", { name: "Post 1 photos on Vinted" });
-    expect(post).toBeEnabled();
-    expect(screen.queryByText(/Mark at least one photo/)).toBeNull();
+    expect(post).not.toHaveAttribute("aria-disabled");
 
     await user.click(post);
     expect(screen.getByRole("dialog")).toHaveTextContent(/Automatic pre-fill on Vinted/);
@@ -136,19 +140,29 @@ describe("PostButton", () => {
     expect(screen.queryByText(/Automatic pre-fill on Vinted/)).toBeNull();
   });
 
-  it("stays disabled outside the desktop app", async () => {
+  it("stays blocked outside the desktop app and says so on tap", async () => {
     platform.desktop = false;
     await makePostable();
     render(<PostButton />);
-    expect(screen.getByRole("button", { name: "Post 1 photos on Vinted" })).toBeDisabled();
-    expect(screen.getByText("Available in the desktop app.")).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Post 1 photos on Vinted" });
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    await userEvent.setup().click(button);
+    expect(useToastStore.getState().toasts.map((x) => x.message)).toEqual(["Available in the desktop app."]);
+    expect(bridge.calls).toEqual([]);
+  });
+
+  it("shows the photo count as a compact badge (the label is for wide screens only)", async () => {
+    await makePostable();
+    render(<PostButton />);
+    const button = screen.getByRole("button", { name: "Post 1 photos on Vinted" });
+    expect(button.querySelector("[data-count]")).toHaveTextContent("1");
   });
 
   it("explains why the last session of this project ended", async () => {
     await makePostable();
     const projectId = useProjectsStore.getState().current!.project.id;
-    usePublishStore.setState({ session: { stage: "closed", busy: false, projectId, error: { code: "CANCELLED", message: "", retryable: false } } });
     render(<PostButton />);
-    expect(screen.getByText("The Vinted window was closed.")).toBeInTheDocument();
+    act(() => usePublishStore.setState({ session: { stage: "closed", busy: false, projectId, error: { code: "CANCELLED", message: "", retryable: false } } }));
+    expect(useToastStore.getState().toasts.map((x) => x.message)).toEqual(["The Vinted window was closed."]);
   });
 });

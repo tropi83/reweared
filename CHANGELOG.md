@@ -16,6 +16,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **“Post on Vinted” moved to the workspace header**, next to the All / To post toggle: labelled from `sm`, icon + photo count below. It stays tappable while the listing is not postable and explains what is missing in a toast (a disabled button was mute on phones); the end of a Vinted session is reported the same way.
+- Phones: the feed scrolls to a run that just started, and “New project” in the drawer goes to the gallery / camera choice instead of opening the photo library.
+- Copy panel: condition, brand and colour are labelled badges; only the search keywords are hashtags (a “#” returned by the model is stripped).
 - **One _Create the listing_ button replaces the two generate buttons.** It runs the photos and the text in parallel, skips the part whose provider is not connected (and says so under the button), stays disabled — without promising photos — while nothing can run, and asks before re-creating a listing that already has photos or text. The copy panel keeps a small _Regenerate text_ action.
 - Favourites are now **“To post”** (circled check on tiles, in the lightbox, the gallery filter and on the source image); project schema v2 migrates `favorites` to `toPost`.
 - **Gemini is now the copy writer, not an image provider.** Title & description default to `gemini-2.5-flash-lite` (cheapest vision-capable Gemini model, free tier; pricing checked 2026-09-12), with a provider/model picker (⚙ next to the panel) listing Gemini Flash models and Cloudflare Llama vision models with their public prices. Image generation with Gemini is disabled (`GEMINI_IMAGE_GENERATION_ENABLED`) because its image models have no free tier; the adapter and tests stay in place. Copy provider status is now reported even when a provider is not used for images.

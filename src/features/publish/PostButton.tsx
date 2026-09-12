@@ -1,18 +1,23 @@
-import { useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { Send } from "lucide-react";
 import { useProjectsStore } from "@/app/stores/projects-store";
 import { postEligibility, usePublishStore } from "@/app/stores/publish-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
+import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
 import { orderedPhotoIds } from "@/domain/services/publish";
 import { useT, type MessageKey } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
+import { cn } from "@/lib/cn";
 import { TermsDialog } from "./TermsDialog";
 
-/** Bottom bar of the workspace column: the entry point of the Vinted publishing flow. */
+/**
+ * Header entry point of the Vinted publishing flow. Compact (icon + count) on narrow screens, labelled from `sm`.
+ * When the project is not postable the button stays tappable and explains why in a toast — a `disabled` button
+ * would be mute on a phone.
+ */
 export function PostButton() {
   const t = useT();
-  const reasonsId = useId();
   const doc = useProjectsStore((s) => s.current);
   const acknowledged = useSettingsStore((s) => s.settings.vintedAutomationAcknowledged);
   const start = usePublishStore((s) => s.start);
@@ -21,32 +26,39 @@ export function PostButton() {
   const [terms, setTerms] = useState(false);
   const { ok, reasons } = postEligibility(doc);
   const count = doc ? orderedPhotoIds(doc).length : 0;
+  const label = count > 0 ? t("publish.button", { count }) : t("publish.button.none");
+
+  useEffect(() => {
+    if (!lastError) return;
+    const message = lastError.code === "CANCELLED" ? t("publish.closed") : errorMessage(lastError, "vinted");
+    if (lastError.code === "CANCELLED") toast.info(message);
+    else toast.error(message);
+  }, [lastError, t]);
+
+  const onClick = () => {
+    if (!ok) return toast.info(reasons.map((r) => t(`publish.reason.${r}` as MessageKey)).join(" "));
+    if (acknowledged) void start();
+    else setTerms(true);
+  };
 
   return (
-    // From lg the column itself scrolls and sticky honours its 1rem padding: -bottom-4 keeps the bar flush with the edge.
-    <div className="sticky bottom-0 -mx-4 mt-auto -mb-4 border-t border-border bg-bg/95 p-3 backdrop-blur lg:-bottom-4">
+    <>
       <Button
         variant="primary"
-        className="w-full"
-        disabled={!ok}
-        aria-describedby={ok ? undefined : reasonsId}
+        size="sm"
+        aria-label={label}
+        aria-disabled={ok ? undefined : true}
+        className={cn("px-2.5 sm:px-3", !ok && "opacity-60")}
         leftIcon={<Send className="size-4" />}
-        onClick={() => (acknowledged ? void start() : setTerms(true))}
+        onClick={onClick}
       >
-        {count > 0 ? t("publish.button", { count }) : t("publish.button.none")}
+        <span className="hidden sm:inline">{label}</span>
+        {count > 0 && (
+          <span data-count className="rounded-full bg-accent-fg/20 px-1.5 text-[11px] leading-4 font-semibold tabular-nums sm:hidden">
+            {count}
+          </span>
+        )}
       </Button>
-      {!ok && (
-        <ul id={reasonsId} className="mt-1.5 space-y-0.5 text-xs text-fg-subtle">
-          {reasons.map((r) => (
-            <li key={r}>{t(`publish.reason.${r}` as MessageKey)}</li>
-          ))}
-        </ul>
-      )}
-      {ok && lastError && (
-        <p className="mt-1.5 text-xs text-fg-subtle" role="status">
-          {lastError.code === "CANCELLED" ? t("publish.closed") : errorMessage(lastError, "vinted")}
-        </p>
-      )}
       <TermsDialog
         open={terms}
         onClose={() => setTerms(false)}
@@ -55,6 +67,6 @@ export function PostButton() {
           void start({ acknowledgedOnce: true });
         }}
       />
-    </div>
+    </>
   );
 }
