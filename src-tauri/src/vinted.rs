@@ -144,8 +144,10 @@ fn data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<std::path::PathBuf, String
         .map_err(|e| e.to_string())
 }
 
+/// Async on purpose: on Windows, building a webview window from a synchronous command deadlocks
+/// (WebView2 — see the `WebviewWindowBuilder::new` docs).
 #[tauri::command]
-pub fn vinted_open<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+pub async fn vinted_open<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(LABEL) {
         return window.set_focus().map_err(|e| e.to_string());
     }
@@ -195,8 +197,10 @@ pub fn vinted_navigate<R: Runtime>(app: AppHandle<R>, path: String) -> Result<()
     window.set_focus().map_err(|e| e.to_string())
 }
 
+/// Async so that deserialising, validating and formatting up to 20 base64 photos never runs on the
+/// main (UI) thread, where synchronous commands execute.
 #[tauri::command]
-pub fn vinted_prefill<R: Runtime>(app: AppHandle<R>, payload: PrefillPayload) -> Result<(), String> {
+pub async fn vinted_prefill<R: Runtime>(app: AppHandle<R>, payload: PrefillPayload) -> Result<(), String> {
     validate_payload(&payload)?;
     let window = app.get_webview_window(LABEL).ok_or("vinted window is not open")?;
     let json = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
