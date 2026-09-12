@@ -2,6 +2,8 @@ mod oauth;
 mod secrets;
 mod vinted;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -10,6 +12,13 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
+        .on_window_event(|window, event| {
+            // The Vinted window is only driven from the main one: never leave it orphaned (and keeping
+            // the process alive) once the main window is gone.
+            if window.label() == vinted::MAIN && matches!(event, tauri::WindowEvent::Destroyed) {
+                let _ = vinted::vinted_close(window.app_handle().clone());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             secrets::secret_get,
             secrets::secret_set,

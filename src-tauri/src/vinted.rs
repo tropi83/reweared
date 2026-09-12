@@ -10,7 +10,7 @@ use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 pub const LABEL: &str = "vinted";
-const MAIN: &str = "main";
+pub const MAIN: &str = "main";
 const HOME: &str = "https://www.vinted.com/";
 const ALLOWED_PATHS: &[&str] = &["/items/new", "/"];
 const VINTED_TLDS: &[&str] = &[
