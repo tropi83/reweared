@@ -132,7 +132,7 @@ CI never needs a Google account: everything runs against the Mock provider and `
 
 ## Code style
 
-Prettier (160 columns, Tailwind class sorting) + ESLint (`typescript-eslint`, `react-hooks` incl. React 19 rules) + `rustfmt`/`clippy`. EditorConfig is provided. Conventions are detailed in `.claude/skills/code-conventions/SKILL.md`; commit rules in `.claude/skills/git-workflow/SKILL.md`.
+Prettier (160 columns, Tailwind class sorting) + ESLint (`typescript-eslint`, `react-hooks` incl. React 19 rules, and the repo rule `local/no-french-identifiers` from `tools/eslint-rules/` — identifiers must be English, tested with `RuleTester` under `pnpm test`) + `rustfmt`/`clippy`. `pnpm lint` covers `src`, `tools` and `scripts`. EditorConfig is provided. Conventions are detailed in `.claude/skills/code-conventions/SKILL.md`; commit rules in `.claude/skills/git-workflow/SKILL.md`.
 
 ## Adding a provider
 

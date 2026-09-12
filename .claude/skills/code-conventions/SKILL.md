@@ -35,7 +35,9 @@ description: Use when writing or reviewing TypeScript/React/Rust code in this re
 
 ## Formatting & lint
 
-`pnpm format` (Prettier 160 cols + Tailwind class sorting) · `pnpm lint` (ESLint + react-hooks) · `pnpm typecheck` · `cargo fmt` · `cargo clippy -- -D warnings`.
+`pnpm format` (Prettier 160 cols + Tailwind class sorting) · `pnpm lint` (ESLint + react-hooks + the repo rule `local/no-french-identifiers`) · `pnpm typecheck` · `cargo fmt` · `cargo clippy -- -D warnings`.
+
+**Identifiers are English, prose may be French.** `tools/eslint-rules/no-french-identifiers.js` fails the lint on any declared name (variable, function, class, interface, type, enum, class member) containing a French word — compared by whole word of the camelCase/snake_case split against a root list + endings, never by substring. Comments and strings are not checked. To extend the list, add a root that is neither an English word nor the prefix of one (`categorie` + s = "categories" is the trap), and add a case to `no-french-identifiers.test.mjs`. The domain vocabulary is `Listing` (the item being sold; was `Project`), `Category`/`Subcategory` (the catalogue), `ListingCopy` (title + description).
 `pnpm check` runs every JS gate; `pnpm rust:check` the Rust ones. CI runs both.
 
 ## Clean-code checklist before finishing
