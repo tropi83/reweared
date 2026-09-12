@@ -13,6 +13,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **Gemini is now the copy writer, not an image provider.** Title & description default to `gemini-2.5-flash-lite` (cheapest vision-capable Gemini model, free tier; pricing checked 2026-09-12), with a provider/model picker (⚙ next to the panel) listing Gemini Flash models and Cloudflare Llama vision models with their public prices. Image generation with Gemini is disabled (`GEMINI_IMAGE_GENERATION_ENABLED`) because its image models have no free tier; the adapter and tests stay in place. Copy provider status is now reported even when a provider is not used for images.
 - **Product pivot: listing photo studio.** The free prompt is gone; the composer asks for a category and subcategory and generates the four photos a listing needs, each with its own prompt adapted to the product kind (56 packs / 40 kinds, also exposed as built-in recipes). "Generate again" re-runs the same four shots.
 - **Title & description from the photo**: a vision model (Cloudflare Llama 4 Scout with JSON-schema output, or Gemini Flash) writes title, description, condition, colour, brand (only if readable) and keywords; editable, copyable, stored in the project.
 

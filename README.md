@@ -29,18 +29,18 @@ Drop the photo of an item you want to sell, pick its category (women, men, kids,
 
 ## Features
 
-| Area              | What you get                                                                                                                                                                                           |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Import**        | Drag & drop, clipboard paste, file picker (native dialog on desktop). PNG · JPEG · WebP · GIF · BMP · AVIF, up to 40 MB, EXIF orientation applied, MIME sniffed from bytes                             |
-| **Listing packs** | Category → subcategory → four or five predefined shots per product kind (56 packs, 40 kinds). No free prompt; prompts can be tweaked per run. Custom recipes remain available                          |
-| **Copy**          | Title (≤ 70 chars), description, condition, colour, brand if readable and keywords written from the original photo by a vision model (Cloudflare Llama 4 Scout or Gemini Flash), editable and copyable |
-| **Generation**    | Each variation is an independent job: bounded concurrency, per-job progress, automatic retry with backoff (rate limits, network, outages), cancel, timeout                                             |
-| **Branches**      | _Use as source_, _Generate more like this_, _Generate again_, _Edit prompt_. The history keeps the tree (source → generation → results)                                                                |
-| **Gallery**       | Responsive grid on thumbnails, fullscreen with zoom/pan, side-by-side compare with the source, metadata panel, favourites, multi-select                                                                |
-| **Export**        | PNG / JPEG / WebP with quality, single file or ZIP for batches, native save dialog on desktop                                                                                                          |
-| **Privacy**       | Local-first, BYOK, no account, no backend, no telemetry. Credentials in the OS keychain on desktop                                                                                                     |
-| **Usage**         | Local per-model gauge (last minute / today, Pacific reset) with limits learned from Google's 429 details or entered manually — Google exposes no consumption API for keys                              |
-| **Settings**      | Providers (Google OAuth / API key / Mock), usage & quotas, concurrency, retries, timeout, upload size, theme, language (EN/FR), storage tools, diagnostics                                             |
+| Area              | What you get                                                                                                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Import**        | Drag & drop, clipboard paste, file picker (native dialog on desktop). PNG · JPEG · WebP · GIF · BMP · AVIF, up to 40 MB, EXIF orientation applied, MIME sniffed from bytes                                                                                                                       |
+| **Listing packs** | Category → subcategory → four or five predefined shots per product kind (56 packs, 40 kinds). No free prompt; prompts can be tweaked per run. Custom recipes remain available                                                                                                                    |
+| **Copy**          | Title (≤ 70 chars), description, condition, colour, brand if readable and keywords written from the original photo by a vision model — Gemini 2.5 Flash-Lite by default (cheapest, free tier), switchable to other Gemini Flash models or Cloudflare Llama vision models — editable and copyable |
+| **Generation**    | Each variation is an independent job: bounded concurrency, per-job progress, automatic retry with backoff (rate limits, network, outages), cancel, timeout                                                                                                                                       |
+| **Branches**      | _Use as source_, _Generate more like this_, _Generate again_, _Edit prompt_. The history keeps the tree (source → generation → results)                                                                                                                                                          |
+| **Gallery**       | Responsive grid on thumbnails, fullscreen with zoom/pan, side-by-side compare with the source, metadata panel, favourites, multi-select                                                                                                                                                          |
+| **Export**        | PNG / JPEG / WebP with quality, single file or ZIP for batches, native save dialog on desktop                                                                                                                                                                                                    |
+| **Privacy**       | Local-first, BYOK, no account, no backend, no telemetry. Credentials in the OS keychain on desktop                                                                                                                                                                                               |
+| **Usage**         | Local per-model gauge (last minute / today, Pacific reset) with limits learned from Google's 429 details or entered manually — Google exposes no consumption API for keys                                                                                                                        |
+| **Settings**      | Providers (Google OAuth / API key / Mock), usage & quotas, concurrency, retries, timeout, upload size, theme, language (EN/FR), storage tools, diagnostics                                                                                                                                       |
 
 ## How it works
 
@@ -89,6 +89,8 @@ Each variation gets its own random seed. _Advanced options_: keep-subject hint (
 
 AI Image Variations does not pay for your Gemini usage. Your Gemini usage is subject to Google's quotas, model availability and billing rules.
 
+**Gemini is used for the listing copy only.** The title & description panel calls a Gemini text model with the photo — `gemini-2.5-flash-lite` by default ($0.10 in / $0.40 out per 1M tokens, free tier available; pricing checked 2026-09-12), or `gemini-3.1-flash-lite`, `gemini-3.5-flash-lite`, `gemini-2.5-flash`, `gemini-3.6-flash` from the ⚙ menu next to the panel. One listing is roughly 1,500 input + 400 output tokens. **Image generation with Gemini is disabled** (`GEMINI_IMAGE_GENERATION_ENABLED` in `src/app/services.ts`) for the reason below; the adapter stays in the codebase and tested.
+
 > **Image models have no free tier in the Gemini API** (pricing page, checked 2026-09-11: every image model is "Free tier: Not available"). A key from a project without a linked billing account gets `limit: 0` and the app reports _Free tier — no access_. Link a Cloud Billing account in [AI Studio](https://aistudio.google.com/plan_information); generation then costs a few cents per image. The free image generation in the consumer Gemini app or in AI Studio's web UI is a different product with no public API, and OAuth sign-in does not change the tier: billing is always attached to the Google Cloud project.
 
 ### API key (web, desktop, mobile)
@@ -101,7 +103,7 @@ AI Image Variations does not pay for your Gemini usage. Your Gemini usage is sub
 
 Requires the app to be built with an OAuth Desktop client ID (see [DEVELOPMENT.md](DEVELOPMENT.md#configuring-google-oauth-desktop)). The flow is Google's installed-app flow: PKCE + loopback redirect on `127.0.0.1`, consent in your system browser. After signing in, pick the **Google Cloud project** that will be billed (`x-goog-user-project`); it needs the Generative Language API enabled. On the web, use an API key.
 
-### Models
+### Image models (disabled by default)
 
 | In the UI    | Model id                      | Sizes                | Notes                     |
 | ------------ | ----------------------------- | -------------------- | ------------------------- |

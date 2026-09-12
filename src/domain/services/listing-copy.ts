@@ -1,4 +1,4 @@
-import { AppError, type ListingCondition, type ListingCopy, type ListingSelection, type Locale } from "@/domain/models";
+import { AppError, type AuthStatus, type ListingCondition, type ListingCopy, type ListingSelection, type Locale } from "@/domain/models";
 import { findSubcategory } from "./listing-catalog";
 
 export interface ListingCopyRequest {
@@ -12,13 +12,35 @@ export interface ListingCopyResult {
   providerMeta?: Record<string, string | number>;
 }
 
+/** A vision model offered for listing copy, with the public list price for the UI (never used for billing). */
+export interface ListingCopyModel {
+  id: string;
+  label: string;
+  /** USD per 1M tokens, input / output, as published by the provider on `pricingCheckedOn`. */
+  pricing?: { inputPerM: number; outputPerM: number; pricingCheckedOn: string };
+  freeTier?: boolean;
+  /** Supports constrained JSON output (otherwise the JSON is parsed defensively). */
+  jsonSchema?: boolean;
+}
+
 /**
  * A vision model that turns the original photo into marketplace copy. Implemented by providers
- * that can look at images (Cloudflare Llama 4 Scout, Gemini Flash).
+ * that can look at images (Gemini Flash-Lite by default, Cloudflare Llama 4 Scout).
  */
 export interface ListingCopyProvider {
   readonly id: string;
-  describeListing(request: ListingCopyRequest, options: { signal: AbortSignal }): Promise<ListingCopyResult>;
+  readonly displayName: string;
+  /** Curated models; `models[0]` is the provider's recommended default (cheapest reliable option). */
+  readonly models: readonly ListingCopyModel[];
+  getAuthStatus(): Promise<AuthStatus>;
+  describeListing(request: ListingCopyRequest, options: { signal: AbortSignal; model?: string }): Promise<ListingCopyResult>;
+}
+
+/** The model to use for a provider: the user's choice when it is still in the catalogue, else the provider default. */
+export function resolveCopyModel(provider: Pick<ListingCopyProvider, "models">, preferred: string | undefined): ListingCopyModel {
+  const first = provider.models[0];
+  if (!first) throw new AppError("MODEL_UNAVAILABLE", "This provider has no vision model.");
+  return provider.models.find((m) => m.id === preferred) ?? first;
 }
 
 export const LISTING_COPY_LIMITS = { title: 70, description: 800, keywords: 8 } as const;

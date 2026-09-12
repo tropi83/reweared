@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { Check, Copy, FileText, RefreshCw, Square } from "lucide-react";
+import { Check, Copy, FileText, RefreshCw, Settings2, Square } from "lucide-react";
+import { navigate } from "@/app/router";
+import { getServices } from "@/app/services";
 import { useAuthStore } from "@/app/stores/auth-store";
-import { useComposerStore } from "@/app/stores/composer-store";
 import { useListingStore } from "@/app/stores/listing-store";
 import { useProjectsStore } from "@/app/stores/projects-store";
+import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Misc";
-import { LISTING_COPY_LIMITS } from "@/domain/services/listing-copy";
-import { MOCK_PROVIDER_ID } from "@/infrastructure/providers/mock/MockImageProvider";
+import { Select } from "@/components/ui/Select";
+import { LISTING_COPY_LIMITS, resolveCopyModel, type ListingCopyModel } from "@/domain/services/listing-copy";
 import { useT, type MessageKey } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 
@@ -17,23 +19,26 @@ import { errorMessage } from "@/i18n/errors";
 export function ListingCopyPanel() {
   const t = useT();
   const doc = useProjectsStore((s) => s.current);
-  const providerId = useComposerStore((s) => s.providerId);
   const providerStatus = useAuthStore((s) => s.providerStatus);
+  const settings = useSettingsStore((s) => s.settings);
+  const updateSettings = useSettingsStore((s) => s.update);
   const busy = useListingStore((s) => s.copyBusy);
   const error = useListingStore((s) => s.copyError);
   const generateCopy = useListingStore((s) => s.generateCopy);
   const updateCopy = useListingStore((s) => s.updateCopy);
   const cancelCopy = useListingStore((s) => s.cancelCopy);
   const [copied, setCopied] = useState<"title" | "description" | "all" | null>(null);
+  const [showModel, setShowModel] = useState(false);
 
   if (!doc?.project.originalImageId) return null;
   const copy = doc.project.copy;
-  // The mock provider has no vision model; use Cloudflare/Gemini credentials when configured.
-  const copyProviderId =
-    providerId === MOCK_PROVIDER_ID
-      ? Object.entries(providerStatus).find(([id, s]) => id !== MOCK_PROVIDER_ID && s.state === "authenticated")?.[0]
-      : providerId;
-  const canGenerate = !!copyProviderId && providerStatus[copyProviderId]?.state === "authenticated";
+  const copyProviders = [...getServices().copyProviders.values()];
+  const copyProviderId = settings.copyProviderId;
+  const provider = getServices().copyProviders.get(copyProviderId) ?? copyProviders[0];
+  const model = provider ? resolveCopyModel(provider, settings.copyModelByProvider[provider.id]) : undefined;
+  const canGenerate = !!provider && providerStatus[provider.id]?.state === "authenticated";
+  const pricing = (m: ListingCopyModel) =>
+    m.pricing ? t("copy.pricing", { input: m.pricing.inputPerM, output: m.pricing.outputPerM, free: m.freeTier ? t("copy.freeTier") : "" }) : "";
 
   const copyText = async (what: "title" | "description" | "all") => {
     if (!copy) return;
@@ -50,23 +55,66 @@ export function ListingCopyPanel() {
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-fg-muted">
           <FileText className="size-3.5" /> {t("copy.title")}
         </span>
-        {busy ? (
-          <Button variant="ghost" size="sm" leftIcon={<Square className="size-3.5" />} onClick={cancelCopy}>
-            {t("common.cancel")}
-          </Button>
-        ) : (
+        <div className="flex items-center gap-1">
           <Button
-            variant={copy ? "ghost" : "secondary"}
-            size="sm"
-            leftIcon={<RefreshCw className="size-3.5" />}
-            disabled={!canGenerate}
-            onClick={() => copyProviderId && void generateCopy(copyProviderId)}
-            title={canGenerate ? undefined : t("copy.needProvider")}
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t("copy.model")}
+            aria-pressed={showModel}
+            title={model ? `${provider?.displayName} · ${model.label}` : undefined}
+            onClick={() => setShowModel((v) => !v)}
           >
-            {copy ? t("copy.regenerate") : t("copy.generate")}
+            <Settings2 className="size-3.5" />
           </Button>
-        )}
+          {busy ? (
+            <Button variant="ghost" size="sm" leftIcon={<Square className="size-3.5" />} onClick={cancelCopy}>
+              {t("common.cancel")}
+            </Button>
+          ) : (
+            <Button
+              variant={copy ? "ghost" : "secondary"}
+              size="sm"
+              leftIcon={<RefreshCw className="size-3.5" />}
+              disabled={!canGenerate}
+              onClick={() => void generateCopy()}
+              title={canGenerate ? undefined : t("copy.needProvider", { provider: provider?.displayName ?? "" })}
+            >
+              {copy ? t("copy.regenerate") : t("copy.generate")}
+            </Button>
+          )}
+        </div>
       </div>
+
+      {showModel && provider && model && (
+        <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-bg-elevated/60 p-2.5">
+          <div className="space-y-1">
+            <Label htmlFor="copy-provider">{t("copy.provider")}</Label>
+            <Select
+              id="copy-provider"
+              value={provider.id}
+              options={copyProviders.map((p) => ({ value: p.id, label: p.displayName }))}
+              onChange={(copyProviderId) => void updateSettings({ copyProviderId })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="copy-model">{t("copy.model")}</Label>
+            <Select
+              id="copy-model"
+              value={model.id}
+              options={provider.models.map((m) => ({ value: m.id, label: m.label, description: pricing(m) }))}
+              onChange={(id) => void updateSettings({ copyModelByProvider: { ...settings.copyModelByProvider, [provider.id]: id } })}
+            />
+          </div>
+          {!canGenerate && (
+            <p className="col-span-2 text-xs text-warning">
+              {t("copy.needProvider", { provider: provider.displayName })}{" "}
+              <button type="button" className="text-accent hover:underline" onClick={() => navigate({ name: "settings", section: "providers" })}>
+                {t("nav.settings")}
+              </button>
+            </p>
+          )}
+        </div>
+      )}
 
       {busy && <div className="shimmer h-16 rounded-lg" aria-busy />}
       {error && !busy && (

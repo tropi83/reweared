@@ -38,6 +38,13 @@ export const APP_VERSION: string = (import.meta.env.VITE_APP_VERSION as string |
 
 export const MOCK_ENABLED: boolean = import.meta.env.VITE_ENABLE_MOCK_PROVIDER === "true" || import.meta.env.DEV;
 
+/**
+ * Gemini image models have no free tier (pricing checked 2026-09-11), so image generation goes
+ * through Cloudflare Workers AI only; Google is kept for listing copy (text models, free tier).
+ * Flip this to re-enable Gemini in the composer — the provider is still wired and tested.
+ */
+export const GEMINI_IMAGE_GENERATION_ENABLED = false;
+
 let services: AppServices | null = null;
 
 export function getServices(): AppServices {
@@ -68,15 +75,14 @@ export function createServices(bindings: {
   const cloudflareAuth = new CloudflareAuth(secrets, { read: (k) => storage.readMeta(k), write: (k, v) => storage.writeMeta(k, v) });
   const cloudflare = new CloudflareProvider(cloudflareAuth, usage);
   const mock = new MockImageProvider({ usage });
+  // Gemini first: it is the default copy writer (Flash-Lite, free tier).
   const copyProviders = new Map<string, ListingCopyProvider>([
-    [CLOUDFLARE_PROVIDER_ID, new CloudflareListingCopyProvider(cloudflareAuth)],
     [GEMINI_PROVIDER_ID, new GeminiListingCopyProvider(auth)],
+    [CLOUDFLARE_PROVIDER_ID, new CloudflareListingCopyProvider(cloudflareAuth)],
   ]);
-  // Cloudflare first: its img2img models are free while in beta, which is the default path.
-  const providers = new Map<string, ImageProvider>([
-    [CLOUDFLARE_PROVIDER_ID, cloudflare],
-    [GEMINI_PROVIDER_ID, gemini],
-  ]);
+  // Cloudflare is the image path (10,000 free neurons/day); Gemini only if explicitly re-enabled.
+  const providers = new Map<string, ImageProvider>([[CLOUDFLARE_PROVIDER_ID, cloudflare]]);
+  if (GEMINI_IMAGE_GENERATION_ENABLED) providers.set(GEMINI_PROVIDER_ID, gemini);
   if (MOCK_ENABLED) providers.set(MOCK_PROVIDER_ID, mock);
 
   const queue = new GenerationQueue(

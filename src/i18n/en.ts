@@ -214,6 +214,8 @@ export const en = {
   // Providers / auth
   "auth.gemini.title": "Google Gemini",
   "auth.gemini.body": "Bring your own Google access. AI Image Variations never proxies or stores your credentials on a server.",
+  "auth.gemini.copyOnly":
+    "Gemini writes the listing title and description (text models with a free tier; Flash-Lite by default, changeable next to the copy panel). Image generation with Gemini is disabled: its image models have no free tier.",
   "auth.status.connected": "Connected",
   "auth.status.disconnected": "Not connected",
   "auth.status.expired": "Session expired",
@@ -399,7 +401,11 @@ export const en = {
   "copy.title": "Title & description",
   "copy.generate": "Write from the photo",
   "copy.regenerate": "Regenerate",
-  "copy.needProvider": "Connect Cloudflare or Gemini to describe the photo.",
+  "copy.needProvider": "Connect {provider} in Settings to describe the photo.",
+  "copy.provider": "Written by",
+  "copy.model": "Model",
+  "copy.pricing": "${input} in / ${output} out per 1M tokens{free}",
+  "copy.freeTier": " · free tier",
   "copy.field.title": "Title",
   "copy.field.description": "Description",
   "copy.copyAll": "Copy title + description",

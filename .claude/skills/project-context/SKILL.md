@@ -7,7 +7,7 @@ description: Use at the start of any task on AI Image Variations — product int
 
 ## Product in one paragraph
 
-Local-first AI photo studio for second-hand listings (Vinted-style): import the item's photo → choose category/subcategory (10 → 56, `listing-catalog.ts`) → the app generates the listing photos with predefined, kind-specific prompts (retouched / studio / in use or worn / folded or detail, + mirror selfie for wearables except kids) → compare, pick, export; a vision model writes the title + description. No free prompt in the main flow (custom recipes remain for power users). BYOK (Cloudflare Workers AI by default, Gemini). No account, no backend, no cloud.
+Local-first AI photo studio for second-hand listings (Vinted-style): import the item's photo → choose category/subcategory (10 → 56, `listing-catalog.ts`) → the app generates the listing photos with predefined, kind-specific prompts (retouched / studio / in use or worn / folded or detail, + mirror selfie for wearables except kids) → compare, pick, export; a vision model writes the title + description (Gemini 2.5 Flash-Lite by default, free tier; Cloudflare Llama as alternative). No free prompt in the main flow (custom recipes remain for power users). BYOK: images = Cloudflare Workers AI only (Gemini image generation disabled via `GEMINI_IMAGE_GENERATION_ENABLED`), copy = Gemini by default. No account, no backend, no cloud.
 
 ## Map
 

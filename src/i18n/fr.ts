@@ -201,6 +201,8 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "settings.defaultVariations": "Variations par défaut",
 
   "auth.gemini.body": "Utilisez votre propre accès Google. AI Image Variations ne relaie ni ne stocke jamais vos identifiants sur un serveur.",
+  "auth.gemini.copyOnly":
+    "Gemini rédige le titre et la description de l'annonce (modèles texte avec offre gratuite ; Flash-Lite par défaut, modifiable à côté du panneau titre & description). La génération d'images avec Gemini est désactivée : ses modèles image n'ont pas d'offre gratuite.",
   "auth.status.connected": "Connecté",
   "auth.status.disconnected": "Non connecté",
   "auth.status.expired": "Session expirée",
@@ -381,7 +383,11 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "copy.title": "Titre & description",
   "copy.generate": "Rédiger depuis la photo",
   "copy.regenerate": "Régénérer",
-  "copy.needProvider": "Connectez Cloudflare ou Gemini pour décrire la photo.",
+  "copy.needProvider": "Connectez {provider} dans les réglages pour décrire la photo.",
+  "copy.provider": "Rédigé par",
+  "copy.model": "Modèle",
+  "copy.pricing": "{input} $ entrée / {output} $ sortie par M tokens{free}",
+  "copy.freeTier": " · offre gratuite",
   "copy.field.title": "Titre",
   "copy.field.description": "Description",
   "copy.copyAll": "Copier titre + description",

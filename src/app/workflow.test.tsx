@@ -184,7 +184,10 @@ describe("listing packs", () => {
     useListingStore.getState().setListing(listing);
     expect(useProjectsStore.getState().current?.project.listing).toEqual(listing);
     // No vision model for the mock provider: a clear error, no crash.
-    expect(await useListingStore.getState().generateCopy("mock")).toBeNull();
+    const { useSettingsStore } = await import("./stores/settings-store");
+    expect(useSettingsStore.getState().settings.copyProviderId).toBe("gemini");
+    useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, copyProviderId: "mock" } });
+    expect(await useListingStore.getState().generateCopy()).toBeNull();
     expect(useListingStore.getState().copyError?.code).toBe("PROVIDER_UNAVAILABLE");
   });
 });

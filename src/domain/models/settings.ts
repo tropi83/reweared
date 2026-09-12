@@ -13,6 +13,10 @@ export interface AppSettings {
   activeProviderId: string;
   /** Last chosen model per provider. */
   lastModelByProvider: Record<string, string>;
+  /** Vision provider that writes the listing title/description (independent from the image provider). */
+  copyProviderId: string;
+  /** Chosen copy model per provider; unset = the provider's default (cheapest). */
+  copyModelByProvider: Record<string, string>;
   defaultVariationCount: number;
   defaultAspectRatio: AspectRatio;
   defaultImageSize?: ImageSize;
@@ -36,6 +40,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
   activeProviderId: "cloudflare",
   lastModelByProvider: {},
+  // Gemini text models have a free tier and Flash-Lite is the cheapest vision model we know of.
+  copyProviderId: "gemini",
+  copyModelByProvider: {},
   defaultVariationCount: 4,
   defaultAspectRatio: "original",
   maxConcurrentJobs: 2,

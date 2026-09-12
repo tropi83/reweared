@@ -16,8 +16,8 @@ interface ListingState {
   copyBusy: boolean;
   copyError: GenerationError | null;
   setListing(selection: ListingSelection | undefined): void;
-  /** Generates title/description from the original photo with the active provider's vision model. */
-  generateCopy(providerId: string): Promise<ListingCopy | null>;
+  /** Generates title/description from the original photo with the copy provider/model chosen in settings. */
+  generateCopy(): Promise<ListingCopy | null>;
   updateCopy(patch: Partial<Pick<ListingCopy, "title" | "description" | "keywords" | "brand" | "color" | "condition">>): void;
   cancelCopy(): void;
 }
@@ -35,12 +35,13 @@ export const useListingStore = create<ListingState>((set) => ({
     });
   },
 
-  async generateCopy(providerId) {
+  async generateCopy() {
     const projects = useProjectsStore.getState();
     const doc = projects.current;
     const originalId = doc?.project.originalImageId;
     if (!doc || !originalId) return null;
     const asset = doc.images[originalId];
+    const { copyProviderId: providerId, copyModelByProvider } = useSettingsStore.getState().settings;
     const provider = getServices().copyProviders.get(providerId);
     if (!asset || !provider) {
       set({ copyError: { code: "PROVIDER_UNAVAILABLE", message: "No vision model for this provider.", retryable: false } });
@@ -57,7 +58,7 @@ export const useListingStore = create<ListingState>((set) => ({
       const language = useSettingsStore.getState().settings.locale;
       const result = await provider.describeListing(
         { image: { blob: prepared.blob, mimeType: prepared.mimeType }, ...(doc.project.listing ? { listing: doc.project.listing } : {}), language },
-        { signal },
+        { signal, ...(copyModelByProvider[providerId] ? { model: copyModelByProvider[providerId] } : {}) },
       );
       if (signal.aborted) return null;
       const copy: ListingCopy = {

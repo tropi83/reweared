@@ -1,7 +1,9 @@
-import { AppError } from "@/domain/models";
+import { AppError, type AuthStatus } from "@/domain/models";
 import {
   buildListingCopyPrompt,
   parseListingCopy,
+  resolveCopyModel,
+  type ListingCopyModel,
   type ListingCopyProvider,
   type ListingCopyRequest,
   type ListingCopyResult,
@@ -16,41 +18,51 @@ const log = createLogger("gemini-copy");
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
+const PRICING_CHECKED_ON = "2026-09-12";
+
 /**
- * Text (multimodal input) models in order of preference. Unlike the image models these have a
- * free tier. Ids from the Interactions API reference (verified 2026-09-11); the first one the
- * account can list is used.
+ * Text models with image input, cheapest first (ai.google.dev/gemini-api/docs/pricing and /models,
+ * verified 2026-09-12). All of them have a free tier, unlike the image models. Prices are USD per
+ * 1M tokens on the paid tier; a listing costs roughly 1,500 input + 400 output tokens, i.e. well
+ * under a tenth of a cent on Flash-Lite.
  */
-export const GEMINI_TEXT_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash"] as const;
+export const GEMINI_TEXT_MODELS: readonly ListingCopyModel[] = [
+  {
+    id: "gemini-2.5-flash-lite",
+    label: "Gemini 2.5 Flash-Lite",
+    pricing: { inputPerM: 0.1, outputPerM: 0.4, pricingCheckedOn: PRICING_CHECKED_ON },
+    freeTier: true,
+  },
+  {
+    id: "gemini-3.1-flash-lite",
+    label: "Gemini 3.1 Flash-Lite",
+    pricing: { inputPerM: 0.25, outputPerM: 1.5, pricingCheckedOn: PRICING_CHECKED_ON },
+    freeTier: true,
+  },
+  {
+    id: "gemini-3.5-flash-lite",
+    label: "Gemini 3.5 Flash-Lite",
+    pricing: { inputPerM: 0.3, outputPerM: 2.5, pricingCheckedOn: PRICING_CHECKED_ON },
+    freeTier: true,
+  },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", pricing: { inputPerM: 0.3, outputPerM: 2.5, pricingCheckedOn: PRICING_CHECKED_ON }, freeTier: true },
+  { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash", pricing: { inputPerM: 0.75, outputPerM: 3.75, pricingCheckedOn: PRICING_CHECKED_ON }, freeTier: true },
+];
 
 export class GeminiListingCopyProvider implements ListingCopyProvider {
   readonly id = "gemini";
-  private resolvedModel: string | null = null;
+  readonly displayName = "Google Gemini";
+  readonly models = GEMINI_TEXT_MODELS;
 
   constructor(private readonly auth: GeminiAuthSource) {}
 
-  private async pickModel(headers: Record<string, string>): Promise<string> {
-    if (this.resolvedModel) return this.resolvedModel;
-    try {
-      const url = new URL(`${BASE_URL}/models`);
-      url.searchParams.set("pageSize", "200");
-      const response = await httpFetch(url.toString(), { headers });
-      if (response.ok) {
-        const json = (await response.json()) as { models?: Array<{ name?: string }> };
-        const names = new Set((json.models ?? []).map((m) => (m.name ?? "").replace(/^models\//, "")));
-        const found = GEMINI_TEXT_MODELS.find((id) => names.has(id));
-        if (found) this.resolvedModel = found;
-      }
-    } catch (err) {
-      log.warn("model listing failed, using default", err);
-    }
-    this.resolvedModel ??= GEMINI_TEXT_MODELS[0];
-    return this.resolvedModel;
+  getAuthStatus(): Promise<AuthStatus> {
+    return this.auth.getStatus();
   }
 
-  async describeListing(request: ListingCopyRequest, { signal }: { signal: AbortSignal }): Promise<ListingCopyResult> {
+  async describeListing(request: ListingCopyRequest, { signal, model: preferred }: { signal: AbortSignal; model?: string }): Promise<ListingCopyResult> {
     const headers = await this.auth.getRequestHeaders();
-    const model = await this.pickModel(headers);
+    const model = resolveCopyModel(this, preferred).id;
     const body = {
       model,
       system_instruction: buildListingCopyPrompt(request),

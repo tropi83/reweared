@@ -43,7 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async refresh() {
     const { auth } = getServices();
-    const { providers, cloudflareAuth } = getServices();
+    const { providers, copyProviders, cloudflareAuth } = getServices();
     const [status, apiKeyStatus, oauthStatus, apiKeyRemembered, cloudflareRemembered] = await Promise.all([
       auth.getStatus(),
       auth.apiKey.getStatus(),
@@ -53,6 +53,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     ]);
     const providerStatus: Record<string, AuthStatus> = {};
     for (const [id, provider] of providers) providerStatus[id] = await provider.getAuthStatus().catch(() => NONE);
+    for (const [id, provider] of copyProviders) providerStatus[id] ??= await provider.getAuthStatus().catch(() => NONE);
     set({ status, apiKeyStatus, oauthStatus, apiKeyRemembered, cloudflareRemembered, providerStatus });
   },
 

@@ -4,7 +4,7 @@ import { LayeredSecretStore, MemorySecretStore, WebLocalSecretStore } from "@/in
 import { CloudflareAuth } from "@/infrastructure/providers/cloudflare/CloudflareAuth";
 import { CloudflareListingCopyProvider } from "@/infrastructure/providers/cloudflare/CloudflareListingCopy";
 import { GeminiListingCopyProvider } from "@/infrastructure/providers/gemini/GeminiListingCopy";
-import { buildListingCopyPrompt, LISTING_COPY_JSON_SCHEMA, parseListingCopy } from "./listing-copy";
+import { buildListingCopyPrompt, LISTING_COPY_JSON_SCHEMA, parseListingCopy, resolveCopyModel } from "./listing-copy";
 
 const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const image = { blob: new Blob([JPEG], { type: "image/jpeg" }), mimeType: "image/jpeg" as const };
@@ -106,37 +106,58 @@ describe("CloudflareListingCopyProvider", () => {
 });
 
 describe("GeminiListingCopyProvider", () => {
-  it("picks an available text model and sends the image through the Interactions API", async () => {
+  const auth = {
+    getRequestHeaders: async () => ({ "x-goog-api-key": "AIzaTEST0000000000000000000000000000" }),
+    getStatus: async () => ({ state: "authenticated" as const, kind: "api_key" as const }),
+  };
+  const answer = () =>
+    new Response(
+      JSON.stringify({
+        status: "completed",
+        steps: [
+          {
+            type: "model_output",
+            content: [{ type: "text", text: '{"title":"T-shirt","description":"Coton, bon état.","condition":"good","color":"noir","keywords":["t-shirt"]}' }],
+          },
+        ],
+      }),
+      { status: 200 },
+    );
+
+  it("defaults to the cheapest Flash-Lite model and sends the image through the Interactions API", async () => {
     const calls: string[] = [];
+    let sentModel = "";
     __setFetchOverride(async (url, init) => {
       calls.push(url);
-      if (url.includes("/models")) return new Response(JSON.stringify({ models: [{ name: "models/gemini-3.5-flash" }] }), { status: 200 });
       const body = JSON.parse(String(init?.body));
-      expect(body.model).toBe("gemini-3.5-flash");
+      sentModel = body.model;
       expect(body.input[1]).toMatchObject({ type: "image", mime_type: "image/jpeg" });
       expect(body.store).toBe(false);
-      return new Response(
-        JSON.stringify({
-          status: "completed",
-          steps: [
-            {
-              type: "model_output",
-              content: [
-                { type: "text", text: '{"title":"T-shirt","description":"Coton, bon état.","condition":"good","color":"noir","keywords":["t-shirt"]}' },
-              ],
-            },
-          ],
-        }),
-        { status: 200 },
-      );
+      return answer();
     });
-    const provider = new GeminiListingCopyProvider({
-      getRequestHeaders: async () => ({ "x-goog-api-key": "AIzaTEST0000000000000000000000000000" }),
-      getStatus: async () => ({ state: "authenticated", kind: "api_key" }),
-    });
+    const provider = new GeminiListingCopyProvider(auth);
+    expect(provider.models[0]?.id).toBe("gemini-2.5-flash-lite");
+    expect(provider.models.every((m) => m.freeTier && m.pricing)).toBe(true);
     const result = await provider.describeListing({ image, language: "fr" }, { signal: new AbortController().signal });
+    expect(sentModel).toBe("gemini-2.5-flash-lite");
     expect(result.copy.title).toBe("T-shirt");
-    expect(result.providerMeta?.model).toBe("gemini-3.5-flash");
-    expect(calls[1]).toBe("https://generativelanguage.googleapis.com/v1beta/interactions");
+    expect(result.providerMeta?.model).toBe("gemini-2.5-flash-lite");
+    // No model listing round-trip: exactly one request.
+    expect(calls).toEqual(["https://generativelanguage.googleapis.com/v1beta/interactions"]);
+  });
+
+  it("honours a chosen model and falls back to the default for unknown ids", async () => {
+    const models: string[] = [];
+    __setFetchOverride(async (_url, init) => {
+      models.push(JSON.parse(String(init?.body)).model);
+      return answer();
+    });
+    const provider = new GeminiListingCopyProvider(auth);
+    const signal = new AbortController().signal;
+    await provider.describeListing({ image, language: "en" }, { signal, model: "gemini-3.6-flash" });
+    await provider.describeListing({ image, language: "en" }, { signal, model: "gemini-9-ultra" });
+    expect(models).toEqual(["gemini-3.6-flash", "gemini-2.5-flash-lite"]);
+    expect(resolveCopyModel(provider, undefined).id).toBe("gemini-2.5-flash-lite");
+    expect(() => resolveCopyModel({ models: [] }, "x")).toThrow();
   });
 });

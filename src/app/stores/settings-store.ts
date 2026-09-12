@@ -23,7 +23,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   loaded: false,
   async load() {
     const stored = await getServices().storage.getSettings();
-    const settings = stored ?? { ...DEFAULT_SETTINGS };
+    // Spread over the defaults so settings saved by an older build get the new fields.
+    const settings = stored ? { ...DEFAULT_SETTINGS, ...stored } : { ...DEFAULT_SETTINGS };
     if (typeof navigator !== "undefined" && !stored && navigator.language.toLowerCase().startsWith("fr")) settings.locale = "fr";
     set({ settings, loaded: true });
     applySideEffects(settings);

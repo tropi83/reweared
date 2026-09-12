@@ -3,7 +3,7 @@ import { CheckCircle2, ExternalLink, KeyRound, LogOut, ShieldAlert } from "lucid
 import { useAuthStore } from "@/app/stores/auth-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
-import { getServices, MOCK_ENABLED } from "@/app/services";
+import { GEMINI_IMAGE_GENERATION_ENABLED, getServices, MOCK_ENABLED } from "@/app/services";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Switch } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -54,9 +54,10 @@ export function ProvidersSection() {
         </div>
         <p className="mt-1 text-sm text-fg-muted">{t("auth.gemini.body")}</p>
         <div className="mt-2 space-y-1.5 rounded-lg bg-bg-sunken px-3 py-2 text-xs text-fg-muted">
+          {!GEMINI_IMAGE_GENERATION_ENABLED && <p>{t("auth.gemini.copyOnly")}</p>}
           <p>{t("auth.billing.notice")}</p>
           <p>
-            {t("auth.billing.noFreeTier")}{" "}
+            {GEMINI_IMAGE_GENERATION_ENABLED && <>{t("auth.billing.noFreeTier")} </>}
             <button
               type="button"
               className="inline-flex items-center gap-1 text-accent hover:underline"

@@ -1,9 +1,11 @@
-import { AppError } from "@/domain/models";
+import { AppError, type AuthStatus } from "@/domain/models";
 import {
   blobToDataUri,
   buildListingCopyPrompt,
   LISTING_COPY_JSON_SCHEMA,
   parseListingCopy,
+  resolveCopyModel,
+  type ListingCopyModel,
   type ListingCopyProvider,
   type ListingCopyRequest,
   type ListingCopyResult,
@@ -17,26 +19,42 @@ import type { CloudflareErrorBody } from "./CloudflareMapper";
 const log = createLogger("cloudflare-copy");
 
 /**
- * Vision models able to describe the photo, in order of preference (schemas verified 2026-09-12):
- * - Llama 4 Scout: natively multimodal, supports `response_format: json_schema` (reliable JSON),
- *   $0.27 / $0.85 per M tokens ⇒ roughly 60 neurons per listing.
+ * Vision models able to describe the photo (schemas and prices verified 2026-09-12, Workers AI
+ * pricing page; both count against the 10,000 free neurons/day):
+ * - Llama 4 Scout: natively multimodal, supports `response_format: json_schema` (reliable JSON).
  * - Llama 3.2 11B Vision: cheaper, JSON asked in the prompt and parsed defensively.
  * Both take OpenAI-style messages with an `image_url` data URI part.
  */
-export const CLOUDFLARE_VISION_MODELS = ["@cf/meta/llama-4-scout-17b-16e-instruct", "@cf/meta/llama-3.2-11b-vision-instruct"] as const;
-
-const SUPPORTS_JSON_SCHEMA = new Set<string>(["@cf/meta/llama-4-scout-17b-16e-instruct"]);
+export const CLOUDFLARE_VISION_MODELS: readonly ListingCopyModel[] = [
+  {
+    id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    label: "Llama 4 Scout 17B",
+    pricing: { inputPerM: 0.27, outputPerM: 0.85, pricingCheckedOn: "2026-09-12" },
+    freeTier: true,
+    jsonSchema: true,
+  },
+  {
+    id: "@cf/meta/llama-3.2-11b-vision-instruct",
+    label: "Llama 3.2 11B Vision",
+    pricing: { inputPerM: 0.049, outputPerM: 0.676, pricingCheckedOn: "2026-09-12" },
+    freeTier: true,
+  },
+];
 
 export class CloudflareListingCopyProvider implements ListingCopyProvider {
   readonly id = "cloudflare";
+  readonly displayName = "Cloudflare Workers AI";
+  readonly models = CLOUDFLARE_VISION_MODELS;
 
-  constructor(
-    private readonly auth: CloudflareAuth,
-    private readonly modelId: string = CLOUDFLARE_VISION_MODELS[0],
-  ) {}
+  constructor(private readonly auth: CloudflareAuth) {}
 
-  async describeListing(request: ListingCopyRequest, { signal }: { signal: AbortSignal }): Promise<ListingCopyResult> {
-    const { url, headers } = await this.auth.resolveEndpoint(this.modelId);
+  getAuthStatus(): Promise<AuthStatus> {
+    return this.auth.getStatus();
+  }
+
+  async describeListing(request: ListingCopyRequest, { signal, model: preferred }: { signal: AbortSignal; model?: string }): Promise<ListingCopyResult> {
+    const model = resolveCopyModel(this, preferred);
+    const { url, headers } = await this.auth.resolveEndpoint(model.id);
     allowHost(new URL(url).host);
     const body: Record<string, unknown> = {
       messages: [
@@ -52,7 +70,7 @@ export class CloudflareListingCopyProvider implements ListingCopyProvider {
       max_tokens: 700,
       temperature: 0.4,
     };
-    if (SUPPORTS_JSON_SCHEMA.has(this.modelId)) {
+    if (model.jsonSchema) {
       body.response_format = { type: "json_schema", json_schema: LISTING_COPY_JSON_SCHEMA };
     }
 
@@ -78,6 +96,6 @@ export class CloudflareListingCopyProvider implements ListingCopyProvider {
     if (json.success === false) throw mapCloudflareEnvelopeError(json);
     const raw = json.result?.response ?? json.response;
     const rawText = typeof raw === "string" ? raw : raw ? JSON.stringify(raw) : "";
-    return { copy: parseListingCopy(rawText), providerMeta: { model: this.modelId } };
+    return { copy: parseListingCopy(rawText), providerMeta: { model: model.id } };
   }
 }
