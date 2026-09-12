@@ -108,7 +108,12 @@ export function Lightbox() {
   const imageStyle = { transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, cursor: zoom > 1 ? "grab" : "zoom-in" } as const;
 
   return (
-    <div className="fade-in fixed inset-0 z-50 flex flex-col bg-[#08080a] text-white" role="dialog" aria-modal="true" aria-label={t("gallery.fullscreen")}>
+    <div
+      className="fade-in fixed inset-0 z-50 flex flex-col bg-[#08080a] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-white"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("gallery.fullscreen")}
+    >
       <header className="flex h-12 shrink-0 items-center gap-1 px-2 sm:px-3">
         <span className="min-w-0 truncate px-2 text-sm text-white/80">
           {job ? (job.shotLabel?.[locale] ?? t("generation.variation", { index: job.index })) : t("gallery.original")} · {index + 1} / {ordered.length}

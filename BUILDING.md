@@ -266,7 +266,8 @@ The universal APK contains all four ABIs. For a quicker build aimed at recent ph
 
 - **Post on Vinted** is desktop-only in this version: the button is shown disabled.
 - **Google sign-in** is not wired on mobile: use an API key. Keys are kept for the session only until the mobile keystore lands.
-- **Camera import**: if a device's WebView requires it, add `<uses-permission android:name="android.permission.CAMERA" />` to `src-tauri/gen/android/app/src/main/AndroidManifest.xml` (see DEVELOPMENT.md → Mobile image import).
+- **Take a photo** opens the phone's camera app. On Android this relies on the `<queries>` entry for `android.media.action.IMAGE_CAPTURE` in `src-tauri/gen/android/app/src/main/AndroidManifest.xml` (Android 11+ hides other apps otherwise and the gallery opens instead); no `CAMERA` permission is needed (DEVELOPMENT.md → Mobile image import).
+- **Screen edges**: Android reserves the status bar, navigation bar and keyboard areas natively (`MainActivity.kt`, window background = the app background); iOS relies on `viewport-fit=cover` + `env(safe-area-inset-*)` padding in the web UI (`App.tsx`, toasts, lightbox).
 
 ## 4. iOS (macOS only)
 

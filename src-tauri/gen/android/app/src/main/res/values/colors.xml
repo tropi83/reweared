@@ -7,4 +7,8 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- The web UI background token "bg" (light theme, oklch(98.5% 0.003 260)): paints the status and
+         navigation bar areas that MainActivity reserves, so they blend with the app instead of Material's
+         default grey. XML comments must not contain two consecutive hyphens. -->
+    <color name="app_background">#FFF9FAFC</color>
 </resources>

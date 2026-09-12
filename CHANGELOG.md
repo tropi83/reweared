@@ -22,6 +22,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- Phones: saving an API key failed with “Unexpected error” — the keychain command (desktop-only) was still used as the persistent tier on Android/iOS. Phones now keep keys for the session (the “Remember” switch is replaced by a note); a desktop keychain refusal keeps the key for the session with a clear storage error; errors raised by Rust commands keep their text.
+- Android: the header was drawn under the status bar (edge-to-edge); the app now reserves the status bar, navigation bar and keyboard areas, with the bars painted in the app background. iOS: the web UI pads the safe areas (notch, home indicator).
+- Android: “Take a photo” opened the gallery — the camera intent was invisible to the app under Android 11+ package visibility; the manifest now declares it in `<queries>`.
 - Android/iOS builds: `keyring` was declared for mobile targets too, where keyring 4 refuses to compile without its `v1` feature; it is now a desktop-only dependency (mobile keeps session-only secrets).
 - Error messages are provider-aware (`errorMessage()` picks `error.<provider>.<code>` before the generic text): a Cloudflare quota error no longer talks about Gemini. Daily-quota messages now state when the quota resets, in local time with the remaining delay (Cloudflare Workers AI: 00:00 UTC; Gemini: midnight Pacific). Cloudflare 429 `4006` "used up your daily free allocation" is `QUOTA_EXCEEDED` (not retried), and the usage meter's "today" window follows the provider's reset time (UTC for Cloudflare) with a link to the Cloudflare dashboard.
 - Cloudflare: 403 `5018`/`3041` ("account not allowed for private model") is reported as a model-access problem, not a bad credential, and the model list is filtered by what the account can actually run (`/ai/models/search`, or `/models` on the Worker).

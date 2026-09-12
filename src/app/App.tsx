@@ -53,8 +53,10 @@ function Shell() {
     setSidebarOpen(false);
   }, [route, setSidebarOpen]);
 
+  // Safe areas: with viewport-fit=cover the iOS WebView runs under the status bar/notch/home indicator,
+  // so the shell reserves them. Android reserves them natively (MainActivity) and desktop reports 0.
   return (
-    <div className="flex h-full overflow-hidden bg-bg">
+    <div className="flex h-full overflow-hidden bg-bg pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-bg-elevated focus:px-3 focus:py-2"
@@ -69,7 +71,8 @@ function Shell() {
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-72 shrink-0 border-r border-border bg-bg-sunken transition-transform md:static md:translate-x-0",
+          // The mobile drawer is fixed to the viewport, outside the shell's padding: it reserves the safe areas itself.
+          "fixed inset-y-0 left-0 z-40 w-72 shrink-0 border-r border-border bg-bg-sunken pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] transition-transform md:static md:translate-x-0 md:p-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >

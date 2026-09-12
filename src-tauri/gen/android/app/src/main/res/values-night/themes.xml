@@ -1,6 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Theme.ai_image_variations" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+        <!-- Behind the system bars (reserved by MainActivity): match the web UI background. -->
+        <item name="android:windowBackground">@color/app_background</item>
     </style>
 </resources>
