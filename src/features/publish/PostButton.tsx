@@ -23,7 +23,8 @@ export function PostButton() {
   const count = doc ? orderedPhotoIds(doc).length : 0;
 
   return (
-    <div className="sticky bottom-0 -mx-4 mt-auto -mb-4 border-t border-border bg-bg/95 p-3 backdrop-blur">
+    // From lg the column itself scrolls and sticky honours its 1rem padding: -bottom-4 keeps the bar flush with the edge.
+    <div className="sticky bottom-0 -mx-4 mt-auto -mb-4 border-t border-border bg-bg/95 p-3 backdrop-blur lg:-bottom-4">
       <Button
         variant="primary"
         className="w-full"
