@@ -70,18 +70,19 @@ export function ListingCopyPanel() {
             <Button variant="ghost" size="sm" leftIcon={<Square className="size-3.5" />} onClick={cancelCopy}>
               {t("common.cancel")}
             </Button>
-          ) : (
+          ) : copy ? (
+            // The first text comes from "Create the listing"; this only rewrites it.
             <Button
-              variant={copy ? "ghost" : "secondary"}
+              variant="ghost"
               size="sm"
               leftIcon={<RefreshCw className="size-3.5" />}
               disabled={!canGenerate}
               onClick={() => void generateCopy()}
               title={canGenerate ? undefined : t("copy.needProvider", { provider: provider?.displayName ?? "" })}
             >
-              {copy ? t("copy.regenerate") : t("copy.generate")}
+              {t("copy.regenerateText")}
             </Button>
-          )}
+          ) : null}
         </div>
       </div>
 

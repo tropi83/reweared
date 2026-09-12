@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Misc";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/cn";
-import { ListingComposer } from "../generation/ListingComposer";
 import { ListingCopyPanel } from "./ListingCopyPanel";
+import { ListingSetupCard } from "./ListingSetupCard";
 import { GenerationFeed } from "../generation/GenerationFeed";
 import { Lightbox } from "../gallery/Lightbox";
 import { SelectionBar } from "../gallery/SelectionBar";
@@ -91,8 +91,8 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
           ) : (
             <>
               <SourcePanel />
+              <ListingSetupCard />
               <ListingCopyPanel />
-              <ListingComposer />
               <PostButton />
             </>
           )}

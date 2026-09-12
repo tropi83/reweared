@@ -44,3 +44,6 @@ Thumbs.db
 coverage
 playwright-report
 test-results
+
+# TypeScript incremental build info (never committed)
+*.tsbuildinfo

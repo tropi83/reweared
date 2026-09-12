@@ -39,6 +39,8 @@ interface ListingState {
   creating: boolean;
   /** Outcome of the last run, per part (UI summary). */
   lastRun: ListingRunReport | null;
+  /** Project the last run belongs to (the report is not shown on another project). */
+  lastRunProjectId: string | null;
   setListing(selection: ListingSelection | undefined): void;
   /** Stores the brand as typed (max 60 chars); blank removes it. */
   setBrand(raw: string): void;
@@ -116,6 +118,7 @@ export const useListingStore = create<ListingState>((set, get) => ({
   copyError: null,
   creating: false,
   lastRun: null,
+  lastRunProjectId: null,
 
   setListing(selection) {
     useProjectsStore.getState().commit((doc) => {
@@ -211,7 +214,7 @@ export const useListingStore = create<ListingState>((set, get) => ({
       textReady: textPartReady(),
     });
     if (!doc || !selection || !sourceImageId || !readiness.canCreate || get().creating) return null;
-    set({ creating: true, lastRun: null });
+    set({ creating: true, lastRun: null, lastRunProjectId: doc.project.id });
     const photos = readiness.skipped.includes("photos")
       ? Promise.resolve<ListingPartOutcome>("skipped-provider")
       : startPhotos(doc, selection, sourceImageId, options);
