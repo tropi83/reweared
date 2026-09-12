@@ -5,6 +5,8 @@ export interface ListingCopyRequest {
   image: { blob: Blob; mimeType: "image/png" | "image/jpeg" };
   listing?: ListingSelection;
   language: Locale;
+  /** Brand stated by the seller; when set, the model must use it verbatim. */
+  brand?: string;
 }
 
 export interface ListingCopyResult {
@@ -55,11 +57,17 @@ export function buildListingCopyPrompt(request: ListingCopyRequest): string {
   const context = found
     ? `The seller filed it under "${found.category.label.en} › ${found.subcategory.label.en}" (${found.subcategory.subject}).`
     : "The category is unknown.";
+  const brand = request.brand?.trim();
+  // JSON.stringify: quotes in the seller's input cannot break out of the instruction.
+  const brandRule = brand
+    ? `The seller states the brand is ${JSON.stringify(brand)}: use exactly this brand in the title and the description and return it in "brand"; never contradict it.`
+    : "Put the brand only if it is clearly readable in the photo, otherwise null.";
   return [
     "You write second-hand marketplace listings (like Vinted or eBay) from a single product photo.",
     context,
     `Write in ${LANGUAGE_NAME[request.language]}.`,
-    "Be factual: describe only what is visible. Mention the type of item, color, material or fabric when recognizable, visible pattern, notable features, and the visible condition (wear, marks, pilling, scratches). Never invent a size, brand, model or year; put the brand only if it is clearly readable in the photo, otherwise null.",
+    "Be factual: describe only what is visible. Mention the type of item, color, material or fabric when recognizable, visible pattern, notable features, and the visible condition (wear, marks, pilling, scratches). Never invent a size, model or year.",
+    brandRule,
     `Return ONLY a JSON object with these keys: "title" (max ${LISTING_COPY_LIMITS.title} characters, no emojis, no price), "description" (80 to 130 words, friendly and honest, plain text with short paragraphs), "condition" (one of ${CONDITIONS.map((c) => `"${c}"`).join(", ")}), "brand" (string or null), "color" (short string), "keywords" (array of 5 to ${LISTING_COPY_LIMITS.keywords} lowercase search keywords).`,
   ].join(" ");
 }

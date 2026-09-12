@@ -21,6 +21,15 @@ describe("listing copy prompt & parsing", () => {
     expect(LISTING_COPY_JSON_SCHEMA.required).toContain("title");
   });
 
+  it("imposes the seller's brand (JSON-quoted) or keeps the 'only if readable' rule", () => {
+    const withBrand = buildListingCopyPrompt({ image, language: "fr", brand: '  Levi\'s "501" ' });
+    expect(withBrand).toContain('The seller states the brand is "Levi\'s \\"501\\""');
+    expect(withBrand).not.toContain("clearly readable");
+    const without = buildListingCopyPrompt({ image, language: "fr", brand: "   " });
+    expect(without).toContain("only if it is clearly readable");
+    expect(without).not.toContain("seller states the brand");
+  });
+
   it("parses JSON wrapped in prose or code fences and normalizes fields", () => {
     const raw =
       'Sure! ```json\n{"title":"  Chemise blanche   cintrée ","description":"Belle chemise.\\n\\nPeu portée.","condition":"very_good","brand":null,"color":" blanc ","keywords":["Chemise","chemise","blanc","femme"]}\n```';
