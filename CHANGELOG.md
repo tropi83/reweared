@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Post on Vinted (desktop)** — a “Post N photos on Vinted” button opens Vinted in a separate window (own cookie profile, navigation allow-list, no IPC for vinted.com) and pre-fills the sell form with the photos marked “To post”, the title and the description. A publication panel follows the steps (log in → sell form → fill → check), reports what was filled and offers copy/export fallbacks. The app never clicks Vinted's “Add”. Vinted's terms forbid automated tools: a warning is shown before the first use; Settings → Publishing brings it back and erases the Vinted session. Web and mobile show the button disabled.
 - **Mirror selfie shot** for clothing, shoes, bags, accessories, jewelry, watches and leather goods (skipped for the kids category) — packs now have four or five photos; UI counts follow the pack.
 - **Projects page** lists every project on the device as a card (cover, image count, last update) with the import zone on top; the empty state only shows when there is nothing yet.
 - **Mobile import** (Android/iOS): "Photo library" opens the system media picker through the Tauri dialog plugin (`pickerMode: "image"`; the returned `content://` / `file://` URI is read by the fs plugin), "Take a photo" uses `<input type=file accept="image/*" capture="environment">`, which the Android WebView and iOS WKWebView open as the camera.
@@ -13,6 +14,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- Favourites are now **“To post”** (circled check on tiles, in the lightbox, the gallery filter and on the source image); project schema v2 migrates `favorites` to `toPost`.
 - **Gemini is now the copy writer, not an image provider.** Title & description default to `gemini-2.5-flash-lite` (cheapest vision-capable Gemini model, free tier; pricing checked 2026-09-12), with a provider/model picker (⚙ next to the panel) listing Gemini Flash models and Cloudflare Llama vision models with their public prices. Image generation with Gemini is disabled (`GEMINI_IMAGE_GENERATION_ENABLED`) because its image models have no free tier; the adapter and tests stay in place. Copy provider status is now reported even when a provider is not used for images.
 - **Product pivot: listing photo studio.** The free prompt is gone; the composer asks for a category and subcategory and generates the four photos a listing needs, each with its own prompt adapted to the product kind (56 packs / 40 kinds, also exposed as built-in recipes). "Generate again" re-runs the same four shots.
 - **Title & description from the photo**: a vision model (Cloudflare Llama 4 Scout with JSON-schema output, or Gemini Flash) writes title, description, condition, colour, brand (only if readable) and keywords; editable, copyable, stored in the project.

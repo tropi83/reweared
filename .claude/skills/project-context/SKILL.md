@@ -11,24 +11,26 @@ Local-first AI photo studio for second-hand listings (Vinted-style): import the 
 
 ## Map
 
-| Concern                                                     | Where                                                                   |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Domain models / errors                                      | `src/domain/models/*` (`AppError`, `GenerationErrorCode`, `listing.ts`) |
-| Listing taxonomy + 4-shot plans, listing copy contract      | `src/domain/services/listing-catalog.ts`, `listing-copy.ts`             |
-| Job queue (concurrency, retry, cancel, timeout)             | `src/domain/services/generation-queue.ts`                               |
-| Provider contract + request builder                         | `src/domain/services/image-provider.ts`                                 |
-| Gemini adapter, models catalogue, error mapping             | `src/infrastructure/providers/gemini/*`                                 |
-| Cloudflare Workers AI adapter, auth (direct/worker), models | `src/infrastructure/providers/cloudflare/*`, `cloudflare-worker/`       |
-| Mock provider (dev/tests)                                   | `src/infrastructure/providers/mock/MockImageProvider.ts`                |
-| Credentials (API key, OAuth PKCE+loopback, SecretStore)     | `src/infrastructure/auth/*`                                             |
-| Storage (IndexedDB web / Tauri fs native), migrations       | `src/infrastructure/storage/*`                                          |
-| Image validation/decoding/thumbnails/export                 | `src/infrastructure/image/*`                                            |
-| HTTP entry point + host allowlist                           | `src/infrastructure/http/http-client.ts`                                |
-| Composition root + stores                                   | `src/app/services.ts`, `src/app/stores/*`                               |
-| UI by feature                                               | `src/features/{projects,workspace,generation,gallery,recipes,settings}` |
-| i18n                                                        | `src/i18n/en.ts` (source), `fr.ts`                                      |
-| Rust commands (keychain, OAuth loopback)                    | `src-tauri/src/{secrets,oauth}.rs`                                      |
-| Permissions / CSP                                           | `src-tauri/capabilities/default.json`, `src-tauri/tauri.conf.json`      |
+| Concern                                                     | Where                                                                                                                       |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Domain models / errors                                      | `src/domain/models/*` (`AppError`, `GenerationErrorCode`, `listing.ts`)                                                     |
+| Listing taxonomy + 4-shot plans, listing copy contract      | `src/domain/services/listing-catalog.ts`, `listing-copy.ts`                                                                 |
+| Job queue (concurrency, retry, cancel, timeout)             | `src/domain/services/generation-queue.ts`                                                                                   |
+| Provider contract + request builder                         | `src/domain/services/image-provider.ts`                                                                                     |
+| Gemini adapter, models catalogue, error mapping             | `src/infrastructure/providers/gemini/*`                                                                                     |
+| Cloudflare Workers AI adapter, auth (direct/worker), models | `src/infrastructure/providers/cloudflare/*`, `cloudflare-worker/`                                                           |
+| Mock provider (dev/tests)                                   | `src/infrastructure/providers/mock/MockImageProvider.ts`                                                                    |
+| Credentials (API key, OAuth PKCE+loopback, SecretStore)     | `src/infrastructure/auth/*`                                                                                                 |
+| Storage (IndexedDB web / Tauri fs native), migrations       | `src/infrastructure/storage/*`                                                                                              |
+| Image validation/decoding/thumbnails/export                 | `src/infrastructure/image/*`                                                                                                |
+| HTTP entry point + host allowlist                           | `src/infrastructure/http/http-client.ts`                                                                                    |
+| Composition root + stores                                   | `src/app/services.ts`, `src/app/stores/*`                                                                                   |
+| UI by feature                                               | `src/features/{projects,workspace,generation,gallery,recipes,settings}`                                                     |
+| i18n                                                        | `src/i18n/en.ts` (source), `fr.ts`                                                                                          |
+| Rust commands (keychain, OAuth loopback)                    | `src-tauri/src/{secrets,oauth}.rs`                                                                                          |
+| Permissions / CSP                                           | `src-tauri/capabilities/default.json`, `src-tauri/tauri.conf.json`                                                          |
+| Vinted publishing (domain, payload, store, UI)              | `src/domain/services/publish.ts`, `src/app/publish-payload.ts`, `src/app/stores/publish-store.ts`, `src/features/publish/*` |
+| Vinted bridge + injected script                             | `src/infrastructure/publish/*` (`vinted/` = script bundled by `pnpm build:prefill`), `src-tauri/src/vinted.rs`              |
 
 ## Decisions already taken (do not re-litigate without new facts)
 
@@ -42,6 +44,7 @@ Local-first AI photo studio for second-hand listings (Vinted-style): import the 
 - Storage layout: `projects/<id>/{project.json, original/, generations/, thumbnails/}`; `schemaVersion` + migrations; images are files, never inside JSON.
 - Variations are independent jobs; the UI shows progressive results; retry only for retryable codes.
 - Hash router (`#/project/:id`, `#/settings/:section`, `#/recipes`); zustand stores; no react-router.
+- **Post on Vinted = pre-fill, never publish** (desktop only). A second `WebviewWindow` with an isolated profile and a navigation allow-list; vinted.com never gets Tauri IPC; the script is compiled into the binary and only fills title, description and photos. DOM selectors live in one file (`src/infrastructure/publish/vinted/selectors.ts`). Vinted's terms forbid automated tools → one-time warning (`vintedAutomationAcknowledged`). Photos to post = the “À publier” marks (`ProjectDocument.toPost`, schema v2). Window-creating commands must be `async` (WebView2 deadlock in sync commands on Windows).
 
 ## Out of scope (MVP)
 

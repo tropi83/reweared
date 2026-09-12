@@ -55,6 +55,13 @@ Isolation of the Vinted profile per platform:
 
 `vinted:page` events carry `scheme://host[:port]/path` only — never the query or fragment — so OAuth `code`/`state` parameters never reach the frontend or its logger.
 
+Other guarantees:
+
+- The injected script only sets the title and description values, attaches the photos and writes a status object `{ pageOk, title, description, photos }`; it never clicks submit and never reads cookies, storage or credentials.
+- `vinted_open` and `vinted_prefill` are `async` commands: building a webview window from a synchronous command deadlocks on Windows (WebView2), and the payload (up to 20 base64 photos) is deserialised off the UI thread.
+- Destroying the main window closes the Vinted window (`on_window_event` in `lib.rs`): it is never left running without the app that drives it.
+- The web inspector (devtools) exists on the Vinted window in debug builds only; release builds do not enable Tauri's `devtools` feature.
+
 ## Content Security Policy (`src-tauri/tauri.conf.json`)
 
 `default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (inline `style` attributes for dynamic sizes); `img-src 'self' blob: data:`; `connect-src` restricted to `ipc:`, `http://ipc.localhost` and the Google hosts; `object-src 'none'`; `frame-ancestors 'none'`; `form-action 'none'`.

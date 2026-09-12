@@ -76,6 +76,31 @@ Verified 2026-09-12 against https://developers.cloudflare.com/workers-ai/ (model
 - 429 handling relies on `error.details` (`QuotaFailure` with `quotaId`/`quotaValue`/`quotaDimensions.model`, `RetryInfo.retryDelay`). Per-minute ids contain `PerMinute`, daily ids `PerDay`; `quotaValue: "0"` means the model is not part of the plan (enable billing / Tier 1). Usage is counted locally (`usage-tracker.ts`) because the Gemini API has no consumption endpoint for API keys; daily counters reset at midnight Pacific like Google's.
 - Rate limits/quotas depend on the project tier. The queue treats `429` as retryable and honours `Retry-After`; quota exhaustion (`QUOTA_EXCEEDED`) is not retried.
 
+## Vinted pre-fill (desktop)
+
+Flow: `PostButton` → `publish-store` → `PublishBridge` (`TauriVintedBridge` → `vinted_*` commands in `src-tauri/src/vinted.rs`) → a second `WebviewWindow` on vinted.com into which Rust evaluates the pre-fill script. vinted.com gets no Tauri IPC (no capability targets the `vinted` window). Security rationale: SECURITY.md → "Vinted window".
+
+- **Script**: `src/infrastructure/publish/vinted/{prefill,selectors,entry}.ts`, bundled into `src-tauri/scripts/vinted-prefill.js` by `pnpm build:prefill` (Vite library build, IIFE) and compiled into the binary with `include_str!`. The generated file is committed; `pnpm prefill:verify` (part of `pnpm check` and CI) rebuilds it and fails when the committed copy is stale. That directory may only `import type` from `@/domain/services/publish` — nothing from the app exists inside vinted.com.
+- **Selectors**: every DOM anchor lives in `selectors.ts` as ordered candidate lists (first match wins). When Vinted changes its form, update that file (specific anchors first, generic fallbacks last), bump its "verified on" date, run `pnpm build:prefill` and commit both files.
+- **Inspecting the live form**: in `pnpm tauri dev`, right-click → _Inspect_ inside the Vinted window (devtools exist in debug builds only), open the sell form and run:
+
+  ```js
+  JSON.stringify(
+    [...document.querySelectorAll("input, textarea")].map((e) => ({
+      tag: e.tagName,
+      name: e.name,
+      id: e.id,
+      type: e.type,
+      testid: e.dataset.testid,
+      accept: e.accept,
+    })),
+  );
+  ```
+
+  then, after attaching a photo by hand, look for the thumbnail anchor (`[data-testid*="thumbnail"]`, `img[src^="blob:"]`).
+
+- **Manual checklist** (any change to the flow): log in (email, then a social login) and restart the app — the session persists; Poster → _Open the sell form_ → _Fill_ reports title and description `filled` and `attached === requested`; nothing is published without clicking Vinted's “Add”; closing the Vinted window mid-flow brings the workspace back with “The Vinted window was closed.”; Settings → Publishing → _Log out of Vinted_ erases the session (the next open asks to log in); closing the main window also closes the Vinted window; the web build shows the button disabled with “Available in the desktop app.”.
+
 ## Tests
 
 Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, stubbed Google endpoints). The `testing` skill (`.claude/skills/testing/SKILL.md`) documents the harnesses.
@@ -89,6 +114,9 @@ Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, st
 - `src/app/workflow.test.tsx` — import → generate 4 → branch → reload; partial failure + retry; deletion without orphans.
 - `src/app/app-units.test.ts`, `src/lib/lib.test.ts` — i18n, router, stores, ids, log redaction, backoff, timeouts.
 - `src-tauri/src/oauth.rs` — callback parsing.
+- `src/domain/services/publish.test.ts` — postability, photo order, Vinted URL stages, report guard; `src/infrastructure/publish/vinted/prefill.test.ts` — form filling on a React-style fixture (fallback selectors, no submit, photos attached once); `src/infrastructure/publish/publish-bridge.test.ts` — command/event mapping, error codes.
+- `src/app/publish-store.test.ts` — publish state machine (page events, poll timeout, partial report, stale session, project binding) and payload builder; `src/features/publish/PostButton.test.tsx`, `src/features/settings/PublishSection.test.tsx` — reasons, terms dialog, logout.
+- `src-tauri/src/vinted.rs` — navigation allow-list, closed paths, payload limits, page-event URL stripping, poll parsing.
 
 ```bash
 pnpm test            # all suites
