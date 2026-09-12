@@ -43,6 +43,11 @@ describe("listing copy prompt & parsing", () => {
     });
   });
 
+  it("strips a leading '#' from keywords so the UI never shows '##'", () => {
+    const copy = parseListingCopy(JSON.stringify({ title: "T", description: "D", keywords: ["#Nike", " # running ", "shoes", "#", "  "] }));
+    expect(copy.keywords).toEqual(["nike", "running", "shoes"]);
+  });
+
   it("truncates to the limits and drops unknown conditions / placeholder brands", () => {
     const copy = parseListingCopy(
       JSON.stringify({
@@ -133,7 +138,7 @@ describe("GeminiListingCopyProvider", () => {
       { status: 200 },
     );
 
-  it("defaults to the cheapest Flash-Lite model and sends the image through the Interactions API", async () => {
+  it("defaults to the cheapest available Flash-Lite model and sends the image through the Interactions API", async () => {
     const calls: string[] = [];
     let sentModel = "";
     __setFetchOverride(async (url, init) => {
@@ -145,12 +150,14 @@ describe("GeminiListingCopyProvider", () => {
       return answer();
     });
     const provider = new GeminiListingCopyProvider(auth);
-    expect(provider.models[0]?.id).toBe("gemini-2.5-flash-lite");
+    expect(provider.models[0]?.id).toBe("gemini-3.1-flash-lite");
+    // Retired for new accounts (404 "no longer available to new users", seen 2026-09-13): never offered again.
+    expect(provider.models.map((m) => m.id)).not.toContain("gemini-2.5-flash-lite");
     expect(provider.models.every((m) => m.freeTier && m.pricing)).toBe(true);
     const result = await provider.describeListing({ image, language: "fr" }, { signal: new AbortController().signal });
-    expect(sentModel).toBe("gemini-2.5-flash-lite");
+    expect(sentModel).toBe("gemini-3.1-flash-lite");
     expect(result.copy.title).toBe("T-shirt");
-    expect(result.providerMeta?.model).toBe("gemini-2.5-flash-lite");
+    expect(result.providerMeta?.model).toBe("gemini-3.1-flash-lite");
     // No model listing round-trip: exactly one request.
     expect(calls).toEqual(["https://generativelanguage.googleapis.com/v1beta/interactions"]);
   });
@@ -165,8 +172,10 @@ describe("GeminiListingCopyProvider", () => {
     const signal = new AbortController().signal;
     await provider.describeListing({ image, language: "en" }, { signal, model: "gemini-3.6-flash" });
     await provider.describeListing({ image, language: "en" }, { signal, model: "gemini-9-ultra" });
-    expect(models).toEqual(["gemini-3.6-flash", "gemini-2.5-flash-lite"]);
-    expect(resolveCopyModel(provider, undefined).id).toBe("gemini-2.5-flash-lite");
+    // A setting saved before a model was retired keeps working on the default.
+    await provider.describeListing({ image, language: "en" }, { signal, model: "gemini-2.5-flash-lite" });
+    expect(models).toEqual(["gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3.1-flash-lite"]);
+    expect(resolveCopyModel(provider, undefined).id).toBe("gemini-3.1-flash-lite");
     expect(() => resolveCopyModel({ models: [] }, "x")).toThrow();
   });
 });

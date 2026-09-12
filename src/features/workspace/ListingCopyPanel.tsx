@@ -161,9 +161,10 @@ export function ListingCopyPanel() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            {copy.condition && <Badge tone="accent">{t(`copy.condition.${copy.condition}` as MessageKey)}</Badge>}
-            {copy.brand && <Badge>{copy.brand}</Badge>}
-            {copy.color && <Badge>{copy.color}</Badge>}
+            {/* Attributes are labelled; only the search keywords are hashtags. */}
+            {copy.condition && <Badge tone="accent">{t("copy.attr.condition", { value: t(`copy.condition.${copy.condition}` as MessageKey) })}</Badge>}
+            {copy.brand && <Badge tone="accent">{t("copy.attr.brand", { value: copy.brand })}</Badge>}
+            {copy.color && <Badge tone="accent">{t("copy.attr.color", { value: copy.color })}</Badge>}
             {copy.keywords.map((k) => (
               <Badge key={k}>#{k}</Badge>
             ))}

@@ -111,7 +111,13 @@ export function parseListingCopy(raw: string): ListingCopyResult["copy"] {
         ...new Set(
           json.keywords
             .filter((k): k is string => typeof k === "string")
-            .map((k) => k.trim().toLowerCase())
+            // The UI adds the '#'; a model that returns hashtags must not produce '##'.
+            .map((k) =>
+              k
+                .replace(/^[\s#]+/, "")
+                .trim()
+                .toLowerCase(),
+            )
             .filter(Boolean),
         ),
       ].slice(0, LISTING_COPY_LIMITS.keywords)
