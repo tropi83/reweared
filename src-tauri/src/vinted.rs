@@ -22,6 +22,12 @@ const MAX_TITLE: usize = 100;
 const MAX_DESCRIPTION: usize = 5000;
 const MAX_PHOTOS: usize = 20;
 const MAX_PHOTO_BYTES: usize = 4 * 1024 * 1024;
+/// Fixed WKWebsiteDataStore identifier for the Vinted webview on macOS (>= 14) / iOS (>= 17), where
+/// `data_directory` is ignored. Random but constant so the same store is reused and can be removed.
+#[cfg(target_os = "macos")]
+const DATA_STORE_ID: [u8; 16] = [
+    0x7a, 0x1c, 0x53, 0x9e, 0xb4, 0x2d, 0x4f, 0x08, 0x9d, 0x61, 0xc0, 0x3b, 0x5e, 0x72, 0xa9, 0x14,
+];
 /// Built by `pnpm build:prefill` from src/infrastructure/publish/vinted/.
 const PREFILL_SCRIPT: &str = include_str!("../scripts/vinted-prefill.js");
 
@@ -110,6 +116,27 @@ fn parse_poll_result(raw: &str) -> Option<serde_json::Value> {
     }
 }
 
+/// `origin + path` only: OAuth redirects carry `code`/`state` in the query, which must never reach
+/// the frontend (and its logger).
+fn page_event_url(url: &url::Url) -> String {
+    let mut out = format!("{}://{}", url.scheme(), url.host_str().unwrap_or_default());
+    if let Some(port) = url.port() {
+        out.push(':');
+        out.push_str(&port.to_string());
+    }
+    out.push_str(url.path());
+    out
+}
+
+/// Deletes the on-disk webview profile; a missing directory counts as already cleared.
+fn remove_dir_if_present(dir: &std::path::Path) -> Result<(), String> {
+    match std::fs::remove_dir_all(dir) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 fn data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<std::path::PathBuf, String> {
     app.path()
         .app_data_dir()
@@ -123,34 +150,38 @@ pub fn vinted_open<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
         return window.set_focus().map_err(|e| e.to_string());
     }
     let main = app.clone();
-    let window = WebviewWindowBuilder::new(
+    let builder = WebviewWindowBuilder::new(
         &app,
         LABEL,
         WebviewUrl::External(HOME.parse().map_err(|e: url::ParseError| e.to_string())?),
     )
     .title("Vinted")
     .inner_size(1100.0, 860.0)
-    .data_directory(data_dir(&app)?)
-    .on_navigation(is_allowed_navigation)
-    .on_page_load(move |_, payload| {
-        // Fired for Started and Finished; the store only wants a loaded DOM, once per navigation.
-        if payload.event() != PageLoadEvent::Finished {
-            return;
-        }
-        let _ = main.emit_to(
-            MAIN,
-            "vinted:page",
-            PageEvent {
-                url: payload.url().to_string(),
-            },
-        );
-    })
-    .build()
-    .map_err(|e| e.to_string())?;
+    .data_directory(data_dir(&app)?);
+    // WKWebView ignores `data_directory`; isolate through a dedicated data store instead.
+    #[cfg(target_os = "macos")]
+    let builder = builder.data_store_identifier(DATA_STORE_ID);
+    let window = builder
+        .on_navigation(is_allowed_navigation)
+        .on_page_load(move |_, payload| {
+            // Fired for Started and Finished; the store only wants a loaded DOM, once per navigation.
+            if payload.event() != PageLoadEvent::Finished {
+                return;
+            }
+            let _ = main.emit_to(
+                MAIN,
+                "vinted:page",
+                PageEvent {
+                    url: page_event_url(payload.url()),
+                },
+            );
+        })
+        .build()
+        .map_err(|e| e.to_string())?;
     let closed = app.clone();
     window.on_window_event(move |event| {
         if let WindowEvent::Destroyed = event {
-            let _ = closed.emit_to(MAIN, "vinted:closed", ());
+            let _ = closed.emit_to(MAIN, "vinted:closed", serde_json::json!({}));
         }
     });
     Ok(())
@@ -207,15 +238,23 @@ pub fn vinted_close<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     Ok(())
 }
 
+/// Erases the Vinted session. With the window open, the live webview clears its own data and
+/// closes; otherwise the stored profile is removed without ever creating a webview (no window
+/// flash, no spurious `vinted:closed`).
 #[tauri::command]
-pub fn vinted_clear_session<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
-    let existed = app.get_webview_window(LABEL).is_some();
-    if !existed {
-        vinted_open(app.clone())?;
+pub async fn vinted_clear_session<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(LABEL) {
+        window.clear_all_browsing_data().map_err(|e| e.to_string())?;
+        return window.close().map_err(|e| e.to_string());
     }
-    let window = app.get_webview_window(LABEL).ok_or("vinted window is not open")?;
-    window.clear_all_browsing_data().map_err(|e| e.to_string())?;
-    window.close().map_err(|e| e.to_string())
+    // Windows / Linux: the WebView2 / WebKitGTK profile lives in `data_directory`.
+    remove_dir_if_present(&data_dir(&app)?)?;
+    // macOS >= 14: the profile is the WKWebsiteDataStore behind DATA_STORE_ID (the directory above
+    // is never created there). Below macOS 14 the webview used the default store, which cannot be
+    // erased in isolation — see SECURITY.md.
+    #[cfg(target_os = "macos")]
+    app.remove_data_store(DATA_STORE_ID).await.map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -293,6 +332,26 @@ mod tests {
             ..ok
         };
         assert!(validate_payload(&bad_name).is_err());
+    }
+
+    #[test]
+    fn page_event_url_keeps_origin_and_path_only() {
+        let u = url::Url::parse("https://www.vinted.fr/items/new?ref=1#x").unwrap();
+        assert_eq!(page_event_url(&u), "https://www.vinted.fr/items/new");
+        let oauth = url::Url::parse("https://accounts.google.com/o/oauth2/v2/auth?code=SECRET&state=s").unwrap();
+        assert_eq!(page_event_url(&oauth), "https://accounts.google.com/o/oauth2/v2/auth");
+        let port = url::Url::parse("https://www.vinted.com:8443/").unwrap();
+        assert_eq!(page_event_url(&port), "https://www.vinted.com:8443/");
+    }
+
+    #[test]
+    fn remove_dir_if_present_deletes_and_tolerates_missing() {
+        let dir = std::env::temp_dir().join(format!("aiv-vinted-webview-test-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("nested")).unwrap();
+        std::fs::write(dir.join("nested").join("cookies"), b"x").unwrap();
+        assert!(remove_dir_if_present(&dir).is_ok());
+        assert!(!dir.exists());
+        assert!(remove_dir_if_present(&dir).is_ok());
     }
 
     #[test]

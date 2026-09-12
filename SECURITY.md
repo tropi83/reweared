@@ -45,7 +45,15 @@ No shell, no process, no notification, no clipboard plugin. `dragDropEnabled: fa
 | `vinted_navigate`                      | Jumps to the sell form                                                             | Only `/items/new` and `/`                                                                                                                                                    |
 | `vinted_prefill`                       | Injects the pre-fill script with title/description/photos                          | Script compiled into the binary (`include_str!`); payload validated (100/5000 chars, ≤ 20 photos, ≤ 4 MiB each, JPEG/PNG, safe names); never logged                          |
 | `vinted_poll`                          | Reads the script's status back                                                     | Read-only expression, 5 s timeout                                                                                                                                            |
-| `vinted_close`, `vinted_clear_session` | Close / erase the Vinted session                                                   | —                                                                                                                                                                            |
+| `vinted_close`, `vinted_clear_session` | Close / erase the Vinted session                                                   | Window open: `clear_all_browsing_data` then close. Window closed: the stored profile is removed without creating a webview (see below)                                       |
+
+Isolation of the Vinted profile per platform:
+
+- **Windows / Linux:** WebView2 / WebKitGTK honour `data_directory` = `$APPDATA/vinted-webview/`. `vinted_clear_session` with the window closed deletes that directory (`remove_dir_all`, a missing directory counts as cleared).
+- **macOS 14+ / iOS 17+:** WKWebView ignores `data_directory`; the window uses a dedicated `WKWebsiteDataStore` bound to a fixed identifier (`data_store_identifier`), and `vinted_clear_session` removes that store by identifier (`AppHandle::remove_data_store`) without opening a window.
+- **macOS < 14:** custom data stores do not exist, so WebKit falls back to the default store — the Vinted session is then shared with the main window's web storage and cannot be erased in isolation (`clear_all_browsing_data` with the window open would also wipe the main window's storage). The app does not target these versions for the Vinted feature.
+
+`vinted:page` events carry `scheme://host[:port]/path` only — never the query or fragment — so OAuth `code`/`state` parameters never reach the frontend or its logger.
 
 ## Content Security Policy (`src-tauri/tauri.conf.json`)
 
