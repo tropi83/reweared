@@ -37,6 +37,16 @@ All logging goes through `lib/logger.ts`, which redacts Google API keys, `ya29.`
 
 No shell, no process, no notification, no clipboard plugin. `dragDropEnabled: false` on the window so HTML5 drag-and-drop delivers `File` objects to the webview without a native file-path bridge.
 
+### Vinted window (`vinted_*` commands)
+
+| Command                                | Why it exists                                                                      | Guard                                                                                                                                                                        |
+| -------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vinted_open`                          | Opens `https://www.vinted.com/` in a second window so the user can log in and post | Isolated `data_directory` (`vinted-webview/`), navigation allow-list (Vinted hosts + Google/Facebook/Apple login), no capability targets the window ⇒ no IPC from vinted.com |
+| `vinted_navigate`                      | Jumps to the sell form                                                             | Only `/items/new` and `/`                                                                                                                                                    |
+| `vinted_prefill`                       | Injects the pre-fill script with title/description/photos                          | Script compiled into the binary (`include_str!`); payload validated (100/5000 chars, ≤ 20 photos, ≤ 4 MiB each, JPEG/PNG, safe names); never logged                          |
+| `vinted_poll`                          | Reads the script's status back                                                     | Read-only expression, 5 s timeout                                                                                                                                            |
+| `vinted_close`, `vinted_clear_session` | Close / erase the Vinted session                                                   | —                                                                                                                                                                            |
+
 ## Content Security Policy (`src-tauri/tauri.conf.json`)
 
 `default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (inline `style` attributes for dynamic sizes); `img-src 'self' blob: data:`; `connect-src` restricted to `ipc:`, `http://ipc.localhost` and the Google hosts; `object-src 'none'`; `frame-ancestors 'none'`; `form-action 'none'`.

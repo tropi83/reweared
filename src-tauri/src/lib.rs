@@ -1,5 +1,6 @@
 mod oauth;
 mod secrets;
+mod vinted;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +17,12 @@ pub fn run() {
             oauth::oauth_loopback_start,
             oauth::oauth_loopback_wait,
             oauth::oauth_loopback_cancel,
+            vinted::vinted_open,
+            vinted::vinted_navigate,
+            vinted::vinted_prefill,
+            vinted::vinted_poll,
+            vinted::vinted_close,
+            vinted::vinted_clear_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
