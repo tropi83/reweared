@@ -1,0 +1,76 @@
+import { AppError } from "@/domain/models";
+import { isFillReport, type FillReport, type PublishPayload } from "@/domain/services/publish";
+import { createLogger } from "@/lib/logger";
+import type { PublishBridge, VintedPath } from "./PublishBridge";
+
+const log = createLogger("vinted-bridge");
+
+/** Injected so tests need no Tauri runtime; production passes @tauri-apps/api's invoke/listen. */
+export interface TauriIpc {
+  invoke(cmd: string, args?: Record<string, unknown>): Promise<unknown>;
+  listen(event: string, cb: (e: { payload: unknown }) => void): Promise<() => void>;
+}
+
+export class TauriVintedBridge implements PublishBridge {
+  readonly supported = true;
+  constructor(private readonly ipc: TauriIpc) {}
+
+  private async call<T = void>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+    try {
+      return (await this.ipc.invoke(cmd, args)) as T;
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      log.warn(cmd, "failed:", detail);
+      const code = /not allowed|too long|too many|too large|unsupported|invalid/.test(detail)
+        ? "INVALID_REQUEST"
+        : /timed out/.test(detail)
+          ? "TIMEOUT"
+          : "UNKNOWN_ERROR";
+      throw new AppError(code, "The Vinted window could not complete the action.", { detail, retryable: false });
+    }
+  }
+
+  open() {
+    return this.call("vinted_open");
+  }
+  navigate(path: VintedPath) {
+    return this.call("vinted_navigate", { path });
+  }
+  prefill(payload: PublishPayload) {
+    return this.call("vinted_prefill", { payload });
+  }
+  async poll(): Promise<FillReport | null> {
+    const value = await this.call<unknown>("vinted_poll");
+    return isFillReport(value) ? value : null;
+  }
+  close() {
+    return this.call("vinted_close");
+  }
+  clearSession() {
+    return this.call("vinted_clear_session");
+  }
+
+  private subscribe(event: string, cb: (payload: unknown) => void): () => void {
+    let off: (() => void) | undefined;
+    let cancelled = false;
+    void this.ipc
+      .listen(event, (e) => cb(e.payload))
+      .then((unlisten) => {
+        if (cancelled) unlisten();
+        else off = unlisten;
+      });
+    return () => {
+      cancelled = true;
+      off?.();
+    };
+  }
+  onPage(cb: (url: string) => void) {
+    return this.subscribe("vinted:page", (p) => {
+      const url = (p as { url?: unknown } | null)?.url;
+      if (typeof url === "string") cb(url);
+    });
+  }
+  onClosed(cb: () => void) {
+    return this.subscribe("vinted:closed", () => cb());
+  }
+}

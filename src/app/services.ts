@@ -12,6 +12,8 @@ import type { ListingCopyProvider } from "@/domain/services/listing-copy";
 import { createSecretStore } from "@/infrastructure/auth/SecretStore";
 import { MOCK_PROVIDER_ID, MockImageProvider } from "@/infrastructure/providers/mock/MockImageProvider";
 import { createStorageProvider, type StorageProvider } from "@/infrastructure/storage";
+import { createPublishBridge } from "@/infrastructure/publish/createPublishBridge";
+import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
 
 /**
  * Composition root. Everything stateful and long-lived is created once here and injected
@@ -29,6 +31,7 @@ export interface AppServices {
   cloudflareAuth: CloudflareAuth;
   queue: GenerationQueue;
   usage: UsageTracker;
+  publish: PublishBridge;
   appVersion: string;
 }
 
@@ -84,6 +87,7 @@ export function createServices(bindings: {
   const providers = new Map<string, ImageProvider>([[CLOUDFLARE_PROVIDER_ID, cloudflare]]);
   if (GEMINI_IMAGE_GENERATION_ENABLED) providers.set(GEMINI_PROVIDER_ID, gemini);
   if (MOCK_ENABLED) providers.set(MOCK_PROVIDER_ID, mock);
+  const publish = createPublishBridge();
 
   const queue = new GenerationQueue(
     {
@@ -103,6 +107,6 @@ export function createServices(bindings: {
     },
   );
 
-  services = { storage, auth, providers, copyProviders, mock, gemini, cloudflare, cloudflareAuth, queue, usage, appVersion: APP_VERSION };
+  services = { storage, auth, providers, copyProviders, mock, gemini, cloudflare, cloudflareAuth, queue, usage, publish, appVersion: APP_VERSION };
   return services;
 }
