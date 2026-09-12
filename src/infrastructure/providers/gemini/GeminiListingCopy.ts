@@ -18,21 +18,19 @@ const log = createLogger("gemini-copy");
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
-const PRICING_CHECKED_ON = "2026-09-12";
+const PRICING_CHECKED_ON = "2026-09-13";
 
 /**
  * Text models with image input, cheapest first (ai.google.dev/gemini-api/docs/pricing and /models,
- * verified 2026-09-12). All of them have a free tier, unlike the image models. Prices are USD per
+ * verified 2026-09-13). All of them have a free tier, unlike the image models. Prices are USD per
  * 1M tokens on the paid tier; a listing costs roughly 1,500 input + 400 output tokens, i.e. well
  * under a tenth of a cent on Flash-Lite.
+ *
+ * `gemini-2.5-flash-lite` is still on the docs but the live API answers 404 "no longer available to
+ * new users" (2026-09-13); it is not offered. A saved setting pointing at it falls back to the default
+ * (`resolveCopyModel`).
  */
 export const GEMINI_TEXT_MODELS: readonly ListingCopyModel[] = [
-  {
-    id: "gemini-2.5-flash-lite",
-    label: "Gemini 2.5 Flash-Lite",
-    pricing: { inputPerM: 0.1, outputPerM: 0.4, pricingCheckedOn: PRICING_CHECKED_ON },
-    freeTier: true,
-  },
   {
     id: "gemini-3.1-flash-lite",
     label: "Gemini 3.1 Flash-Lite",
