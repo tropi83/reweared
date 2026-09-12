@@ -302,6 +302,9 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "error.CANCELLED": "Annulé.",
   "error.STORAGE_ERROR": "Le résultat n'a pas pu être enregistré sur cet appareil.",
   "error.PLATFORM_UNSUPPORTED": "Cette fonction n'est disponible que dans l'application desktop.",
+  "error.vinted.TIMEOUT": "La page Vinted n'a pas répondu à temps. Vérifiez la fenêtre Vinted, puis remplissez à nouveau.",
+  "error.vinted.INVALID_REQUEST": "La fenêtre Vinted a refusé les données (texte trop long ou photo non prise en charge).",
+  "error.vinted.UNKNOWN_ERROR": "La fenêtre Vinted n'a pas pu terminer l'action.",
   "error.UNKNOWN_ERROR": "Une erreur est survenue.",
 
   "publish.button": "Poster {count} photos sur Vinted",

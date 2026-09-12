@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { AppError, toGenerationError, type GenerationError } from "@/domain/models";
-import { canPost, stageForUrl, VINTED_SELL_PATH, type FillReport, type PublishStage } from "@/domain/services/publish";
+import { AppError, toGenerationError, type GenerationError, type ProjectDocument } from "@/domain/models";
+import { canPost, stageForUrl, VINTED_SELL_PATH, type FillReport, type PublishBlocker, type PublishStage } from "@/domain/services/publish";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { createLogger } from "@/lib/logger";
 import { buildPublishPayload } from "../publish-payload";
@@ -18,6 +18,8 @@ export const POLL_TIMEOUT_MS = 20_000;
  */
 export interface PublishSession {
   stage: PublishStage;
+  /** The project whose photos and copy this session posts; other projects never fill through it. */
+  projectId?: string;
   url?: string;
   busy: boolean;
   report?: FillReport;
@@ -31,7 +33,7 @@ export interface StartOptions {
 
 interface PublishState {
   session: PublishSession;
-  /** Opens the Vinted window; requires canPost() and the acknowledged automation warning. */
+  /** Opens the Vinted window; requires postEligibility() and the acknowledged automation warning. */
   start(options?: StartOptions): Promise<void>;
   /** Brings the Vinted window back to the front. */
   focus(): Promise<void>;
@@ -61,13 +63,14 @@ function endSession() {
   epoch++;
 }
 
-function desktop() {
-  const p = getPlatform();
-  return p.isTauri && !p.isMobile;
-}
-
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+/** Whether `doc` can be posted from this platform (single source for the store, the button and the panel). */
+export function postEligibility(doc: ProjectDocument | null | undefined): { ok: boolean; reasons: PublishBlocker[] } {
+  const platform = getPlatform();
+  return canPost(doc, { desktop: platform.isTauri && !platform.isMobile });
 }
 
 export const usePublishStore = create<PublishState>((set, get) => ({
@@ -76,7 +79,8 @@ export const usePublishStore = create<PublishState>((set, get) => ({
   async start(options) {
     const doc = useProjectsStore.getState().current;
     const acknowledged = options?.acknowledgedOnce || useSettingsStore.getState().settings.vintedAutomationAcknowledged;
-    if (!acknowledged || !canPost(doc, { desktop: desktop() }).ok) return;
+    if (!doc || !acknowledged || !postEligibility(doc).ok) return;
+    const projectId = doc.project.id;
     const bridge = getServices().publish;
     endSession();
     const session = epoch;
@@ -87,13 +91,13 @@ export const usePublishStore = create<PublishState>((set, get) => ({
     });
     const offClosed = bridge.onClosed(() => {
       endSession();
-      set({ session: { ...CLOSED, error: { code: "CANCELLED", message: "Vinted window closed.", retryable: false } } });
+      set({ session: { ...CLOSED, projectId, error: { code: "CANCELLED", message: "Vinted window closed.", retryable: false } } });
     });
     unsubscribe = () => {
       offPage();
       offClosed();
     };
-    set({ session: { stage: "browsing", busy: false } });
+    set({ session: { stage: "browsing", busy: false, projectId } });
     try {
       await bridge.open();
     } catch (err) {
@@ -101,7 +105,7 @@ export const usePublishStore = create<PublishState>((set, get) => ({
       log.warn("open failed", error.code);
       if (session !== epoch) return;
       endSession();
-      set({ session: { ...CLOSED, error } });
+      set({ session: { ...CLOSED, projectId, error } });
     }
   },
 
@@ -119,7 +123,9 @@ export const usePublishStore = create<PublishState>((set, get) => ({
 
   async fill() {
     const doc = useProjectsStore.getState().current;
-    if (!doc || get().session.stage === "closed" || get().session.busy) return;
+    const current = get().session;
+    // Only the project the session was opened for, and only while it is still postable (marks/copy may have changed).
+    if (!doc || current.stage === "closed" || current.busy || doc.project.id !== current.projectId || !postEligibility(doc).ok) return;
     const session = epoch;
     const stale = () => session !== epoch;
     const { publish, storage } = getServices();

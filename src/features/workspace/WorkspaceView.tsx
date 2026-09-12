@@ -3,6 +3,7 @@ import { CheckCircle2, Menu } from "lucide-react";
 import { navigate } from "@/app/router";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useProjectsStore } from "@/app/stores/projects-store";
+import { usePublishStore } from "@/app/stores/publish-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Misc";
@@ -13,6 +14,8 @@ import { ListingCopyPanel } from "./ListingCopyPanel";
 import { GenerationFeed } from "../generation/GenerationFeed";
 import { Lightbox } from "../gallery/Lightbox";
 import { SelectionBar } from "../gallery/SelectionBar";
+import { PostButton } from "../publish/PostButton";
+import { PublishPanel } from "../publish/PublishPanel";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { SourcePanel } from "./SourcePanel";
 
@@ -26,6 +29,8 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
   const filter = useUiStore((s) => s.filter);
   const setFilter = useUiStore((s) => s.setFilter);
   const clearSelection = useUiStore((s) => s.clearSelection);
+  // The Vinted window is open for this project: the publication panel takes over the left column.
+  const publishing = usePublishStore((s) => s.session.stage !== "closed" && s.session.projectId === projectId);
   useWorkspaceShortcuts();
 
   useEffect(() => {
@@ -81,9 +86,16 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
           aria-label={t("composer.promptLabel")}
           className={cn("flex shrink-0 flex-col gap-4 border-b border-border p-4 lg:w-[22rem] lg:overflow-y-auto lg:border-r lg:border-b-0 xl:w-[24rem]")}
         >
-          <SourcePanel />
-          <ListingCopyPanel />
-          <ListingComposer />
+          {publishing ? (
+            <PublishPanel />
+          ) : (
+            <>
+              <SourcePanel />
+              <ListingCopyPanel />
+              <ListingComposer />
+              <PostButton />
+            </>
+          )}
         </section>
         <section aria-label={t("gallery.title")} className="relative flex-1 lg:min-h-0 lg:overflow-y-auto">
           <GenerationFeed />

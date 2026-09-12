@@ -318,6 +318,9 @@ export const en = {
   "error.CANCELLED": "Cancelled.",
   "error.STORAGE_ERROR": "The result could not be saved on this device.",
   "error.PLATFORM_UNSUPPORTED": "This feature is only available in the desktop app.",
+  "error.vinted.TIMEOUT": "The Vinted page did not answer in time. Check the Vinted window, then fill again.",
+  "error.vinted.INVALID_REQUEST": "The Vinted window refused the data (text too long or unsupported photo).",
+  "error.vinted.UNKNOWN_ERROR": "The Vinted window could not complete the action.",
   "error.UNKNOWN_ERROR": "Something went wrong.",
 
   // Publishing on Vinted

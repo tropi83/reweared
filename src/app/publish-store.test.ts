@@ -204,7 +204,31 @@ describe("publish-store", () => {
     bridge.report = { pageOk: true, title: "filled", description: "filled", photos: { requested: 1, attached: 1 } };
     await filling;
 
-    expect(usePublishStore.getState().session).toEqual({ stage: "browsing", busy: false });
+    const session = usePublishStore.getState().session;
+    expect(session).toMatchObject({ stage: "browsing", busy: false });
+    expect(session.report).toBeUndefined();
+  });
+
+  it("binds the session to its project: another project never fills through it", async () => {
+    const first = await prepareProject();
+    await usePublishStore.getState().start();
+    expect(usePublishStore.getState().session.projectId).toBe(first.project.id);
+    bridge.emitPage("https://www.vinted.fr/items/new");
+
+    // The user switches to another (postable) project while the Vinted window is still open.
+    await prepareProject();
+    await usePublishStore.getState().fill();
+    expect(bridge.calls).not.toContain("prefill");
+    expect(usePublishStore.getState().session).toMatchObject({ stage: "form", busy: false, projectId: first.project.id });
+  });
+
+  it("refuses to fill once the project is no longer postable", async () => {
+    const doc = await prepareProject();
+    await usePublishStore.getState().start();
+    bridge.emitPage("https://www.vinted.fr/items/new");
+    useProjectsStore.getState().toggleToPost(doc.project.originalImageId!);
+    await usePublishStore.getState().fill();
+    expect(bridge.calls).not.toContain("prefill");
   });
 
   it("returns to closed when the Vinted window is closed", async () => {

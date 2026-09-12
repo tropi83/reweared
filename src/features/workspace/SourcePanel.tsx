@@ -1,4 +1,4 @@
-import { GitBranch, Maximize2, RotateCcw } from "lucide-react";
+import { CheckCircle2, GitBranch, Maximize2, RotateCcw } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useProjectsStore } from "@/app/stores/projects-store";
@@ -6,6 +6,7 @@ import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Misc";
 import { useT } from "@/i18n";
+import { cn } from "@/lib/cn";
 import { ImportDropzone } from "./HomeView";
 
 /** Shows the image that will be sent with the next generation (original or a chosen variation). */
@@ -15,6 +16,7 @@ export function SourcePanel() {
   const sourceImageId = useComposerStore((s) => s.sourceImageId);
   const setSource = useComposerStore((s) => s.setSource);
   const openLightbox = useUiStore((s) => s.openLightbox);
+  const toggleToPost = useProjectsStore((s) => s.toggleToPost);
 
   const originalId = doc?.project.originalImageId;
   const effectiveId = sourceImageId && doc?.images[sourceImageId] ? sourceImageId : originalId;
@@ -26,18 +28,27 @@ export function SourcePanel() {
   if (!doc || !asset) {
     return <ImportDropzone compact />;
   }
+  const isToPost = doc.toPost.includes(asset.id);
+  const toPostLabel = t(isToPost ? "gallery.unToPost" : "gallery.toPost");
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-fg-muted">{t("composer.sourceLabel")}</span>
-        {isOriginal ? (
-          <Badge>{t("composer.sourceOriginal")}</Badge>
-        ) : (
-          <Badge tone="accent">
-            <GitBranch className="size-3" /> {t("generation.branchFrom")}
-          </Badge>
-        )}
+        <div className="flex min-w-0 items-center gap-1">
+          {isToPost && (
+            <Badge tone="accent">
+              <CheckCircle2 className="size-3" /> {t("gallery.toPost")}
+            </Badge>
+          )}
+          {isOriginal ? (
+            <Badge>{t("composer.sourceOriginal")}</Badge>
+          ) : (
+            <Badge tone="accent">
+              <GitBranch className="size-3" /> {t("generation.branchFrom")}
+            </Badge>
+          )}
+        </div>
       </div>
       <div className="group checkerboard relative overflow-hidden rounded-xl border border-border bg-bg-sunken">
         <div className="flex max-h-64 items-center justify-center">
@@ -48,6 +59,16 @@ export function SourcePanel() {
           )}
         </div>
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            onClick={() => toggleToPost(asset.id)}
+            aria-label={toPostLabel}
+            aria-pressed={isToPost}
+            title={toPostLabel}
+          >
+            <CheckCircle2 className={cn("size-3.5", isToPost && "fill-accent text-white")} />
+          </Button>
           <Button
             variant="secondary"
             size="icon-sm"
