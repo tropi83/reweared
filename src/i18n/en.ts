@@ -301,6 +301,7 @@ export const en = {
   "error.gemini.QUOTA_EXCEEDED":
     "Daily Gemini quota reached for this model. It resets at midnight Pacific time — {resetLocal} your local time, in {resetIn}. Check your plan and billing in Google AI Studio.",
   "error.cloudflare.RATE_LIMITED": "Cloudflare Workers AI rate limit reached. We'll retry automatically when possible.",
+  "error.cloudflare.CONTENT_REJECTED": "Cloudflare's safety filter blocked this image, often wrongly on product photos. Retry: each attempt uses a new seed.",
   "error.cloudflare.QUOTA_EXCEEDED":
     "Your free daily Workers AI allocation (10,000 neurons) is used up. It resets at 00:00 UTC — {resetLocal} your local time, in {resetIn}. To keep going today, enable paid usage in the Cloudflare dashboard (Workers & Pages → Plans).",
   "error.FREE_TIER_NO_ACCESS":

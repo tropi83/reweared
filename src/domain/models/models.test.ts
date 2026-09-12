@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AppError, deriveGenerationStatus, isGenerationError, isRetryableCode, summarize, toGenerationError, type ProjectDocument } from "./index";
-import { buildRequestForModel } from "@/domain/services/image-provider";
+import { buildRequestForModel, seedForAttempt } from "@/domain/services/image-provider";
 import { GEMINI_IMAGE_MODELS } from "@/infrastructure/providers/gemini/GeminiModels";
 import { DEFAULT_SETTINGS } from "@/domain/models";
 
@@ -37,6 +37,23 @@ describe("errors", () => {
     expect(toGenerationError("x".repeat(1000)).message).toHaveLength(300);
     expect(isGenerationError({ code: "X", message: "m", retryable: false })).toBe(true);
     expect(isGenerationError({ code: "X" })).toBe(false);
+  });
+});
+
+describe("seedForAttempt", () => {
+  it("keeps the job's seed for the first attempt and derives a different, reproducible seed for each retry", () => {
+    const seed = 892_320_333;
+    expect(seedForAttempt(seed, 0)).toBe(seed);
+    expect(seedForAttempt(seed, 1)).toBe(seed);
+    const retries = [2, 3, 4, 5].map((attempt) => seedForAttempt(seed, attempt));
+    expect(new Set([seed, ...retries]).size).toBe(5);
+    expect(retries).toEqual([2, 3, 4, 5].map((attempt) => seedForAttempt(seed, attempt)));
+    for (const s of retries) {
+      expect(Number.isInteger(s)).toBe(true);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThan(2_147_483_647);
+    }
+    expect(seedForAttempt(2_147_483_646, 9)).toBeLessThan(2_147_483_647);
   });
 });
 

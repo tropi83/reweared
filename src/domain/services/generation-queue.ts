@@ -76,11 +76,11 @@ export class GenerationQueue {
     this.pump();
   }
 
-  /** Re-queues a failed or cancelled job. Attempt counter restarts. */
-  retry(jobId: string): void {
+  /** Re-queues a failed or cancelled job. Attempt counter restarts; `patch` changes it first (e.g. a fresh seed). */
+  retry(jobId: string, patch: Partial<Pick<GenerationJob, "seed">> = {}): void {
     const job = this.jobs.get(jobId);
     if (!job || job.status === "generating" || job.status === "queued") return;
-    this.enqueue([{ ...job, attempt: 0, resultImageId: undefined, completedAt: undefined }]);
+    this.enqueue([{ ...job, ...patch, attempt: 0, resultImageId: undefined, completedAt: undefined }]);
   }
 
   cancel(jobId: string): void {

@@ -223,6 +223,21 @@ describe("GenerationQueue", () => {
     expect(h.updates.at(-1)?.attempt).toBe(1);
   });
 
+  it("re-queues with a patch, e.g. a fresh seed so a diffusion retry does not reproduce the same output", async () => {
+    let calls = 0;
+    const h = harness(async () => {
+      calls++;
+      if (calls === 1) throw new AppError("CONTENT_REJECTED", "no");
+      return okResult;
+    });
+    h.queue.enqueue([{ ...makeJob(1), seed: 7 }]);
+    await h.waitForIdle();
+    expect(h.updates.at(-1)).toMatchObject({ status: "failed", seed: 7 });
+    h.queue.retry("job_1", { seed: 99 });
+    await h.waitForIdle();
+    expect(h.updates.at(-1)).toMatchObject({ status: "completed", seed: 99, attempt: 1 });
+  });
+
   it("surfaces provider resolution errors (e.g. AUTH_REQUIRED) as failed jobs", async () => {
     const updates: GenerationJob[] = [];
     const queue = new GenerationQueue(

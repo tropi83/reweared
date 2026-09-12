@@ -104,6 +104,30 @@ describe("CloudflareErrors", () => {
     expect(mapCloudflareHttpError(503, "gateway", null)).toMatchObject({ code: "PROVIDER_UNAVAILABLE", retryable: true });
     expect(mapCloudflareEnvelopeError({ success: false, errors: [{ code: 3030, message: "NSFW content detected" }] }).code).toBe("CONTENT_REJECTED");
   });
+
+  it("classifies FLUX's output safety filter as content rejection, retryable with another seed", () => {
+    // Live answer seen 2026-09-12 on product shots of shoes (a false positive): it mentions "input image",
+    // which used to be read as an invalid source image.
+    const flagged = {
+      success: false,
+      errors: [
+        { code: 3030, message: "AiError: AiError: Your output has been flagged. Please choose another prompt / input image combination (38435508-1b3c)" },
+      ],
+    };
+    const fromHttp = mapCloudflareHttpError(400, flagged, null);
+    expect(fromHttp).toMatchObject({ code: "CONTENT_REJECTED", retryable: true });
+    expect(fromHttp.detail).toContain("3030");
+    expect(mapCloudflareEnvelopeError(flagged)).toMatchObject({ code: "CONTENT_REJECTED", retryable: true });
+    // A policy refusal of the input itself does not change with a new seed.
+    expect(mapCloudflareHttpError(400, { errors: [{ code: 3030, message: "NSFW content detected in the prompt" }] }, null)).toMatchObject({
+      code: "CONTENT_REJECTED",
+      retryable: false,
+    });
+    // Genuine source-image problems keep their meaning.
+    expect(mapCloudflareHttpError(400, { errors: [{ code: 3030, message: 'input tensor "image" is not present in the model' }] }, null).code).toBe(
+      "INVALID_IMAGE",
+    );
+  });
 });
 
 describe("CloudflareAuth", () => {

@@ -1,7 +1,13 @@
 import { create } from "zustand";
 import { AppError, deriveGenerationStatus, type AspectRatio, type Generation, type GenerationJob, type ImageSize, type ModelInfo } from "@/domain/models";
 import type { ListingSelection, ShotSpec } from "@/domain/models";
-import { buildRequestForModel, inputPreparationFor, type ImageGenerationRequest, type ImageGenerationResult } from "@/domain/services/image-provider";
+import {
+  buildRequestForModel,
+  inputPreparationFor,
+  seedForAttempt,
+  type ImageGenerationRequest,
+  type ImageGenerationResult,
+} from "@/domain/services/image-provider";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { createId, nowIso } from "@/lib/ids";
 import { createLogger } from "@/lib/logger";
@@ -96,7 +102,8 @@ export async function buildRequestForJob(job: GenerationJob, _signal: AbortSigna
     sourceImage: { blob: source.blob, mimeType: source.mimeType, width: source.width, height: source.height },
     aspectRatio: job.aspectRatio,
     ...(job.imageSize ? { imageSize: job.imageSize } : {}),
-    ...(job.seed !== undefined ? { seed: job.seed } : {}),
+    // Automatic retries get a derived seed (see seedForAttempt): same seed = same output = same rejection.
+    ...(job.seed !== undefined ? { seed: seedForAttempt(job.seed, job.attempt) } : {}),
     ...(job.providerOptions ? { options: job.providerOptions } : {}),
   });
 }
@@ -217,8 +224,11 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     const job = doc?.jobs[jobId];
     if (!job) return;
     const { queue } = getServices();
-    if (queue.getJob(jobId)) queue.retry(jobId);
-    else queue.enqueue([{ ...job, attempt: 0, resultImageId: undefined, completedAt: undefined }]);
+    // A fresh seed: a diffusion model returns the same image for the same seed, so retrying with the old one
+    // would reproduce the same output — and the same safety-filter rejection.
+    const patch = job.seed !== undefined ? { seed: randomSeed() } : {};
+    if (queue.getJob(jobId)) queue.retry(jobId, patch);
+    else queue.enqueue([{ ...job, ...patch, attempt: 0, resultImageId: undefined, completedAt: undefined }]);
   },
 
   retryFailed(generationId) {

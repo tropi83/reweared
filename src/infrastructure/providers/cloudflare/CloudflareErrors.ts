@@ -1,6 +1,27 @@
 import { AppError, type GenerationErrorCode } from "@/domain/models";
 import type { CloudflareErrorBody } from "./CloudflareMapper";
 
+interface Classified {
+  code: GenerationErrorCode;
+  retryable?: boolean;
+}
+
+/**
+ * "The model refused this input" answers. Cloudflare reuses code 3030 for several of them, so the
+ * message decides, and content-filter wording is checked first: the safety filter's answer ("Your
+ * output has been flagged. Please choose another prompt / input image combination") also mentions
+ * "input image". An output flag comes from the safety checker judging the *generated* image — another
+ * seed usually passes (false positives are frequent on plain product shots), so it is retryable; a
+ * refusal of the prompt or source image itself is not.
+ */
+export function classifyRejectedInput(message: string): Classified {
+  const lower = message.toLowerCase();
+  if (/output[^.]*flagged/.test(lower)) return { code: "CONTENT_REJECTED", retryable: true };
+  if (/flagged|nsfw|safety|policy|prohibited|blocked|moderat/.test(lower)) return { code: "CONTENT_REJECTED", retryable: false };
+  if (/image|b64|base64|decode|dimension|width|height/.test(lower)) return { code: "INVALID_IMAGE" };
+  return { code: "INVALID_REQUEST" };
+}
+
 /**
  * Maps a Cloudflare API failure (`{ success:false, errors:[{code,message}] }`, standard Cloudflare
  * v4 envelope) to the app's error vocabulary. Messages never contain the token.
@@ -13,13 +34,12 @@ export function mapCloudflareHttpError(status: number, body: CloudflareErrorBody
   const detail = `HTTP ${status}${first?.code !== undefined ? ` (${first.code})` : ""}${message ? `: ${message.slice(0, 400)}` : ""}`;
 
   let code: GenerationErrorCode;
+  let retryable: boolean | undefined;
   switch (status) {
     case 400:
       // Cloudflare answers bad tokens with 400 + code 9106/10000 "Authentication failed/error".
       if (/authentication|authorization|api token|invalid token/.test(lower) || first?.code === 9106 || first?.code === 10000) code = "INVALID_CREDENTIAL";
-      else if (/image|b64|base64|decode|dimension|width|height/.test(lower)) code = "INVALID_IMAGE";
-      else if (/nsfw|safety|policy|prohibited|blocked/.test(lower)) code = "CONTENT_REJECTED";
-      else code = "INVALID_REQUEST";
+      else ({ code, retryable } = classifyRejectedInput(message));
       break;
     case 401:
       code = "INVALID_CREDENTIAL";
@@ -50,6 +70,7 @@ export function mapCloudflareHttpError(status: number, body: CloudflareErrorBody
   const seconds = retryAfter ? Number(retryAfter) : NaN;
   return new AppError(code, cloudflareMessageFor(code), {
     detail,
+    ...(retryable !== undefined ? { retryable } : {}),
     ...(Number.isFinite(seconds) ? { retryAfterMs: Math.max(0, seconds * 1000) } : {}),
   });
 }
@@ -58,13 +79,11 @@ export function mapCloudflareHttpError(status: number, body: CloudflareErrorBody
 export function mapCloudflareEnvelopeError(body: CloudflareErrorBody): AppError {
   const first = body.errors?.[0];
   const message = first?.message ?? "Cloudflare returned an unsuccessful response.";
-  const lower = message.toLowerCase();
-  const code: GenerationErrorCode = /nsfw|safety|policy/.test(lower)
-    ? "CONTENT_REJECTED"
-    : /image|b64|base64|decode/.test(lower)
-      ? "INVALID_IMAGE"
-      : "INVALID_REQUEST";
-  return new AppError(code, cloudflareMessageFor(code), { detail: `${first?.code ?? "-"}: ${message.slice(0, 400)}` });
+  const { code, retryable } = classifyRejectedInput(message);
+  return new AppError(code, cloudflareMessageFor(code), {
+    detail: `${first?.code ?? "-"}: ${message.slice(0, 400)}`,
+    ...(retryable !== undefined ? { retryable } : {}),
+  });
 }
 
 export function cloudflareMessageFor(code: GenerationErrorCode): string {
@@ -82,7 +101,7 @@ export function cloudflareMessageFor(code: GenerationErrorCode): string {
     case "INVALID_IMAGE":
       return "Cloudflare could not process the source image.";
     case "CONTENT_REJECTED":
-      return "Cloudflare declined this prompt or image.";
+      return "Cloudflare's safety filter blocked this image (often a false positive). Retry: each attempt uses a new seed.";
     case "PROVIDER_UNAVAILABLE":
       return "Cloudflare Workers AI is temporarily unavailable.";
     case "INVALID_REQUEST":

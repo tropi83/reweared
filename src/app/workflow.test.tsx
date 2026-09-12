@@ -130,8 +130,14 @@ describe("core workflow (mock provider)", () => {
     expect(failed.error?.code).toBe("CONTENT_REJECTED");
     expect(gen.jobIds.map((id) => doc.jobs[id]!).filter((j) => j.status === "completed")).toHaveLength(2);
 
+    const seedBefore = failed.seed;
     useGenerationStore.getState().retryJob(failed.id);
     await waitFor(() => useProjectsStore.getState().current?.generations[gen.id]?.status === "completed");
+    // A manual retry draws a fresh seed: a diffusion model would otherwise reproduce the same (rejected) output.
+    const retried = useProjectsStore.getState().current!.jobs[failed.id]!;
+    expect(retried.status).toBe("completed");
+    expect(retried.seed).toBeDefined();
+    expect(retried.seed).not.toBe(seedBefore);
     mock.generate = original;
   });
 

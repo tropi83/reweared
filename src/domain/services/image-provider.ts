@@ -52,6 +52,22 @@ export interface ImageProvider {
 /** Pixel budget for an image size choice; used when a model wants its input pre-sized. */
 export const IMAGE_SIZE_PX: Record<ImageSize, number> = { "512px": 512, "1K": 1024, "2K": 2048, "4K": 4096 };
 
+/** Seeds are 31-bit, as drawn by the generation store. */
+const SEED_SPACE = 2_147_483_647;
+/** Golden-ratio step, so consecutive attempts land far apart in the seed space. */
+const SEED_STEP = 2_654_435_761;
+
+/**
+ * Seed actually sent for one attempt of a job. The first attempt uses the job's own seed, so a result
+ * stays reproducible from `job.seed` + `job.attempt`; automatic retries derive a different seed, because
+ * a diffusion model given the same prompt, image and seed returns the same image — and so the same
+ * rejection when a safety filter flagged it.
+ */
+export function seedForAttempt(seed: number, attempt: number): number {
+  if (attempt <= 1) return seed;
+  return (seed + (attempt - 1) * SEED_STEP) % SEED_SPACE;
+}
+
 /** Builds a request that only contains parameters the model supports. */
 export function buildRequestForModel(
   model: ModelInfo,
