@@ -151,3 +151,40 @@ describe("core workflow (mock provider)", () => {
     expect(await storage.cleanupOrphans(after.project.id)).toBe(0);
   });
 });
+
+describe("listing packs", () => {
+  it("generates one job per shot with distinct prompts and labels, and stores the copy on the project", async () => {
+    const projects = useProjectsStore.getState();
+    const doc = projects.current!;
+    const { buildListingShots } = await import("@/domain/services/listing-catalog");
+    const listing = { categoryId: "women" as const, subcategoryId: "shoes" };
+    const shots = buildListingShots(listing);
+    const gen = await useGenerationStore.getState().start({
+      sourceImageId: doc.project.originalImageId!,
+      prompt: "",
+      providerId: "mock",
+      modelId: "mock-fast",
+      aspectRatio: "3:4",
+      variationCount: 1,
+      listing,
+      shots,
+      recipeId: "rcp_listing_women_shoes",
+    });
+    expect(gen.jobIds).toHaveLength(4);
+    expect(gen.listing).toEqual(listing);
+    await waitFor(() => useProjectsStore.getState().current?.generations[gen.id]?.status === "completed");
+    const after = useProjectsStore.getState().current!;
+    const jobs = gen.jobIds.map((id) => after.jobs[id]!);
+    expect(jobs.map((j) => j.shotId)).toEqual(["retouch", "studio", "worn", "profile"]);
+    expect(new Set(jobs.map((j) => j.prompt)).size).toBe(4);
+    expect(jobs[2]!.shotLabel?.fr).toBe("Portées");
+    expect(new Set(jobs.map((j) => j.seed)).size).toBeGreaterThan(1);
+
+    const { useListingStore } = await import("./stores/listing-store");
+    useListingStore.getState().setListing(listing);
+    expect(useProjectsStore.getState().current?.project.listing).toEqual(listing);
+    // No vision model for the mock provider: a clear error, no crash.
+    expect(await useListingStore.getState().generateCopy("mock")).toBeNull();
+    expect(useListingStore.getState().copyError?.code).toBe("PROVIDER_UNAVAILABLE");
+  });
+});

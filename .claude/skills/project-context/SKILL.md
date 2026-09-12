@@ -7,13 +7,14 @@ description: Use at the start of any task on AI Image Variations — product int
 
 ## Product in one paragraph
 
-Local-first workspace: import an image → prompt → N independent variations (jobs) → compare → pick → "use as source" / "more like this" → iterate, all persisted on the device. Gemini is the intelligence; the app is the workflow. BYOK (API key or Google OAuth). No account, no backend, no cloud.
+Local-first AI photo studio for second-hand listings (Vinted-style): import the item's photo → choose category/subcategory (10 → 56, `listing-catalog.ts`) → the app generates the four listing photos with predefined, kind-specific prompts (retouched / studio / in use or worn / folded or detail) → compare, pick, export; a vision model writes the title + description. No free prompt in the main flow (custom recipes remain for power users). BYOK (Cloudflare Workers AI by default, Gemini). No account, no backend, no cloud.
 
 ## Map
 
 | Concern                                                     | Where                                                                   |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Domain models / errors                                      | `src/domain/models/*` (`AppError`, `GenerationErrorCode`)               |
+| Domain models / errors                                      | `src/domain/models/*` (`AppError`, `GenerationErrorCode`, `listing.ts`) |
+| Listing taxonomy + 4-shot plans, listing copy contract      | `src/domain/services/listing-catalog.ts`, `listing-copy.ts`             |
 | Job queue (concurrency, retry, cancel, timeout)             | `src/domain/services/generation-queue.ts`                               |
 | Provider contract + request builder                         | `src/domain/services/image-provider.ts`                                 |
 | Gemini adapter, models catalogue, error mapping             | `src/infrastructure/providers/gemini/*`                                 |

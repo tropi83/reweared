@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Badge, EmptyState } from "@/components/ui/Misc";
 import type { Generation, GenerationJob, ProjectDocument } from "@/domain/models";
-import { useT } from "@/i18n";
+import { useLocale, useT } from "@/i18n";
+import { findSubcategory } from "@/domain/services/listing-catalog";
 import { VariationTile } from "./VariationTile";
 
 export function GenerationFeed() {
@@ -33,6 +34,9 @@ export function GenerationFeed() {
 
 function GenerationCard({ generation, doc, favoritesOnly }: { generation: Generation; doc: ProjectDocument; favoritesOnly: boolean }) {
   const t = useT();
+  const locale = useLocale();
+  const listing = generation.listing ? findSubcategory(generation.listing) : undefined;
+  const title = listing ? `${t("listing.pack")} · ${listing.category.label[locale]} › ${listing.subcategory.label[locale]}` : generation.prompt;
   const composer = useComposerStore();
   const { retryFailed, cancelGeneration, start } = useGenerationStore.getState();
   const deleteGeneration = useProjectsStore((s) => s.deleteGeneration);
@@ -52,10 +56,18 @@ function GenerationCard({ generation, doc, favoritesOnly }: { generation: Genera
   const parentJob = source?.jobId ? doc.jobs[source.jobId] : undefined;
 
   const regenerate = async () => {
+    // Listing packs re-run the same four shots (prompts live on the jobs), free prompts re-run as before.
+    const packShots = generation.listing
+      ? generation.jobIds
+          .map((id) => doc.jobs[id])
+          .filter((j): j is GenerationJob => !!j)
+          .map((j) => ({ id: j.shotId ?? String(j.index), label: j.shotLabel ?? { en: `Shot ${j.index}`, fr: `Prise ${j.index}` }, prompt: j.prompt }))
+      : undefined;
     try {
       await start({
         sourceImageId: generation.sourceImageId,
         prompt: generation.prompt,
+        ...(packShots ? { shots: packShots, listing: generation.listing } : {}),
         providerId: generation.settings.providerId,
         modelId: generation.settings.modelId,
         aspectRatio: generation.settings.aspectRatio,
@@ -88,7 +100,19 @@ function GenerationCard({ generation, doc, favoritesOnly }: { generation: Genera
       <header className="mb-3 flex flex-wrap items-start gap-2">
         <div className="min-w-[14rem] flex-1">
           <button type="button" className="w-full text-left" onClick={() => setExpanded((v) => !v)} title={generation.prompt}>
-            <p className={expanded ? "text-sm leading-relaxed" : "line-clamp-2 text-sm leading-relaxed"}>{generation.prompt}</p>
+            <p className={expanded ? "text-sm leading-relaxed" : "line-clamp-2 text-sm leading-relaxed"}>{title}</p>
+            {expanded && listing && (
+              <ol className="mt-2 space-y-1 text-xs text-fg-muted">
+                {generation.jobIds.map((id) => {
+                  const job = doc.jobs[id];
+                  return job ? (
+                    <li key={id}>
+                      <span className="font-medium text-fg">{job.shotLabel?.[locale] ?? job.index}</span> — {job.prompt}
+                    </li>
+                  ) : null;
+                })}
+              </ol>
+            )}
           </button>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-fg-subtle">
             <Badge tone={fromOriginal ? "neutral" : "accent"}>
@@ -125,9 +149,11 @@ function GenerationCard({ generation, doc, favoritesOnly }: { generation: Genera
               >
                 <span className="hidden sm:inline">{t("generation.regenerate")}</span>
               </Button>
-              <Button variant="ghost" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={editPrompt} title={t("generation.editPrompt")}>
-                <span className="hidden sm:inline">{t("generation.editPrompt")}</span>
-              </Button>
+              {!generation.listing && (
+                <Button variant="ghost" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={editPrompt} title={t("generation.editPrompt")}>
+                  <span className="hidden sm:inline">{t("generation.editPrompt")}</span>
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon-sm"

@@ -371,6 +371,35 @@ export const en = {
   "composer.resetAdvanced": "Reset to defaults",
   "provider.pricing.free": "Free",
 
+  // Listing packs
+  "listing.category": "Category",
+  "listing.chooseCategory": "Choose a category…",
+  "listing.subcategory": "Subcategory",
+  "listing.shots": "The 4 photos that will be generated",
+  "listing.editShots": "Edit prompts",
+  "listing.customRecipe": "Use a custom recipe instead",
+  "listing.customRecipeNone": "No — use the listing pack",
+  "listing.generatePack": "Generate the 4 listing photos",
+  "listing.needCategory": "Choose a category and a subcategory to generate",
+  "listing.pack": "Listing pack",
+  "listing.packHint": "One request per photo; each shot has its own prompt and seed.",
+
+  // Listing copy (title + description)
+  "copy.title": "Title & description",
+  "copy.generate": "Write from the photo",
+  "copy.regenerate": "Regenerate",
+  "copy.needProvider": "Connect Cloudflare or Gemini to describe the photo.",
+  "copy.field.title": "Title",
+  "copy.field.description": "Description",
+  "copy.copyAll": "Copy title + description",
+  "copy.disclaimer": "Written by AI from the photo only — check size, brand and condition before publishing.",
+  "copy.condition.new_with_tags": "New with tags",
+  "copy.condition.new": "New without tags",
+  "copy.condition.very_good": "Very good condition",
+  "copy.condition.good": "Good condition",
+  "copy.condition.satisfactory": "Satisfactory",
+  "recipes.category.listing": "Listing pack",
+
   // Shortcuts
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.generate": "Generate",

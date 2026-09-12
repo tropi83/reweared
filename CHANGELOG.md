@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- **Product pivot: listing photo studio.** The free prompt is gone; the composer asks for a category and subcategory and generates the four photos a listing needs, each with its own prompt adapted to the product kind (56 packs / 40 kinds, also exposed as built-in recipes). "Generate again" re-runs the same four shots.
+- **Title & description from the photo**: a vision model (Cloudflare Llama 4 Scout with JSON-schema output, or Gemini Flash) writes title, description, condition, colour, brand (only if readable) and keywords; editable, copyable, stored in the project.
+
 ### Fixed
 
 - Cloudflare: 403 `5018`/`3041` ("account not allowed for private model") is reported as a model-access problem, not a bad credential, and the model list is filtered by what the account can actually run (`/ai/models/search`, or `/models` on the Worker).

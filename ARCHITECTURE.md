@@ -54,6 +54,12 @@ A `ProjectDocument` (`project.json`) holds all of a project's records plus `sche
 
 The queue is pure TypeScript with injectable `sleep`/`random`, covered by `generation-queue.test.ts`.
 
+## Listing catalogue and packs
+
+`domain/services/listing-catalog.ts` holds the marketplace taxonomy (10 categories → 56 subcategories) and, per `ProductKind` (40 kinds: garment, footwear, bag, jewelry, phone, trading-card, pet-carrier…), a plan of four `ShotSpec`s. Every prompt shares a fidelity preamble (keep shape, colours, pattern, logos, text) and a quality suffix; `{{subject}}` and `{{wearer}}` are interpolated from the subcategory and the category (a woman / a man / a child, face not visible / an athlete…). Built-in recipes are generated from the catalogue (`listingRecipeId`). `GenerationQueue` is unchanged: a pack is a `Generation` with `listing` set and one job per shot, each job carrying its own `prompt`, `shotId`, `shotLabel` and seed.
+
+`domain/services/listing-copy.ts` defines `ListingCopyProvider` (photo → `{ title, description, condition, brand, color, keywords }`), the shared prompt, a JSON schema for constrained output and a defensive parser. Implementations: `CloudflareListingCopyProvider` (Llama 4 Scout, `response_format: json_schema`, fallback Llama 3.2 Vision) and `GeminiListingCopyProvider` (Flash text models, Interactions API with an image part). The result is stored on `Project.copy`.
+
 ## Providers
 
 ```ts

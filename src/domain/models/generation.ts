@@ -1,4 +1,5 @@
 import type { GenerationError } from "./errors";
+import type { ListingSelection, Localized } from "./listing";
 
 export type AspectRatio = "original" | "1:1" | "2:3" | "3:2" | "3:4" | "4:3" | "4:5" | "5:4" | "9:16" | "16:9" | "21:9";
 
@@ -30,8 +31,11 @@ export interface Generation {
   /** Image used as input. May be an imported original or any previous result. */
   sourceImageId: string;
   parentGenerationId?: string;
+  /** Free prompt, or a summary for listing packs (jobs carry the real prompts). */
   prompt: string;
   recipeId?: string;
+  /** Present for listing packs generated from the catalogue. */
+  listing?: ListingSelection;
   settings: GenerationSettings;
   status: GenerationStatus;
   jobIds: string[];
@@ -49,6 +53,9 @@ export interface GenerationJob {
   /** 1-based position inside its generation, for display ("Variation 3"). */
   index: number;
   prompt: string;
+  /** Shot id/label when the job belongs to a listing pack ("studio", "worn"…). */
+  shotId?: string;
+  shotLabel?: Localized;
   provider: string;
   model: string;
   aspectRatio: AspectRatio;

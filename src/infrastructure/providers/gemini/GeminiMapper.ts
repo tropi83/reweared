@@ -116,7 +116,7 @@ export function extractImage(response: InteractionResponse): ExtractedImage | un
 }
 
 /** Text the model produced alongside (or instead of) the image, for diagnostics. */
-export function extractText(response: InteractionResponse): string {
+export function extractText(response: InteractionResponse, maxChars = 500): string {
   const parts: string[] = [];
   for (const step of response.steps ?? []) {
     if (step.type !== "model_output") continue;
@@ -124,5 +124,5 @@ export function extractText(response: InteractionResponse): string {
       if (content.type === "text" && content.text) parts.push(content.text);
     }
   }
-  return parts.join("\n").slice(0, 500);
+  return parts.join("\n").slice(0, maxChars);
 }

@@ -1,5 +1,6 @@
 import type { Generation, GenerationJob } from "./generation";
 import type { ImageAsset } from "./image";
+import type { ListingCopy, ListingSelection } from "./listing";
 
 /** Bump when the on-disk shape of ProjectDocument changes; add a migration in storage/migrations.ts. */
 export const CURRENT_SCHEMA_VERSION = 1;
@@ -11,6 +12,10 @@ export interface Project {
   originalImageId?: string;
   /** Asset shown as project cover in the sidebar. */
   coverImageId?: string;
+  /** Marketplace taxonomy chosen for this item. */
+  listing?: ListingSelection;
+  /** Title/description generated from the original photo, edited by the user. */
+  copy?: ListingCopy;
   createdAt: string;
   updatedAt: string;
 }

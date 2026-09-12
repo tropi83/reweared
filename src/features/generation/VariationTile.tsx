@@ -11,7 +11,7 @@ import type { GenerationJob, ProjectDocument } from "@/domain/models";
 import { exportSingle } from "@/infrastructure/image/export";
 import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
 import { openExternal } from "@/lib/open-external";
-import { useT, type MessageKey } from "@/i18n";
+import { useLocale, useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
 
 interface Props {
@@ -23,6 +23,8 @@ const QUOTA_CODES = new Set(["RATE_LIMITED", "QUOTA_EXCEEDED", "MODEL_NOT_IN_PLA
 
 export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
   const t = useT();
+  const locale = useLocale();
+  const shotName = job.shotLabel?.[locale] ?? t("generation.variation", { index: job.index });
   const asset = job.resultImageId ? doc.images[job.resultImageId] : undefined;
   const url = useImageUrl(doc.project.id, "thumbnail", asset?.id);
   const selected = useUiStore((s) => (asset ? s.selection.has(asset.id) : false));
@@ -52,13 +54,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
           aria-label={t("gallery.fullscreen")}
         >
           {url ? (
-            <img
-              src={url}
-              alt={`${t("generation.variation", { index: job.index })}: ${job.prompt}`}
-              className="size-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
+            <img src={url} alt={`${shotName}: ${job.prompt}`} className="size-full object-cover" loading="lazy" decoding="async" />
           ) : (
             <div className="shimmer size-full" />
           )}
@@ -120,7 +116,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
         <div className="shimmer absolute inset-0" />
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
           <span className="size-2 animate-pulse rounded-full bg-accent" />
-          <span className="text-xs font-medium">{t("generation.variation", { index: job.index })}</span>
+          <span className="text-xs font-medium">{shotName}</span>
           <span className="text-[11px] text-fg-muted">
             {job.status === "queued" ? (
               t("generation.status.queued")
@@ -156,7 +152,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
       style={{ aspectRatio: ratio }}
     >
       {isCancelled ? <X className="size-5 text-fg-subtle" /> : <AlertTriangle className="size-5 text-danger" />}
-      <span className="text-xs font-medium">{t("generation.variation", { index: job.index })}</span>
+      <span className="text-xs font-medium">{shotName}</span>
       <span className="text-[11px] text-fg-muted">
         {isCancelled ? t("generation.status.cancelled") : job.error ? t(`error.${job.error.code}` as MessageKey) : t("generation.status.failed")}
       </span>

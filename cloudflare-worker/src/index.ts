@@ -28,9 +28,15 @@ const ALLOWED_MODELS = new Set([
   "@cf/black-forest-labs/flux-2-klein-4b",
   "@cf/black-forest-labs/flux-2-klein-9b",
   "@cf/runwayml/stable-diffusion-v1-5-img2img",
+  "@cf/meta/llama-4-scout-17b-16e-instruct",
+  "@cf/meta/llama-3.2-11b-vision-instruct",
 ]);
 /** FLUX.2 models take multipart/form-data (prompt, input_image_0..3, width, height, seed, guidance). */
 const MULTIPART_MODELS = new Set(["@cf/black-forest-labs/flux-2-klein-4b", "@cf/black-forest-labs/flux-2-klein-9b"]);
+/** Vision LLMs used to write the listing title/description (OpenAI-style messages with a data-URI image). */
+const TEXT_MODELS = new Set(["@cf/meta/llama-4-scout-17b-16e-instruct", "@cf/meta/llama-3.2-11b-vision-instruct"]);
+const MAX_TEXT_CHARS = 6000;
+const MAX_DATA_URI_CHARS = 8 * 1024 * 1024;
 const MAX_REFERENCE_BYTES = 4 * 1024 * 1024;
 
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
@@ -109,6 +115,7 @@ export default {
     if (length > MAX_BODY_BYTES) return json(413, { success: false, errors: [{ code: 413, message: "Body too large" }] }, cors);
 
     if (MULTIPART_MODELS.has(model)) return runMultipart(request, env, model, cors);
+    if (TEXT_MODELS.has(model)) return runText(request, env, model, cors);
 
     let body: RunBody;
     try {
@@ -150,6 +157,58 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env>;
+
+type MessagePart = { type: string; text?: string; image_url?: { url?: string } };
+type Message = { role: string; content: string | MessagePart[] };
+
+/** Vision LLM path: validate the chat messages (text limits, data-URI images only) and forward. */
+async function runText(request: Request, env: Env, model: string, cors: Record<string, string>): Promise<Response> {
+  let body: { messages?: unknown; max_tokens?: unknown; temperature?: unknown; response_format?: unknown };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json(400, { success: false, errors: [{ code: 400, message: "Invalid JSON body" }] }, cors);
+  }
+  if (!Array.isArray(body.messages) || body.messages.length === 0 || body.messages.length > 6) {
+    return json(400, { success: false, errors: [{ code: 400, message: "messages must be a non-empty array (max 6)" }] }, cors);
+  }
+  const messages: Message[] = [];
+  for (const m of body.messages as Array<Partial<Message>>) {
+    if (!m || !["system", "user", "assistant"].includes(String(m.role)))
+      return json(400, { success: false, errors: [{ code: 400, message: "invalid message role" }] }, cors);
+    if (typeof m.content === "string") {
+      if (m.content.length > MAX_TEXT_CHARS) return json(400, { success: false, errors: [{ code: 400, message: "message too long" }] }, cors);
+      messages.push({ role: m.role as string, content: m.content });
+    } else if (Array.isArray(m.content)) {
+      const parts: MessagePart[] = [];
+      for (const part of m.content as MessagePart[]) {
+        if (part.type === "text" && typeof part.text === "string" && part.text.length <= MAX_TEXT_CHARS) parts.push({ type: "text", text: part.text });
+        else if (
+          part.type === "image_url" &&
+          typeof part.image_url?.url === "string" &&
+          /^data:image\/(png|jpeg);base64,/.test(part.image_url.url) &&
+          part.image_url.url.length <= MAX_DATA_URI_CHARS
+        ) {
+          parts.push({ type: "image_url", image_url: { url: part.image_url.url } });
+        } else return json(400, { success: false, errors: [{ code: 400, message: "invalid message part" }] }, cors);
+      }
+      messages.push({ role: m.role as string, content: parts });
+    } else return json(400, { success: false, errors: [{ code: 400, message: "invalid message content" }] }, cors);
+  }
+  const inputs: Record<string, unknown> = { messages };
+  const maxTokens = typeof body.max_tokens === "number" ? Math.min(1024, Math.max(1, Math.round(body.max_tokens))) : 512;
+  inputs.max_tokens = maxTokens;
+  if (typeof body.temperature === "number") inputs.temperature = Math.min(2, Math.max(0, body.temperature));
+  if (body.response_format && typeof body.response_format === "object") inputs.response_format = body.response_format;
+  try {
+    const result = await env.AI.run(model as Parameters<Ai["run"]>[0], inputs as never);
+    return json(200, { success: true, result }, cors);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Workers AI error";
+    const status = /rate limit|too many|quota|allocation|neuron/i.test(message) ? 429 : /not allowed/i.test(message) ? 403 : 502;
+    return json(status, { success: false, errors: [{ code: status === 403 ? 5018 : status, message }] }, cors);
+  }
+}
 
 /** FLUX.2 path: validate the form fields, rebuild a clean form and stream it to the AI binding. */
 async function runMultipart(request: Request, env: Env, model: string, cors: Record<string, string>): Promise<Response> {

@@ -6,6 +6,9 @@ import { GeminiAuthManager } from "@/infrastructure/auth/GeminiAuthManager";
 import { CloudflareAuth } from "@/infrastructure/providers/cloudflare/CloudflareAuth";
 import { CLOUDFLARE_PROVIDER_ID, CloudflareProvider } from "@/infrastructure/providers/cloudflare/CloudflareProvider";
 import { GEMINI_PROVIDER_ID, GeminiProvider } from "@/infrastructure/providers/gemini/GeminiProvider";
+import { CloudflareListingCopyProvider } from "@/infrastructure/providers/cloudflare/CloudflareListingCopy";
+import { GeminiListingCopyProvider } from "@/infrastructure/providers/gemini/GeminiListingCopy";
+import type { ListingCopyProvider } from "@/domain/services/listing-copy";
 import { createSecretStore } from "@/infrastructure/auth/SecretStore";
 import { MOCK_PROVIDER_ID, MockImageProvider } from "@/infrastructure/providers/mock/MockImageProvider";
 import { createStorageProvider, type StorageProvider } from "@/infrastructure/storage";
@@ -18,6 +21,8 @@ export interface AppServices {
   storage: StorageProvider;
   auth: GeminiAuthManager;
   providers: Map<string, ImageProvider>;
+  /** Vision models that write listing copy, keyed by the same provider ids. */
+  copyProviders: Map<string, ListingCopyProvider>;
   mock: MockImageProvider;
   gemini: GeminiProvider;
   cloudflare: CloudflareProvider;
@@ -63,6 +68,10 @@ export function createServices(bindings: {
   const cloudflareAuth = new CloudflareAuth(secrets, { read: (k) => storage.readMeta(k), write: (k, v) => storage.writeMeta(k, v) });
   const cloudflare = new CloudflareProvider(cloudflareAuth, usage);
   const mock = new MockImageProvider({ usage });
+  const copyProviders = new Map<string, ListingCopyProvider>([
+    [CLOUDFLARE_PROVIDER_ID, new CloudflareListingCopyProvider(cloudflareAuth)],
+    [GEMINI_PROVIDER_ID, new GeminiListingCopyProvider(auth)],
+  ]);
   // Cloudflare first: its img2img models are free while in beta, which is the default path.
   const providers = new Map<string, ImageProvider>([
     [CLOUDFLARE_PROVIDER_ID, cloudflare],
@@ -88,6 +97,6 @@ export function createServices(bindings: {
     },
   );
 
-  services = { storage, auth, providers, mock, gemini, cloudflare, cloudflareAuth, queue, usage, appVersion: APP_VERSION };
+  services = { storage, auth, providers, copyProviders, mock, gemini, cloudflare, cloudflareAuth, queue, usage, appVersion: APP_VERSION };
   return services;
 }

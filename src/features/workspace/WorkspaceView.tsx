@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Misc";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/cn";
-import { Composer } from "../generation/Composer";
+import { ListingComposer } from "../generation/ListingComposer";
+import { ListingCopyPanel } from "./ListingCopyPanel";
 import { GenerationFeed } from "../generation/GenerationFeed";
 import { Lightbox } from "../gallery/Lightbox";
 import { SelectionBar } from "../gallery/SelectionBar";
@@ -81,7 +82,8 @@ export function WorkspaceView({ projectId }: { projectId: string }) {
           className={cn("flex shrink-0 flex-col gap-4 border-b border-border p-4 lg:w-[22rem] lg:overflow-y-auto lg:border-r lg:border-b-0 xl:w-[24rem]")}
         >
           <SourcePanel />
-          <Composer />
+          <ListingCopyPanel />
+          <ListingComposer />
         </section>
         <section aria-label={t("gallery.title")} className="relative flex-1 lg:min-h-0 lg:overflow-y-auto">
           <GenerationFeed />

@@ -8,7 +8,8 @@ import { Input, Label, Select, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Misc";
 import { RECIPE_CATEGORIES, type Recipe, type RecipeCategory } from "@/domain/models";
 import { BUILT_IN_RECIPES, extractVariables } from "@/domain/services/recipes";
-import { useT, type MessageKey } from "@/i18n";
+import { useLocale, useT, type MessageKey } from "@/i18n";
+import { findSubcategory } from "@/domain/services/listing-catalog";
 
 type Draft = { id?: string; name: string; description: string; promptTemplate: string; category: RecipeCategory };
 
@@ -141,6 +142,12 @@ function RecipeGroup({
   onDelete?: (r: Recipe) => void;
 }) {
   const t = useT();
+  const locale = useLocale();
+  const displayName = (r: Recipe) => {
+    const found = r.listing ? findSubcategory(r.listing) : undefined;
+    return found ? `${found.category.label[locale]} › ${found.subcategory.label[locale]}` : r.name;
+  };
+  const displayDescription = (r: Recipe) => (r.shots ? r.shots.map((s) => s.label[locale]).join(" · ") : r.description);
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold tracking-wider text-fg-subtle uppercase">{title}</h2>
@@ -149,11 +156,11 @@ function RecipeGroup({
         {recipes.map((r) => (
           <li key={r.id} className="group flex flex-col gap-2 rounded-xl border border-border bg-bg-elevated p-3">
             <div className="flex items-center gap-2">
-              <span className="font-medium">{r.name}</span>
+              <span className="font-medium">{displayName(r)}</span>
               <Badge className="ml-auto">{t(`recipes.category.${r.category}` as MessageKey)}</Badge>
             </div>
-            {r.description && <p className="text-xs text-fg-muted">{r.description}</p>}
-            <p className="line-clamp-3 text-xs text-fg-subtle">{r.promptTemplate}</p>
+            {displayDescription(r) && <p className="text-xs text-fg-muted">{displayDescription(r)}</p>}
+            {!r.shots && <p className="line-clamp-3 text-xs text-fg-subtle">{r.promptTemplate}</p>}
             <div className="mt-auto flex items-center gap-1 pt-1">
               {onEdit && (
                 <Button variant="ghost" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => onEdit(r)}>

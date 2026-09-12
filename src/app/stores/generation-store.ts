@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { AppError, deriveGenerationStatus, type AspectRatio, type Generation, type GenerationJob, type ImageSize, type ModelInfo } from "@/domain/models";
+import type { ListingSelection, ShotSpec } from "@/domain/models";
 import { buildRequestForModel, inputPreparationFor, type ImageGenerationRequest, type ImageGenerationResult } from "@/domain/services/image-provider";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { createId, nowIso } from "@/lib/ids";
@@ -20,6 +21,12 @@ export interface StartGenerationParams {
   variationCount: number;
   recipeId?: string;
   providerOptions?: Record<string, string | number | boolean>;
+  /**
+   * Listing pack: one job per shot, each with its own prompt (variationCount is ignored).
+   * `prompt` then only serves as the generation's summary.
+   */
+  shots?: ShotSpec[];
+  listing?: ListingSelection;
 }
 
 interface GenerationState {
@@ -147,12 +154,13 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     const source = doc.images[params.sourceImageId];
     if (!source) throw new AppError("INVALID_IMAGE", "Source image not found.");
     const prompt = params.prompt.trim();
-    if (!prompt) throw new AppError("INVALID_REQUEST", "Prompt is empty.");
+    const shots = params.shots?.filter((s) => s.prompt.trim().length > 0) ?? [];
+    if (!prompt && shots.length === 0) throw new AppError("INVALID_REQUEST", "Prompt is empty.");
     const models = await get().loadModels(params.providerId);
     const model = models.find((m) => m.id === params.modelId);
     if (!model) throw new AppError("MODEL_UNAVAILABLE", "Select an available model.");
 
-    const count = Math.max(1, Math.min(8, Math.round(params.variationCount)));
+    const count = shots.length > 0 ? Math.min(8, shots.length) : Math.max(1, Math.min(8, Math.round(params.variationCount)));
     const now = nowIso();
     const generationId = createId("gen");
     const jobs: GenerationJob[] = Array.from({ length: count }, (_, i) => ({
@@ -161,7 +169,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       generationId,
       sourceImageId: source.id,
       index: i + 1,
-      prompt,
+      prompt: shots[i]?.prompt.trim() ?? prompt,
+      ...(shots[i] ? { shotId: shots[i]!.id, shotLabel: shots[i]!.label } : {}),
       provider: params.providerId,
       model: params.modelId,
       aspectRatio: params.aspectRatio,
@@ -177,8 +186,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       projectId: doc.project.id,
       sourceImageId: source.id,
       ...(source.generationId ? { parentGenerationId: source.generationId } : {}),
-      prompt,
+      prompt: prompt || (shots[0]?.prompt ?? ""),
       ...(params.recipeId ? { recipeId: params.recipeId } : {}),
+      ...(params.listing ? { listing: params.listing } : {}),
       settings: {
         providerId: params.providerId,
         modelId: params.modelId,
