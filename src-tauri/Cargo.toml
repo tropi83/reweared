@@ -22,10 +22,11 @@ tauri-plugin-dialog = "2"
 tauri-plugin-http = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# OS credential store for API keys / OAuth tokens (Windows Credential Manager, macOS Keychain, Secret Service).
-keyring = { version = "4", default-features = false }
 url = "2"
 
+# OS credential store for API keys / OAuth tokens (Windows Credential Manager, macOS Keychain, Secret Service).
+# Desktop only: secrets.rs has no keyring code on mobile, and keyring 4 refuses to compile without its
+# `v1` (or `cli`) feature, so it must not be declared for Android/iOS at all.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 keyring = { version = "4", features = ["v1"] }
 
