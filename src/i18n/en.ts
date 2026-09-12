@@ -438,6 +438,7 @@ export const en = {
   "listing.customRecipeNone": "No — use the listing pack",
   "listing.generatePack": "Generate the {count} listing photos",
   "listing.needCategory": "Choose a category and a subcategory to generate",
+  "listing.needProviders": "Connect an image provider or a text provider in Settings.",
   "listing.pack": "Listing pack",
   "listing.packHint": "One request per photo; each shot has its own prompt and seed.",
 

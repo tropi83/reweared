@@ -421,6 +421,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "listing.customRecipeNone": "Non — utiliser le pack annonce",
   "listing.generatePack": "Générer les {count} photos de l'annonce",
   "listing.needCategory": "Choisissez une catégorie et une sous-catégorie pour générer",
+  "listing.needProviders": "Connectez un fournisseur d'images ou de texte dans les Réglages.",
   "listing.pack": "Pack annonce",
   "listing.packHint": "Une requête par photo ; chaque prise a son propre prompt et sa propre seed.",
 
