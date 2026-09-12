@@ -10,8 +10,7 @@ import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Misc";
-import { Select } from "@/components/ui/Select";
-import { LISTING_COPY_LIMITS, resolveCopyModel, type ListingCopyModel } from "@/domain/services/listing-copy";
+import { LISTING_COPY_LIMITS, resolveCopyModel } from "@/domain/services/listing-copy";
 import { useT, type MessageKey } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 
@@ -21,14 +20,12 @@ export function ListingCopyPanel() {
   const doc = useListingsStore((s) => s.current);
   const providerStatus = useAuthStore((s) => s.providerStatus);
   const settings = useSettingsStore((s) => s.settings);
-  const updateSettings = useSettingsStore((s) => s.update);
   const busy = useListingSetupStore((s) => s.copyBusy);
   const error = useListingSetupStore((s) => s.copyError);
   const generateCopy = useListingSetupStore((s) => s.generateCopy);
   const updateCopy = useListingSetupStore((s) => s.updateCopy);
   const cancelCopy = useListingSetupStore((s) => s.cancelCopy);
   const [copied, setCopied] = useState<"title" | "description" | "all" | null>(null);
-  const [showModel, setShowModel] = useState(false);
 
   if (!doc?.listing.originalImageId) return null;
   const copy = doc.listing.copy;
@@ -37,8 +34,6 @@ export function ListingCopyPanel() {
   const provider = getServices().copyProviders.get(copyProviderId) ?? copyProviders[0];
   const model = provider ? resolveCopyModel(provider, settings.copyModelByProvider[provider.id]) : undefined;
   const canGenerate = !!provider && providerStatus[provider.id]?.state === "authenticated";
-  const pricing = (m: ListingCopyModel) =>
-    m.pricing ? t("copy.pricing", { input: m.pricing.inputPerM, output: m.pricing.outputPerM, free: m.freeTier ? t("copy.freeTier") : "" }) : "";
 
   const copyText = async (what: "title" | "description" | "all") => {
     if (!copy) return;
@@ -56,13 +51,13 @@ export function ListingCopyPanel() {
           <FileText className="size-3.5" /> {t("copy.title")}
         </span>
         <div className="flex items-center gap-1">
+          {/* The provider and model are chosen in Settings → Models. */}
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={t("copy.model")}
-            aria-pressed={showModel}
+            aria-label={t("models.change")}
             title={model ? `${provider?.displayName} · ${model.label}` : undefined}
-            onClick={() => setShowModel((v) => !v)}
+            onClick={() => navigate({ name: "settings", section: "models" })}
           >
             <Settings2 className="size-3.5" />
           </Button>
@@ -85,37 +80,6 @@ export function ListingCopyPanel() {
           ) : null}
         </div>
       </div>
-
-      {showModel && provider && model && (
-        <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-bg-elevated/60 p-2.5">
-          <div className="space-y-1">
-            <Label htmlFor="copy-provider">{t("copy.provider")}</Label>
-            <Select
-              id="copy-provider"
-              value={provider.id}
-              options={copyProviders.map((p) => ({ value: p.id, label: p.displayName }))}
-              onChange={(copyProviderId) => void updateSettings({ copyProviderId })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="copy-model">{t("copy.model")}</Label>
-            <Select
-              id="copy-model"
-              value={model.id}
-              options={provider.models.map((m) => ({ value: m.id, label: m.label, description: pricing(m) }))}
-              onChange={(id) => void updateSettings({ copyModelByProvider: { ...settings.copyModelByProvider, [provider.id]: id } })}
-            />
-          </div>
-          {!canGenerate && (
-            <p className="col-span-2 text-xs text-warning">
-              {t("copy.needProvider", { provider: provider.displayName })}{" "}
-              <button type="button" className="text-accent hover:underline" onClick={() => navigate({ name: "settings", section: "providers" })}>
-                {t("nav.settings")}
-              </button>
-            </p>
-          )}
-        </div>
-      )}
 
       {busy && <div className="shimmer h-16 rounded-lg" aria-busy />}
       {error && !busy && (

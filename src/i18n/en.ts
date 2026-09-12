@@ -213,7 +213,7 @@ export const en = {
   "auth.gemini.title": "Google Gemini",
   "auth.gemini.body": "Bring your own Google access. AI Image Variations never proxies or stores your credentials on a server.",
   "auth.gemini.copyOnly":
-    "Gemini writes the listing title and description (text models with a free tier; Flash-Lite by default, changeable next to the copy panel). Image generation with Gemini is disabled: its image models have no free tier.",
+    "Gemini writes the listing title and description (text models with a free tier; Flash-Lite by default, changeable in Settings → Models). Image generation with Gemini is disabled: its image models have no free tier.",
   "auth.status.connected": "Connected",
   "auth.status.disconnected": "Not connected",
   "auth.status.expired": "Session expired",
@@ -380,7 +380,7 @@ export const en = {
   "usage.limitsManual": "Counted on this device only. Limits set manually. Daily counter resets at {time}.",
   "usage.throttled": "{count} throttled",
   "usage.body":
-    "Google does not expose consumption for API keys, so requests are counted locally per model. Limits come from Google's 429 responses (quotaValue) or can be entered manually. Daily counters follow Google's reset at midnight Pacific time.",
+    "Providers do not expose per-key consumption, so requests are counted locally per model, one block per provider. Limits come from the provider's 429 responses or can be entered manually. Daily counters follow each provider's reset time (Google: midnight Pacific; Cloudflare: 00:00 UTC).",
   "usage.empty": "No requests recorded yet.",
   "usage.reset": "Reset counters",
   "usage.reset.help": "Clears local counters and learned limits on this device.",
@@ -454,6 +454,12 @@ export const en = {
   "listing.packHint": "One request per photo; each shot has its own prompt and seed.",
 
   // Mannequin
+  "settings.section.models": "Models",
+  "models.images": "Images",
+  "models.imagesHelp":
+    "The provider and model that generate the listing photos. Format, prompts and model options stay in the listing card under Advanced options.",
+  "models.textHelp": "The vision model that writes the title and the description from the photo. Prices are public list prices, shown for information.",
+  "models.change": "Change in Settings",
   "settings.section.mannequin": "Mannequin",
   "mannequin.title": "My mannequin",
   "mannequin.body":

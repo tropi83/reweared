@@ -200,7 +200,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
 
   "auth.gemini.body": "Utilisez votre propre accès Google. AI Image Variations ne relaie ni ne stocke jamais vos identifiants sur un serveur.",
   "auth.gemini.copyOnly":
-    "Gemini rédige le titre et la description de l'annonce (modèles texte avec offre gratuite ; Flash-Lite par défaut, modifiable à côté du panneau titre & description). La génération d'images avec Gemini est désactivée : ses modèles image n'ont pas d'offre gratuite.",
+    "Gemini rédige le titre et la description de l'annonce (modèles texte avec offre gratuite ; Flash-Lite par défaut, modifiable dans Réglages → Modèles). La génération d'images avec Gemini est désactivée : ses modèles image n'ont pas d'offre gratuite.",
   "auth.status.connected": "Connecté",
   "auth.status.disconnected": "Non connecté",
   "auth.status.expired": "Session expirée",
@@ -365,7 +365,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "usage.limitsManual": "Comptage local à cet appareil. Limites définies manuellement. Compteur journalier remis à zéro à {time}.",
   "usage.throttled": "{count} limitée(s)",
   "usage.body":
-    "Google n'expose pas la consommation des clés API : les requêtes sont donc comptées localement par modèle. Les limites proviennent des réponses 429 de Google (quotaValue) ou peuvent être saisies manuellement. Les compteurs journaliers suivent la remise à zéro de Google à minuit, heure du Pacifique.",
+    "Les fournisseurs n'exposent pas la consommation par clé : les requêtes sont comptées localement par modèle, un bloc par fournisseur. Les limites proviennent des réponses 429 du fournisseur ou peuvent être saisies manuellement. Les compteurs journaliers suivent l'heure de remise à zéro de chacun (Google : minuit heure du Pacifique ; Cloudflare : 00:00 UTC).",
   "usage.empty": "Aucune requête enregistrée pour l'instant.",
   "usage.reset": "Réinitialiser les compteurs",
   "usage.reset.help": "Efface les compteurs locaux et les limites apprises sur cet appareil.",
@@ -436,6 +436,13 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "listing.pack": "Pack annonce",
   "listing.packHint": "Une requête par photo ; chaque prise a son propre prompt et sa propre seed.",
 
+  "settings.section.models": "Modèles",
+  "models.images": "Images",
+  "models.imagesHelp":
+    "Le fournisseur et le modèle qui génèrent les photos de l'annonce. Le format, les prompts et les options du modèle restent dans la carte annonce, sous Options avancées.",
+  "models.textHelp":
+    "Le modèle de vision qui rédige le titre et la description à partir de la photo. Les prix sont les tarifs publics, donnés à titre indicatif.",
+  "models.change": "Modifier dans les Réglages",
   "settings.section.mannequin": "Mannequin",
   "mannequin.title": "Mon mannequin",
   "mannequin.body":

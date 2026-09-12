@@ -1,22 +1,18 @@
 import { useState } from "react";
-import { MOCK_ENABLED } from "@/app/services";
+import { Settings2 } from "lucide-react";
+import { navigate } from "@/app/router";
 import { useRecipesStore } from "@/app/stores/recipes-store";
-import { useSettingsStore } from "@/app/stores/settings-store";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Switch, Textarea } from "@/components/ui/Input";
 import { Segmented } from "@/components/ui/Misc";
 import { Select } from "@/components/ui/Select";
-import type { ImageSize, ModelInfo, ShotSpec } from "@/domain/models";
+import type { ImageSize, ShotSpec } from "@/domain/models";
 import { useLocale, useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
-import { UsageMeter } from "../generation/UsageMeter";
+import { modelLabel } from "../settings/ModelsSection";
 import { useComposerModels } from "./useComposerDefaults";
 
-function modelLabel(m: ModelInfo): string {
-  return /^(Fast|Balanced|Professional|Legacy)$/.test(m.displayName) ? m.id : m.displayName;
-}
-
-/** Everything technical behind "Advanced options" of the listing card: shot prompts, custom recipe, provider, model, format. */
+/** Per-run options behind "Advanced options" of the listing card: shot prompts, custom recipe, format, model options. The provider and model live in Settings → Models. */
 export function AdvancedOptions({
   shots,
   promptOverrides,
@@ -32,20 +28,14 @@ export function AdvancedOptions({
 }) {
   const t = useT();
   const locale = useLocale();
-  const { composer, providers, models, model, aspectOptions, sizeOptions } = useComposerModels();
-  const updateSettings = useSettingsStore((s) => s.update);
+  const { composer, providers, model, aspectOptions, sizeOptions } = useComposerModels();
   const customRecipes = useRecipesStore((s) => s.custom);
   const [editShots, setEditShots] = useState(false);
   const providerId = composer.providerId;
   const optionSpecs = model?.capabilities.options ?? [];
   const providerOptions = composer.providerOptions[providerId] ?? {};
   const customRecipe = customRecipes.find((r) => r.id === customRecipeId);
-  const showProvider = providers.length > 1 || MOCK_ENABLED;
-
-  const changeProvider = (id: string) => {
-    composer.setProvider(id);
-    void updateSettings({ activeProviderId: id });
-  };
+  const providerName = providers.find((p) => p.info.id === providerId)?.info.displayName ?? providerId;
 
   return (
     <div className="space-y-4">
@@ -113,30 +103,14 @@ export function AdvancedOptions({
             ))}
           </div>
         </div>
-        {showProvider && (
-          <div className="space-y-1.5">
-            <Label htmlFor="provider">{t("composer.provider")}</Label>
-            <Select
-              id="provider"
-              value={providerId}
-              options={providers.map((p) => ({ value: p.info.id, label: p.info.displayName }))}
-              onChange={changeProvider}
-            />
-          </div>
-        )}
-        <div className={cn("space-y-1.5", showProvider ? "" : "col-span-2")}>
-          <Label htmlFor="model">{t("composer.model")}</Label>
-          <Select
-            id="model"
-            value={composer.modelId ?? ""}
-            options={models.map((m) => ({
-              value: m.id,
-              label: modelLabel(m),
-              description: `${t(`composer.modelTier.${m.tier}` as MessageKey)}${!m.available ? ` · ${t("composer.modelUnavailable")}` : ""}`,
-              disabled: !m.available,
-            }))}
-            onChange={(id) => composer.setModel(id)}
-          />
+        <div className="col-span-2 flex items-center justify-between gap-2 text-xs text-fg-muted">
+          <span className="truncate">
+            {t("composer.model")}: {providerName}
+            {model ? ` · ${modelLabel(model)}` : ""}
+          </span>
+          <Button variant="ghost" size="sm" leftIcon={<Settings2 className="size-3.5" />} onClick={() => navigate({ name: "settings", section: "models" })}>
+            {t("models.change")}
+          </Button>
         </div>
         {sizeOptions.length > 0 && (
           <div className="col-span-2 space-y-1.5">
@@ -192,8 +166,6 @@ export function AdvancedOptions({
           </Button>
         </div>
       )}
-
-      <UsageMeter providerId={providerId} modelId={composer.modelId} />
     </div>
   );
 }

@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, Gauge } from "lucide-react";
-import { navigate } from "@/app/router";
 import { getServices } from "@/app/services";
 import type { UsageSnapshot } from "@/domain/services/usage-tracker";
-import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
-import { CF_WORKERS_AI_DASHBOARD } from "@/features/settings/CloudflareCard";
-import { openExternal } from "@/lib/open-external";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/cn";
 
@@ -61,8 +56,8 @@ function Bar({ label, used, limit, ratio }: { label: string; used: number; limit
   );
 }
 
-/** Compact local usage gauge for the selected model, shown under the Generate button. */
-export function UsageMeter({ providerId, modelId }: { providerId: string; modelId: string | null }) {
+/** Minute / day bars of one model, with the reset-time footnote. Counted on this device only. */
+export function UsageGauge({ providerId, modelId }: { providerId: string; modelId: string | null }) {
   const t = useT();
   const snapshot = useUsage(providerId, modelId);
   if (!snapshot || !modelId) return null;
@@ -71,34 +66,8 @@ export function UsageMeter({ providerId, modelId }: { providerId: string; modelI
   const resetTime = new Date(day.resetsAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="rounded-lg border border-border bg-bg-elevated/60 p-2.5">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-fg-muted">
-        <Gauge className="size-3.5" />
-        {t("usage.title")}
-        <button type="button" className="ml-auto text-accent hover:underline" onClick={() => navigate({ name: "settings", section: "usage" })}>
-          {t("usage.details")}
-        </button>
-        {providerId === "gemini" && (
-          <button
-            type="button"
-            className="inline-flex items-center gap-0.5 text-accent hover:underline"
-            title={t("usage.openGoogleDashboard")}
-            onClick={() => void openExternal(GOOGLE_RATE_LIMIT_DASHBOARD)}
-          >
-            {t("usage.googleDashboard")} <ExternalLink className="size-3" />
-          </button>
-        )}
-        {providerId === "cloudflare" && (
-          <button
-            type="button"
-            className="inline-flex items-center gap-0.5 text-accent hover:underline"
-            title={t("usage.openCloudflareDashboard")}
-            onClick={() => void openExternal(CF_WORKERS_AI_DASHBOARD)}
-          >
-            {t("usage.cloudflareDashboard")} <ExternalLink className="size-3" />
-          </button>
-        )}
-      </div>
+    <div>
+      <div className="mb-1 font-mono text-[11px] text-fg-subtle">{modelId}</div>
       <div className="flex gap-3">
         <Bar label={t("usage.minute")} used={minute.used} limit={minute.limit} ratio={minute.ratio} />
         <Bar label={t("usage.today")} used={day.used} limit={day.limit} ratio={day.ratio} />
