@@ -5,6 +5,7 @@
 - Node 22+ and pnpm 10
 - Rust 1.88+ (stable) and the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS (WebView2 on Windows, Xcode CLT on macOS, webkit2gtk on Linux)
 - For mobile: Android Studio / Xcode as described in the Tauri docs
+- Android on Windows, in addition: SDK Platform, Platform-Tools, Build-Tools, NDK (side by side) and Command-line Tools from Android Studio's SDK Manager; `NDK_HOME` set to the NDK folder (e.g. `%LOCALAPPDATA%\Android\Sdk\ndk\27.1.12297006`); `rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android`; and **Windows Developer Mode** (Settings → System → For developers) — `tauri android build/dev` symlinks the Rust library into `jniLibs`, which Windows refuses otherwise. A debug APK for a USB-connected phone: `pnpm tauri android build --apk --debug`, then `adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`.
 
 ## Commands
 
