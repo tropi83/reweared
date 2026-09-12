@@ -239,6 +239,7 @@ export const en = {
   "auth.apiKey.remember": "Remember on this device",
   "auth.apiKey.rememberHelp.native": "Stored in your operating system's secure credential store.",
   "auth.apiKey.rememberHelp.web": "Stored in this browser's local storage. Anyone with access to this browser profile can read it.",
+  "auth.apiKey.sessionOnly": "Kept until you close the app: saving keys on this device is not available yet.",
   "auth.apiKey.test": "Test connection",
   "auth.apiKey.testing": "Testing…",
   "auth.apiKey.testOk": "Connection works.",

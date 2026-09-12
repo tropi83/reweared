@@ -1,4 +1,5 @@
-import { isTauri } from "@/infrastructure/platform/capabilities";
+import { AppError, toGenerationError } from "@/domain/models";
+import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("secrets");
@@ -112,10 +113,25 @@ export class LayeredSecretStore {
     return stored;
   }
 
+  /**
+   * The session tier always gets the value. When the persistent tier refuses it (for example Linux
+   * without a Secret Service provider), the key still works until the app closes and the caller
+   * gets a STORAGE_ERROR carrying the platform's reason.
+   */
   async set(key: SecretKey, value: string, remember: boolean): Promise<void> {
     await this.session.set(key, value);
-    if (remember && this.persistentStore) await this.persistentStore.set(key, value);
-    else await this.persistentStore?.delete(key);
+    if (!remember || !this.persistentStore) {
+      await this.persistentStore?.delete(key);
+      return;
+    }
+    try {
+      await this.persistentStore.set(key, value);
+    } catch (err) {
+      throw new AppError("STORAGE_ERROR", "The key works until the app closes, but this device's secure storage refused to keep it.", {
+        retryable: false,
+        detail: toGenerationError(err).message,
+      });
+    }
   }
 
   async isRemembered(key: SecretKey): Promise<boolean> {
@@ -129,8 +145,11 @@ export class LayeredSecretStore {
 }
 
 export function createSecretStore(): LayeredSecretStore {
-  if (isTauri()) {
-    return new LayeredSecretStore(new MemorySecretStore(), new TauriKeychainSecretStore());
+  const platform = getPlatform();
+  if (platform.isTauri) {
+    // Desktop: OS keychain. Phones: no keystore integration yet (the Rust command refuses writes), so
+    // memory only — `canPersist` is false and the UI does not offer "Remember".
+    return new LayeredSecretStore(new MemorySecretStore(), platform.secureStorage ? new TauriKeychainSecretStore() : null);
   }
   const hasLocalStorage = typeof localStorage !== "undefined";
   return new LayeredSecretStore(new MemorySecretStore(), hasLocalStorage ? new WebLocalSecretStore() : null);

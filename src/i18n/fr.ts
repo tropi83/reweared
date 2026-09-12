@@ -227,6 +227,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "auth.apiKey.remember": "Mémoriser sur cet appareil",
   "auth.apiKey.rememberHelp.native": "Stockée dans le coffre de mots de passe sécurisé de votre système.",
   "auth.apiKey.rememberHelp.web": "Stockée dans le stockage local de ce navigateur. Toute personne ayant accès à ce profil de navigateur peut la lire.",
+  "auth.apiKey.sessionOnly": "Conservée jusqu'à la fermeture de l'app : l'enregistrement des clés sur cet appareil n'est pas encore disponible.",
   "auth.apiKey.test": "Tester la connexion",
   "auth.apiKey.testing": "Test…",
   "auth.apiKey.testOk": "La connexion fonctionne.",

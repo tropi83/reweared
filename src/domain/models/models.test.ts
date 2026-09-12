@@ -26,7 +26,15 @@ describe("errors", () => {
     const abort = new DOMException("x", "AbortError");
     expect(toGenerationError(abort).code).toBe("CANCELLED");
     expect(toGenerationError(new TypeError("Failed to fetch")).code).toBe("NETWORK_ERROR");
-    expect(toGenerationError("boom")).toEqual({ code: "UNKNOWN_ERROR", message: "Unexpected error.", retryable: false });
+    // Tauri's invoke rejects with the Rust command's error string: keep it instead of hiding it.
+    expect(toGenerationError("secure storage is not available on this platform yet")).toEqual({
+      code: "UNKNOWN_ERROR",
+      message: "secure storage is not available on this platform yet",
+      retryable: false,
+    });
+    expect(toGenerationError("   ")).toEqual({ code: "UNKNOWN_ERROR", message: "Unexpected error.", retryable: false });
+    expect(toGenerationError({ weird: true })).toEqual({ code: "UNKNOWN_ERROR", message: "Unexpected error.", retryable: false });
+    expect(toGenerationError("x".repeat(1000)).message).toHaveLength(300);
     expect(isGenerationError({ code: "X", message: "m", retryable: false })).toBe(true);
     expect(isGenerationError({ code: "X" })).toBe(false);
   });

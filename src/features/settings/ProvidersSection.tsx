@@ -296,12 +296,16 @@ function ApiKeyCard() {
             placeholder={t("auth.apiKey.placeholder")}
             aria-label={t("auth.apiKey.title")}
           />
-          <div>
-            <Switch checked={remember} onChange={setRemember} label={t("auth.apiKey.remember")} />
-            <p className="mt-1 text-[11px] text-fg-subtle">
-              {platform.secureStorage ? t("auth.apiKey.rememberHelp.native") : t("auth.apiKey.rememberHelp.web")}
-            </p>
-          </div>
+          {getServices().secrets.canPersist ? (
+            <div>
+              <Switch checked={remember} onChange={setRemember} label={t("auth.apiKey.remember")} />
+              <p className="mt-1 text-[11px] text-fg-subtle">
+                {platform.secureStorage ? t("auth.apiKey.rememberHelp.native") : t("auth.apiKey.rememberHelp.web")}
+              </p>
+            </div>
+          ) : (
+            <p className="text-[11px] text-fg-subtle">{t("auth.apiKey.sessionOnly")}</p>
+          )}
           <Button type="submit" variant="primary" disabled={value.trim().length < 20} loading={auth.busy}>
             {t("common.save")} · {t("auth.apiKey.test")}
           </Button>

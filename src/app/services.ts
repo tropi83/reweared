@@ -9,7 +9,7 @@ import { GEMINI_PROVIDER_ID, GeminiProvider } from "@/infrastructure/providers/g
 import { CloudflareListingCopyProvider } from "@/infrastructure/providers/cloudflare/CloudflareListingCopy";
 import { GeminiListingCopyProvider } from "@/infrastructure/providers/gemini/GeminiListingCopy";
 import type { ListingCopyProvider } from "@/domain/services/listing-copy";
-import { createSecretStore } from "@/infrastructure/auth/SecretStore";
+import { createSecretStore, type LayeredSecretStore } from "@/infrastructure/auth/SecretStore";
 import { MOCK_PROVIDER_ID, MockImageProvider } from "@/infrastructure/providers/mock/MockImageProvider";
 import { createStorageProvider, type StorageProvider } from "@/infrastructure/storage";
 import { createPublishBridge } from "@/infrastructure/publish/createPublishBridge";
@@ -21,6 +21,8 @@ import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
  */
 export interface AppServices {
   storage: StorageProvider;
+  /** Credentials: session memory plus the platform's persistent tier when there is one (`canPersist`). */
+  secrets: LayeredSecretStore;
   auth: GeminiAuthManager;
   providers: Map<string, ImageProvider>;
   /** Vision models that write listing copy, keyed by the same provider ids. */
@@ -107,6 +109,6 @@ export function createServices(bindings: {
     },
   );
 
-  services = { storage, auth, providers, copyProviders, mock, gemini, cloudflare, cloudflareAuth, queue, usage, publish, appVersion: APP_VERSION };
+  services = { storage, secrets, auth, providers, copyProviders, mock, gemini, cloudflare, cloudflareAuth, queue, usage, publish, appVersion: APP_VERSION };
   return services;
 }

@@ -92,6 +92,12 @@ export function toGenerationError(err: unknown): GenerationError {
   if (err instanceof TypeError && /fetch|network/i.test(err.message)) {
     return { code: "NETWORK_ERROR", message: "Network error while contacting the provider.", retryable: true };
   }
+  // Tauri's invoke rejects with the Rust command's error string (never a secret): keep its text
+  // instead of hiding the cause behind a generic message.
+  if (typeof err === "string" && err.trim()) return { code: "UNKNOWN_ERROR", message: err.trim().slice(0, MAX_FOREIGN_MESSAGE), retryable: false };
   const message = err instanceof Error ? err.message : "Unexpected error.";
   return { code: "UNKNOWN_ERROR", message, retryable: false };
 }
+
+/** Upper bound for messages taken verbatim from foreign errors (they end up in toasts). */
+const MAX_FOREIGN_MESSAGE = 300;
