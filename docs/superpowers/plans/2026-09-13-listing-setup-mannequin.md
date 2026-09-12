@@ -1654,14 +1654,23 @@ Delete `src/features/generation/ListingComposer.tsx` (after copying its blocks i
 
 Update this section after each task (task, status, commit, deviations). A new agent resumes at the first task not marked done.
 
-| Task                          | Status | Commit                                          | Notes                       |
-| ----------------------------- | ------ | ----------------------------------------------- | --------------------------- |
-| Spec                          | done   | `docs: design spec for the listing setup card…` | approved in chat 2026-09-13 |
-| Plan                          | done   | (this commit)                                   |                             |
-| 1 Mannequin model + helpers   | done   | `208df09`                                       | as planned                  |
-| 2 Catalogue prompts           | done   | `aead02e`                                       | as planned                  |
-| 3 Brand in copy prompt        | done   | `c083191`                                       | as planned                  |
-| 4 createListing orchestration | done   | `28e28fe`                                       | as planned (7 tests)        |
-| 5 Mannequin dialog + settings | done   | `feat(listing): mannequin editor dialog…`       | as planned (2 tests)        |
-| 6 Listing card, single button | todo   |                                                 |                             |
-| 7 Docs + verification         | todo   |                                                 |                             |
+| Task                          | Status | Commit                                             | Notes                                                                                          |
+| ----------------------------- | ------ | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Spec                          | done   | `docs: design spec for the listing setup card…`    | approved in chat 2026-09-13                                                                    |
+| Plan                          | done   | (this commit)                                      |                                                                                                |
+| 1 Mannequin model + helpers   | done   | `208df09`                                          | as planned                                                                                     |
+| 2 Catalogue prompts           | done   | `aead02e`                                          | as planned                                                                                     |
+| 3 Brand in copy prompt        | done   | `c083191`                                          | as planned                                                                                     |
+| 4 createListing orchestration | done   | `28e28fe`                                          | as planned (7 tests)                                                                           |
+| 5 Mannequin dialog + settings | done   | `99df390`                                          | as planned (2 tests)                                                                           |
+| 6 Listing card, single button | done   | `f8a7c92`                                          | see deviations below                                                                           |
+| 7 Docs + verification         | done   | `docs(listing): listing card, brand and mannequin` | `pnpm check` + `pnpm build` green 2026-09-13; Android step skipped: no device on `adb devices` |
+
+### Task 6 deviations
+
+- Button label: `listing.create` is used only when both parts run; added `listing.createPlain` ("Create the listing", also shown while a blocker applies — the button never promises photos it cannot start), `listing.createPhotos` ("· {count} photos", text skipped) and `listing.createText` ("· text", photos skipped). The label is derived from `listingReadiness` so it says exactly what `createListing` will do.
+- `useListingStore.lastRunProjectId`: the last run report is stamped with its project id and only shown on that project (switching projects no longer shows a stale error under the button).
+- Dead i18n keys removed from both locales once no reference remained: `composer.generateCount`, `composer.needAuth`, `composer.advanced`, `listing.generatePack`, `copy.generate`, `copy.regenerate` (replaced by `copy.regenerateText`).
+- `ListingCopyPanel`: the "Write from the photo" button is gone; the panel only offers "Regenerate text" once a copy exists (the first text comes from "Create the listing").
+- Tests: 8 in `ListingSetupCard.test.tsx` (the plan listed fewer) — includes the "no provider at all" case that caught the label bug during the browser check.
+- Browser check (web build, desktop + 375 px): card layout, category picker, mannequin dialog (closed with "Cancel": the automation tool's synthetic Escape does not fire the native `cancel` event that `Dialog` listens to — a tooling artifact, not a bug), blocked label verified after the fix.
