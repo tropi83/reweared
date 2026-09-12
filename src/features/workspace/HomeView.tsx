@@ -7,6 +7,7 @@ import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { MAX_IMPORT_BYTES, type ListingSummary } from "@/domain/models";
 import { useT } from "@/i18n";
+import { CategoryBadge } from "../catalog/CategoryBadge";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { cn } from "@/lib/cn";
 import { formatRelative } from "@/lib/format";
@@ -142,7 +143,10 @@ function ListingCard({ listing }: { listing: ListingSummary }) {
           )}
         </div>
         <div className="min-w-0 p-2.5">
-          <div className="truncate text-sm font-medium">{listing.name}</div>
+          <div className="flex items-center gap-1.5 text-sm font-medium">
+            <CategoryBadge category={listing.category} />
+            <span className="truncate">{listing.name}</span>
+          </div>
           <div className="mt-0.5 truncate text-[11px] text-fg-subtle">
             {t("listings.imageCount", { count: listing.imageCount })} · {t("listings.updated", { when: updated })}
           </div>

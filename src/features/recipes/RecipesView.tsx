@@ -11,6 +11,7 @@ import { RECIPE_CATEGORIES, type Recipe, type RecipeCategory } from "@/domain/mo
 import { BUILT_IN_RECIPES, extractVariables } from "@/domain/services/recipes";
 import { useLocale, useT, type MessageKey } from "@/i18n";
 import { findSubcategory } from "@/domain/services/catalog";
+import { CategoryIcon } from "../catalog/category-icons";
 
 type Draft = { id?: string; name: string; description: string; promptTemplate: string; category: RecipeCategory };
 
@@ -145,7 +146,13 @@ function RecipeGroup({
   const locale = useLocale();
   const displayName = (r: Recipe) => {
     const found = r.pack ? findSubcategory(r.pack) : undefined;
-    return found ? `${found.category.label[locale]} › ${found.subcategory.label[locale]}` : r.name;
+    if (!found || !r.pack) return r.name;
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <CategoryIcon selection={r.pack} className="size-4 shrink-0 text-fg-muted" aria-hidden />
+        {found.category.label[locale]} › {found.subcategory.label[locale]}
+      </span>
+    );
   };
   const displayDescription = (r: Recipe) => (r.shots ? r.shots.map((s) => s.label[locale]).join(" · ") : r.description);
   return (

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/Input";
 import type { ListingSummary } from "@/domain/models";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { useT } from "@/i18n";
+import { CategoryBadge } from "../catalog/CategoryBadge";
 import { cn } from "@/lib/cn";
 import { importImageFile, pickImageFile } from "../workspace/useImageImport";
 
@@ -122,7 +123,10 @@ function ListingRow({ listing, active }: { listing: ListingSummary; active: bool
           {url && <img src={url} alt="" className="size-full object-cover" loading="lazy" decoding="async" />}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{listing.name}</div>
+          <div className="flex items-center gap-1.5 text-sm font-medium">
+            <CategoryBadge category={listing.category} />
+            <span className="truncate">{listing.name}</span>
+          </div>
           <div className="truncate text-[11px] text-fg-subtle">{t("listings.imageCount", { count: listing.imageCount })}</div>
         </div>
       </button>

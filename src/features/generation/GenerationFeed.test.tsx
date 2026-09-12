@@ -20,13 +20,14 @@ import { GenerationFeed } from "./GenerationFeed";
 
 const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])], { type: "image/png" });
 
-function addGeneration(id: string): void {
+function addGeneration(id: string, category?: Generation["category"]): void {
   useListingsStore.getState().commit((d) => {
     const gen: Generation = {
       id,
       listingId: d.listing.id,
       sourceImageId: d.listing.originalImageId!,
       prompt: `prompt ${id}`,
+      ...(category ? { category } : {}),
       settings: { providerId: "mock", modelId: "mock-fast", aspectRatio: "original", variationCount: 1 },
       status: "active",
       jobIds: [],
@@ -50,6 +51,12 @@ describe("GenerationFeed › scroll to a new run", () => {
     await useListingsStore.getState().createFromFile(PNG, "item.png");
   });
   afterEach(() => cleanup());
+
+  it("shows the subcategory icon on a pack card", () => {
+    act(() => addGeneration("gen_pack", { categoryId: "women", subcategoryId: "bags" }));
+    render(<GenerationFeed />);
+    expect(screen.getByRole("article", { name: "prompt gen_pack" }).querySelector("svg.lucide-shopping-bag")).not.toBeNull();
+  });
 
   it("does not scroll for the generations already there when the listing opens", () => {
     act(() => addGeneration("gen_old"));

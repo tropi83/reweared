@@ -11,6 +11,7 @@ import { Badge, EmptyState } from "@/components/ui/Misc";
 import type { Generation, GenerationJob, ListingDocument } from "@/domain/models";
 import { useLocale, useT } from "@/i18n";
 import { findSubcategory } from "@/domain/services/catalog";
+import { CategoryIcon } from "../catalog/category-icons";
 import { formatRelative } from "@/lib/format";
 import { VariationTile } from "./VariationTile";
 
@@ -58,7 +59,15 @@ function GenerationCard({ generation, doc, toPostOnly }: { generation: Generatio
   const t = useT();
   const locale = useLocale();
   const pack = generation.category ? findSubcategory(generation.category) : undefined;
-  const title = pack ? `${t("listing.pack")} · ${pack.category.label[locale]} › ${pack.subcategory.label[locale]}` : generation.prompt;
+  const title =
+    pack && generation.category ? (
+      <span className="inline-flex items-center gap-1.5">
+        <CategoryIcon selection={generation.category} className="size-4 shrink-0 text-fg-muted" aria-hidden />
+        {t("listing.pack")} · {pack.category.label[locale]} › {pack.subcategory.label[locale]}
+      </span>
+    ) : (
+      generation.prompt
+    );
   const composer = useComposerStore();
   const { retryFailed, cancelGeneration, start } = useGenerationStore.getState();
   const deleteGeneration = useListingsStore((s) => s.deleteGeneration);

@@ -43,6 +43,8 @@ export interface ListingSummary {
   id: string;
   name: string;
   coverImageId?: string;
+  /** Chosen taxonomy, so lists can show its icon. */
+  category?: CategorySelection;
   imageCount: number;
   updatedAt: string;
 }
@@ -53,6 +55,7 @@ export function summarize(doc: ListingDocument): ListingSummary {
     id: doc.listing.id,
     name: doc.listing.name,
     ...(cover ? { coverImageId: cover } : {}),
+    ...(doc.listing.category ? { category: doc.listing.category } : {}),
     imageCount: Object.values(doc.images).filter((i) => i.kind === "generation").length,
     updatedAt: doc.listing.updatedAt,
   };

@@ -17,6 +17,7 @@ import { Select } from "@/components/ui/Select";
 import type { CategoryId } from "@/domain/models";
 import { buildShots, CATEGORIES } from "@/domain/services/catalog";
 import { mannequinApplies, normalizeMannequin } from "@/domain/services/mannequin";
+import { CATEGORY_ICONS, SUBCATEGORY_ICONS } from "../catalog/category-icons";
 import { interpolate } from "@/domain/services/recipes";
 import { useLocale, useT } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
@@ -111,11 +112,18 @@ export function ListingSetupCard() {
           id="category"
           value={selection?.categoryId ?? ""}
           placeholder={t("listing.chooseCategory")}
-          options={CATEGORIES.map((c) => ({
-            value: c.id,
-            label: c.label[locale],
-            description: c.subcategories.map((s) => s.label[locale]).join(" · "),
-          }))}
+          options={CATEGORIES.map((c) => {
+            const Icon = CATEGORY_ICONS[c.id];
+            return {
+              value: c.id,
+              label: (
+                <span className="inline-flex items-center gap-2">
+                  <Icon className="size-4 shrink-0 text-fg-muted" aria-hidden /> {c.label[locale]}
+                </span>
+              ),
+              description: c.subcategories.map((s) => s.label[locale]).join(" · "),
+            };
+          })}
           onChange={(id) => {
             setPromptOverrides({});
             if (!id) return setCategory(undefined);
@@ -128,26 +136,30 @@ export function ListingSetupCard() {
         <div className="space-y-1.5">
           <Label>{t("listing.subcategory")}</Label>
           <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t("listing.subcategory")}>
-            {category.subcategories.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                role="radio"
-                aria-checked={selection?.subcategoryId === s.id}
-                onClick={() => {
-                  setPromptOverrides({});
-                  setCategory({ categoryId: category.id, subcategoryId: s.id });
-                }}
-                className={cn(
-                  "inline-flex h-8 items-center rounded-md border px-2.5 text-xs font-medium transition-colors",
-                  selection?.subcategoryId === s.id
-                    ? "border-accent bg-accent-soft text-fg"
-                    : "border-border text-fg-muted hover:border-border-strong hover:text-fg",
-                )}
-              >
-                {s.label[locale]}
-              </button>
-            ))}
+            {category.subcategories.map((s) => {
+              const Icon = SUBCATEGORY_ICONS[`${category.id}/${s.id}`] ?? CATEGORY_ICONS[category.id];
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selection?.subcategoryId === s.id}
+                  onClick={() => {
+                    setPromptOverrides({});
+                    setCategory({ categoryId: category.id, subcategoryId: s.id });
+                  }}
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
+                    selection?.subcategoryId === s.id
+                      ? "border-accent bg-accent-soft text-fg"
+                      : "border-border text-fg-muted hover:border-border-strong hover:text-fg",
+                  )}
+                >
+                  <Icon className="size-3.5 shrink-0" aria-hidden />
+                  {s.label[locale]}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

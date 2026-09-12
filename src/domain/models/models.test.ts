@@ -86,6 +86,9 @@ describe("summarize", () => {
     expect(summarize(doc)).toEqual({ id: "prj_1", name: "P", coverImageId: "img_o", imageCount: 1, updatedAt: now });
     doc.listing.coverImageId = "img_g";
     expect(summarize(doc).coverImageId).toBe("img_g");
+    // The chosen taxonomy travels with the summary so lists can show its icon.
+    doc.listing.category = { categoryId: "men", subcategoryId: "shoes" };
+    expect(summarize(doc).category).toEqual({ categoryId: "men", subcategoryId: "shoes" });
   });
 });
 

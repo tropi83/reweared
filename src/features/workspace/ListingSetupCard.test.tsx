@@ -79,6 +79,14 @@ describe("ListingSetupCard", () => {
     expect(screen.getByRole("button", { name: "Create the listing" })).toBeDisabled();
   });
 
+  it("shows the taxonomy icons on the category picker and the subcategory chips", () => {
+    act(() => useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" }));
+    render(<ListingSetupCard />);
+    expect(screen.getByRole("combobox", { name: "Category" }).querySelector("svg.lucide-mars")).not.toBeNull();
+    expect(screen.getByRole("radio", { name: "Shoes" }).querySelector("svg.lucide-footprints")).not.toBeNull();
+    expect(screen.getByRole("radio", { name: "Clothing" }).querySelector("svg.lucide-shirt")).not.toBeNull();
+  });
+
   it("stores the brand as typed", async () => {
     const user = userEvent.setup();
     render(<ListingSetupCard />);
