@@ -52,10 +52,11 @@ export function createPrefill(win: Window & typeof globalThis, selectors: Vinted
     return new win.File([bytes], photo.name, { type: photo.mimeType });
   };
 
-  const countThumbnails = () => {
+  // Scoped to the sell form: the generic fallbacks (e.g. `img[src^="blob:"]`) would match unrelated page images.
+  const countThumbnails = (root: ParentNode) => {
     for (const sel of selectors.photoThumbnail) {
       try {
-        const n = doc.querySelectorAll(sel).length;
+        const n = root.querySelectorAll(sel).length;
         if (n > 0) return n;
       } catch {
         /* next */
@@ -64,8 +65,12 @@ export function createPrefill(win: Window & typeof globalThis, selectors: Vinted
     return 0;
   };
 
-  const attachPhotos = (photos: PublishPayload["photos"], onDone: (attached: number) => void) => {
-    if (photos.length === 0 || countThumbnails() > 0) return onDone(countThumbnails());
+  let polling = false;
+
+  const attachPhotos = (root: ParentNode, photos: PublishPayload["photos"], onDone: (attached: number) => void) => {
+    const existing = countThumbnails(root);
+    // Re-entrant run while thumbnails are still loading: report what is there, let the in-flight poll finish.
+    if (polling || photos.length === 0 || existing > 0) return onDone(existing);
     const input = find<HTMLInputElement>(selectors.photoInput);
     if (!input) return onDone(0);
     try {
@@ -76,11 +81,14 @@ export function createPrefill(win: Window & typeof globalThis, selectors: Vinted
     } catch {
       return onDone(0);
     }
+    polling = true;
     const started = Date.now();
     const tick = () => {
-      const n = countThumbnails();
-      if (n >= photos.length || Date.now() - started > THUMBNAIL_WAIT_MS) onDone(n);
-      else win.setTimeout(tick, THUMBNAIL_POLL_MS);
+      const n = countThumbnails(root);
+      if (n >= photos.length || Date.now() - started > THUMBNAIL_WAIT_MS) {
+        polling = false;
+        onDone(n);
+      } else win.setTimeout(tick, THUMBNAIL_POLL_MS);
     };
     win.setTimeout(tick, THUMBNAIL_POLL_MS);
   };
@@ -90,7 +98,8 @@ export function createPrefill(win: Window & typeof globalThis, selectors: Vinted
       return status;
     },
     run(payload) {
-      const pageOk = !!find(selectors.sellFormRoot) && !!find(selectors.titleInput);
+      const root = find(selectors.sellFormRoot);
+      const pageOk = !!root && !!find(selectors.titleInput);
       status = { pageOk, title: "not_found", description: "not_found", photos: { requested: payload.photos.length, attached: 0 } };
       if (!pageOk) return;
       const title = find<HTMLInputElement>(selectors.titleInput);
@@ -100,7 +109,7 @@ export function createPrefill(win: Window & typeof globalThis, selectors: Vinted
         title: title ? setText(title, payload.title) : "not_found",
         description: description ? setText(description, payload.description) : "not_found",
       };
-      attachPhotos(payload.photos, (attached) => {
+      attachPhotos(root ?? doc, payload.photos, (attached) => {
         status = status && { ...status, photos: { requested: payload.photos.length, attached } };
       });
     },

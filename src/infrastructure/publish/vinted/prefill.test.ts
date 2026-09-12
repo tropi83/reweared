@@ -5,7 +5,7 @@ import { VINTED_SELECTORS, type VintedSelectors } from "./selectors";
 const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
 /** Minimal stand-in for Vinted's React-controlled sell form. */
-function mountForm({ withDescription = true } = {}) {
+function mountForm({ withDescription = true, thumbnailDelayMs = 0 } = {}) {
   document.body.innerHTML = `
     <form data-testid="item-upload-form">
       <input type="file" accept="image/*" multiple data-testid="photo-input" />
@@ -22,8 +22,13 @@ function mountForm({ withDescription = true } = {}) {
   // jsdom's `files` setter only accepts a real FileList (which cannot be constructed); browsers accept DataTransfer.files.
   Object.defineProperty(photoInput, "files", { writable: true, value: null });
   photoInput.addEventListener("change", () => {
-    const box = document.querySelector('[data-testid="photo-thumbnails"]')!;
-    for (const f of Array.from(photoInput.files ?? [])) box.insertAdjacentHTML("beforeend", `<img data-testid="photo-thumbnail" alt="${f.name}">`);
+    const files = Array.from(photoInput.files ?? []);
+    const render = () => {
+      const box = document.querySelector('[data-testid="photo-thumbnails"]')!;
+      for (const f of files) box.insertAdjacentHTML("beforeend", `<img data-testid="photo-thumbnail" alt="${f.name}">`);
+    };
+    if (thumbnailDelayMs > 0) setTimeout(render, thumbnailDelayMs);
+    else render();
   });
   const submit = vi.fn();
   document.querySelector("form")!.addEventListener("submit", submit);
@@ -70,6 +75,27 @@ describe("vinted prefill", () => {
     const prefill = createPrefill(window, VINTED_SELECTORS);
     prefill.run(payload);
     expect(prefill.status).toEqual({ pageOk: false, title: "not_found", description: "not_found", photos: { requested: 2, attached: 0 } });
+  });
+
+  it("ignores blob images outside the sell form when deciding whether photos are attached", async () => {
+    mountForm();
+    document.body.insertAdjacentHTML("afterbegin", '<header><img src="blob:x" alt="avatar"></header>');
+    const prefill = createPrefill(window, VINTED_SELECTORS);
+    prefill.run(payload);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(document.querySelectorAll('form [data-testid="photo-thumbnail"]')).toHaveLength(2);
+    expect(prefill.status?.photos).toEqual({ requested: 2, attached: 2 });
+  });
+
+  it("does not re-assign files or start a second poll while thumbnails are still loading", async () => {
+    mountForm({ thumbnailDelayMs: 1000 });
+    const prefill = createPrefill(window, VINTED_SELECTORS);
+    prefill.run(payload);
+    await vi.advanceTimersByTimeAsync(300);
+    prefill.run(payload); // re-entrant while the first poll is in flight
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(document.querySelectorAll('[data-testid="photo-thumbnail"]')).toHaveLength(2);
+    expect(prefill.status?.photos).toEqual({ requested: 2, attached: 2 });
   });
 
   it("does not re-attach photos that are already there", async () => {

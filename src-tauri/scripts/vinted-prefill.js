@@ -36,15 +36,17 @@
 			for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
 			return new win.File([bytes], photo.name, { type: photo.mimeType });
 		};
-		const countThumbnails = () => {
+		const countThumbnails = (root) => {
 			for (const sel of selectors.photoThumbnail) try {
-				const n = doc.querySelectorAll(sel).length;
+				const n = root.querySelectorAll(sel).length;
 				if (n > 0) return n;
 			} catch {}
 			return 0;
 		};
-		const attachPhotos = (photos, onDone) => {
-			if (photos.length === 0 || countThumbnails() > 0) return onDone(countThumbnails());
+		let polling = false;
+		const attachPhotos = (root, photos, onDone) => {
+			const existing = countThumbnails(root);
+			if (polling || photos.length === 0 || existing > 0) return onDone(existing);
 			const input = find(selectors.photoInput);
 			if (!input) return onDone(0);
 			try {
@@ -55,11 +57,14 @@
 			} catch {
 				return onDone(0);
 			}
+			polling = true;
 			const started = Date.now();
 			const tick = () => {
-				const n = countThumbnails();
-				if (n >= photos.length || Date.now() - started > THUMBNAIL_WAIT_MS) onDone(n);
-				else win.setTimeout(tick, THUMBNAIL_POLL_MS);
+				const n = countThumbnails(root);
+				if (n >= photos.length || Date.now() - started > THUMBNAIL_WAIT_MS) {
+					polling = false;
+					onDone(n);
+				} else win.setTimeout(tick, THUMBNAIL_POLL_MS);
 			};
 			win.setTimeout(tick, THUMBNAIL_POLL_MS);
 		};
@@ -68,7 +73,8 @@
 				return status;
 			},
 			run(payload) {
-				const pageOk = !!find(selectors.sellFormRoot) && !!find(selectors.titleInput);
+				const root = find(selectors.sellFormRoot);
+				const pageOk = !!root && !!find(selectors.titleInput);
 				status = {
 					pageOk,
 					title: "not_found",
@@ -86,7 +92,7 @@
 					title: title ? setText(title, payload.title) : "not_found",
 					description: description ? setText(description, payload.description) : "not_found"
 				};
-				attachPhotos(payload.photos, (attached) => {
+				attachPhotos(root ?? doc, payload.photos, (attached) => {
 					status = status && {
 						...status,
 						photos: {
