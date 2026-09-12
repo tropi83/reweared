@@ -18,7 +18,12 @@
     "format:check": "prettier --check .",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm prefill:verify",
     "rust:check": "cd src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo test",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "android:doctor": "node scripts/mobile-doctor.mjs android",
+    "android:dev": "node scripts/mobile-doctor.mjs android && tauri android dev",
+    "android:apk": "node scripts/mobile-doctor.mjs android && tauri android build --apk --debug",
+    "ios:doctor": "node scripts/mobile-doctor.mjs ios",
+    "ios:dev": "node scripts/mobile-doctor.mjs ios && tauri ios dev"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
