@@ -32,6 +32,8 @@ export interface AppSettings {
   webCredentialDisclaimerAccepted: boolean;
   /** Ads are disabled by default in the MVP; kept for the entitlement model. */
   adsEnabled: boolean;
+  /** The user read the Vinted terms warning before the first automated pre-fill. */
+  vintedAutomationAcknowledged: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -51,6 +53,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   prepareMaxDimension: 3072,
   webCredentialDisclaimerAccepted: false,
   adsEnabled: false,
+  vintedAutomationAcknowledged: false,
 };
 
 export interface Entitlement {

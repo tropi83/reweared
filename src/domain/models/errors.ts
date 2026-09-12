@@ -22,6 +22,7 @@ export type GenerationErrorCode =
   | "NO_IMAGE_RETURNED"
   | "CANCELLED"
   | "STORAGE_ERROR"
+  | "PLATFORM_UNSUPPORTED"
   | "UNKNOWN_ERROR";
 
 export interface GenerationError {

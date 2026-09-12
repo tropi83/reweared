@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AppError, deriveGenerationStatus, isGenerationError, isRetryableCode, summarize, toGenerationError, type ProjectDocument } from "./index";
 import { buildRequestForModel } from "@/domain/services/image-provider";
 import { GEMINI_IMAGE_MODELS } from "@/infrastructure/providers/gemini/GeminiModels";
+import { DEFAULT_SETTINGS } from "@/domain/models";
 
 describe("errors", () => {
   it("marks only transient codes as retryable by default", () => {
@@ -91,5 +92,14 @@ describe("buildRequestForModel", () => {
       expect(m.capabilities.supportedAspectRatios).not.toContain("original");
       expect(m.capabilities.imageEditing).toBe(true);
     }
+  });
+});
+
+describe("publish groundwork", () => {
+  it("PLATFORM_UNSUPPORTED is a known, non-retryable code", () => {
+    expect(isRetryableCode("PLATFORM_UNSUPPORTED")).toBe(false);
+  });
+  it("Vinted automation warning is not acknowledged by default", () => {
+    expect(DEFAULT_SETTINGS.vintedAutomationAcknowledged).toBe(false);
   });
 });
