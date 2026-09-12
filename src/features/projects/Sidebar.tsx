@@ -4,10 +4,12 @@ import { useImageUrl } from "@/app/image-urls";
 import { navigate, useRoute } from "@/app/router";
 import { useProjectsStore } from "@/app/stores/projects-store";
 import { toast } from "@/app/stores/toast-store";
+import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import type { ProjectSummary } from "@/domain/models";
+import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/cn";
 import { importImageFile, pickImageFile } from "../workspace/useImageImport";
@@ -35,6 +37,12 @@ export function Sidebar() {
           className="w-full"
           leftIcon={<Plus className="size-4" />}
           onClick={async () => {
+            // Phones choose between the photo library and the camera on the home screen; desktop opens the file dialog.
+            if (getPlatform().isMobile) {
+              navigate({ name: "home" });
+              useUiStore.getState().setSidebarOpen(false);
+              return;
+            }
             const file = await pickImageFile();
             if (file) await importImageFile(file);
           }}
