@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{mpsc, Mutex};
 use std::time::Duration;
+use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 pub const LABEL: &str = "vinted";
@@ -132,6 +133,10 @@ pub fn vinted_open<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     .data_directory(data_dir(&app)?)
     .on_navigation(is_allowed_navigation)
     .on_page_load(move |_, payload| {
+        // Fired for Started and Finished; the store only wants a loaded DOM, once per navigation.
+        if payload.event() != PageLoadEvent::Finished {
+            return;
+        }
         let _ = main.emit_to(
             MAIN,
             "vinted:page",
