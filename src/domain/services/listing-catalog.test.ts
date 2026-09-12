@@ -44,6 +44,10 @@ describe("listing catalogue", () => {
     expect(men.find((s) => s.id === "worn")?.prompt).toContain("worn by a man");
     expect(women.map((s) => s.id)).toEqual(["retouch", "studio", "worn", "selfie", "folded"]);
     expect(women.find((s) => s.id === "selfie")?.prompt).toContain("mirror selfie taken by a woman");
+    // Anything that can be ironed is shown ironed when folded or laid flat.
+    expect(women.find((s) => s.id === "folded")?.prompt).toMatch(/freshly ironed.*wrinkle/);
+    expect(women.find((s) => s.id === "studio")?.prompt).toContain("wrinkle-free");
+    expect(buildListingShots({ categoryId: "home", subcategoryId: "textile" }).find((s) => s.id === "studio")?.prompt).toContain("freshly ironed");
     expect(men.map((s) => s.id)).toEqual(["retouch", "studio", "worn", "selfie", "profile"]);
     expect(buildListingShots({ categoryId: "electronics", subcategoryId: "phones" }).map((s) => s.id)).toEqual(["retouch", "studio", "hand", "back"]);
   });

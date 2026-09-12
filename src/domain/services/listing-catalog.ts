@@ -57,7 +57,7 @@ const SELFIE = (extra: string): ShotTemplate => ({
 const PLANS: Record<ProductKind, ShotTemplate[]> = {
   garment: [
     RETOUCH("the garment neatly ironed with no wrinkles or creases, lint removed."),
-    STUDIO("The garment laid flat and neatly arranged, or on an invisible mannequin, showing its full silhouette."),
+    STUDIO("The garment freshly ironed and wrinkle-free, laid flat and neatly arranged, or on an invisible mannequin, showing its full silhouette."),
     CONTEXT(
       "worn",
       L("Worn", "Portée"),
@@ -67,7 +67,7 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
     DETAIL(
       "folded",
       L("Folded", "Pliée"),
-      "The garment neatly folded on a plain white surface, top-down flat lay, soft daylight, brand label or neckline visible if present.",
+      "The garment freshly ironed — no wrinkles, creases or folds marks, crisp smooth fabric — then neatly folded on a plain white surface, top-down flat lay, soft daylight, brand label or neckline visible if present.",
     ),
   ],
   footwear: [
@@ -169,7 +169,7 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
   ],
   "home-textile": [
     RETOUCH("the textile ironed and smooth, colors accurate, lint removed."),
-    STUDIO("The textile neatly folded in a stack, front view, centered."),
+    STUDIO("The textile freshly ironed, smooth and wrinkle-free, neatly folded in a stack, front view, centered."),
     CONTEXT("styled", L("Styled at home", "Mis en scène"), "The textile in use on a made bed or sofa in a bright bedroom or living room, soft daylight."),
     DETAIL("texture", L("Texture close-up", "Gros plan texture"), "Macro close-up of the weave, pattern and hem stitching."),
   ],
