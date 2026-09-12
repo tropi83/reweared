@@ -1660,8 +1660,8 @@ Update this section after each task (task, status, commit, deviations). A new ag
 | Plan                          | done   | (this commit)                                   |                             |
 | 1 Mannequin model + helpers   | done   | `208df09`                                       | as planned                  |
 | 2 Catalogue prompts           | done   | `aead02e`                                       | as planned                  |
-| 3 Brand in copy prompt        | done   | (see git log: "seller's brand is imposed")      | as planned                  |
-| 4 createListing orchestration | todo   |                                                 |                             |
-| 5 Mannequin dialog + settings | todo   |                                                 |                             |
+| 3 Brand in copy prompt        | done   | `c083191`                                       | as planned                  |
+| 4 createListing orchestration | done   | `28e28fe`                                       | as planned (7 tests)        |
+| 5 Mannequin dialog + settings | done   | `feat(listing): mannequin editor dialog…`       | as planned (2 tests)        |
 | 6 Listing card, single button | todo   |                                                 |                             |
 | 7 Docs + verification         | todo   |                                                 |                             |

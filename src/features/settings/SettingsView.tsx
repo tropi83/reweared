@@ -17,6 +17,7 @@ import type { StorageUsage } from "@/infrastructure/storage";
 import { useT, type MessageKey } from "@/i18n";
 import { getRecentLogs } from "@/lib/logger";
 import { cn } from "@/lib/cn";
+import { MannequinSection } from "./MannequinSection";
 import { ProvidersSection } from "./ProvidersSection";
 import { PublishSection } from "./PublishSection";
 import { UsageSection } from "./UsageSection";
@@ -29,6 +30,7 @@ const SECTIONS: Array<{ id: string; key: MessageKey }> = [
   { id: "storage", key: "settings.section.storage" },
   { id: "privacy", key: "settings.section.privacy" },
   { id: "publish", key: "settings.section.publish" },
+  { id: "mannequin", key: "settings.section.mannequin" },
   { id: "diagnostics", key: "settings.section.diagnostics" },
   { id: "about", key: "settings.section.about" },
 ];
@@ -83,6 +85,7 @@ export function SettingsView({ section }: { section?: string }) {
             <StorageSection />
             <PrivacySection />
             <PublishSection />
+            <MannequinSection />
             <DiagnosticsSection />
             <AboutSection />
           </div>
