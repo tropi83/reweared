@@ -275,9 +275,15 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "error.AUTH_EXPIRED": "Votre session Google a expiré. Reconnectez-vous dans les réglages.",
   "error.INVALID_CREDENTIAL": "Le fournisseur a refusé votre identifiant. Vérifiez-le dans les réglages.",
   "error.PERMISSION_DENIED": "Votre compte n'a pas accès à ce modèle ou à ce projet.",
-  "error.RATE_LIMITED": "Limite de débit Gemini atteinte. Nouvel essai automatique dès que possible.",
+  "error.RATE_LIMITED": "Limite de débit du fournisseur atteinte. Nouvel essai automatique dès que possible.",
   "error.QUOTA_EXCEEDED":
-    "Quota Gemini journalier atteint pour ce modèle. Il se réinitialise à minuit heure du Pacifique ; vérifiez votre plan et la facturation dans Google AI Studio.",
+    "Le quota journalier du fournisseur est épuisé. Réessayez après sa réinitialisation, ou vérifiez votre offre sur le tableau de bord du fournisseur.",
+  "error.gemini.RATE_LIMITED": "Limite de débit Gemini atteinte (requêtes par minute). Nouvel essai automatique dès que possible.",
+  "error.gemini.QUOTA_EXCEEDED":
+    "Quota Gemini journalier atteint pour ce modèle. Il se réinitialise à minuit heure du Pacifique — {resetLocal} heure locale, dans {resetIn}. Vérifiez votre plan et la facturation dans Google AI Studio.",
+  "error.cloudflare.RATE_LIMITED": "Limite de débit Cloudflare Workers AI atteinte. Nouvel essai automatique dès que possible.",
+  "error.cloudflare.QUOTA_EXCEEDED":
+    "Votre allocation gratuite journalière Workers AI (10 000 neurones) est épuisée. Elle se réinitialise à 00:00 UTC — {resetLocal} heure locale, dans {resetIn}. Pour continuer aujourd'hui, activez l'usage payant dans le tableau de bord Cloudflare (Workers & Pages → Plans).",
   "error.FREE_TIER_NO_ACCESS":
     "Votre projet Google est en offre gratuite (Free tier), qui n'a aucun quota (limite 0) pour ce modèle image. Associez un compte de facturation à votre projet dans Google AI Studio pour l'utiliser.",
   "error.MODEL_NOT_IN_PLAN":
@@ -299,6 +305,9 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "usage.details": "Détails",
   "usage.googleDashboard": "Tableau de bord Google",
   "usage.openGoogleDashboard": "Voir vos quotas et votre consommation réels chez Google",
+  "usage.cloudflareDashboard": "Tableau de bord Cloudflare",
+  "usage.openCloudflareDashboard":
+    "Voir votre consommation de neurones et activer l'usage payant chez Cloudflare (allocation gratuite réinitialisée à 00:00 UTC)",
   "usage.minute": "Dernière minute",
   "usage.today": "Aujourd'hui",
   "usage.limitMinute": "Limite / min",

@@ -46,10 +46,26 @@ export interface UsageSnapshot {
   limitSource?: QuotaLimit["source"];
 }
 
+/**
+ * Time zone in which each provider resets its daily quota: Google at midnight Pacific,
+ * Cloudflare Workers AI at 00:00 UTC ("All limits reset daily at 00:00 UTC", pricing page, 2026-09-12).
+ */
+export const QUOTA_RESET_TIME_ZONE: Record<string, string> = { gemini: "America/Los_Angeles", cloudflare: "UTC" };
+
+/** Start of the provider's current quota day (defaults to Pacific midnight for unknown providers). */
+export function quotaDayStart(provider: string, now: number): number {
+  return midnightBefore(now, QUOTA_RESET_TIME_ZONE[provider] ?? "America/Los_Angeles");
+}
+
 /** Google resets daily quotas at midnight Pacific time. */
 export function pacificMidnightBefore(now: number): number {
+  return midnightBefore(now, "America/Los_Angeles");
+}
+
+/** The most recent 00:00 in `timeZone`, as an epoch timestamp. */
+export function midnightBefore(now: number, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -137,7 +153,7 @@ export class UsageTracker {
 
   snapshot(provider: string, model: string): UsageSnapshot {
     const now = this.now();
-    const dayStart = pacificMidnightBefore(now);
+    const dayStart = quotaDayStart(provider, now);
     const minuteStart = now - 60_000;
     let minute = 0;
     let day = 0;

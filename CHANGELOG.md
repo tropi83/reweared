@@ -18,6 +18,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- Error messages are provider-aware (`errorMessage()` picks `error.<provider>.<code>` before the generic text): a Cloudflare quota error no longer talks about Gemini. Daily-quota messages now state when the quota resets, in local time with the remaining delay (Cloudflare Workers AI: 00:00 UTC; Gemini: midnight Pacific). Cloudflare 429 `4006` "used up your daily free allocation" is `QUOTA_EXCEEDED` (not retried), and the usage meter's "today" window follows the provider's reset time (UTC for Cloudflare) with a link to the Cloudflare dashboard.
 - Cloudflare: 403 `5018`/`3041` ("account not allowed for private model") is reported as a model-access problem, not a bad credential, and the model list is filtered by what the account can actually run (`/ai/models/search`, or `/models` on the Worker).
 
 - Gemini: 429 responses are classified from Google's structured `QuotaFailure`/`RetryInfo` details — daily quota exhaustion is `QUOTA_EXCEEDED` (not retried), a `quotaValue` of 0 is `MODEL_NOT_IN_PLAN`, per-minute throttling stays `RATE_LIMITED` with the delay Google suggests. Previously the doc URL in the message (`…/rate-limits`) made every quota error look like throttling.

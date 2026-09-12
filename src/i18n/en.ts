@@ -291,8 +291,15 @@ export const en = {
   "error.AUTH_EXPIRED": "Your Google session expired. Reconnect in Settings.",
   "error.INVALID_CREDENTIAL": "The provider rejected your credential. Check it in Settings.",
   "error.PERMISSION_DENIED": "Your account does not have access to this model or project.",
-  "error.RATE_LIMITED": "Gemini rate limit reached. We'll retry automatically when possible.",
-  "error.QUOTA_EXCEEDED": "Daily Gemini quota reached for this model. It resets at midnight Pacific time; check your plan and billing in Google AI Studio.",
+  "error.RATE_LIMITED": "The provider's rate limit is reached. We'll retry automatically when possible.",
+  "error.QUOTA_EXCEEDED": "The provider's daily quota is used up. Try again after it resets, or check your plan on the provider's dashboard.",
+  // Provider-specific wordings, picked by errorMessage() when they exist. {resetLocal}/{resetIn} = next quota reset.
+  "error.gemini.RATE_LIMITED": "Gemini rate limit reached (requests per minute). We'll retry automatically when possible.",
+  "error.gemini.QUOTA_EXCEEDED":
+    "Daily Gemini quota reached for this model. It resets at midnight Pacific time — {resetLocal} your local time, in {resetIn}. Check your plan and billing in Google AI Studio.",
+  "error.cloudflare.RATE_LIMITED": "Cloudflare Workers AI rate limit reached. We'll retry automatically when possible.",
+  "error.cloudflare.QUOTA_EXCEEDED":
+    "Your free daily Workers AI allocation (10,000 neurons) is used up. It resets at 00:00 UTC — {resetLocal} your local time, in {resetIn}. To keep going today, enable paid usage in the Cloudflare dashboard (Workers & Pages → Plans).",
   "error.FREE_TIER_NO_ACCESS":
     "Your Google project is on the Free tier, which has no quota (limit 0) for this image model. Link a billing account to your project in Google AI Studio to use it.",
   "error.MODEL_NOT_IN_PLAN":
@@ -315,6 +322,8 @@ export const en = {
   "usage.details": "Details",
   "usage.googleDashboard": "Google dashboard",
   "usage.openGoogleDashboard": "See your real quotas and usage on Google",
+  "usage.cloudflareDashboard": "Cloudflare dashboard",
+  "usage.openCloudflareDashboard": "See your neuron usage and enable paid usage on Cloudflare (free allocation resets at 00:00 UTC)",
   "usage.minute": "Last minute",
   "usage.today": "Today",
   "usage.limitMinute": "Limit / min",

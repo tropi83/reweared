@@ -37,7 +37,12 @@ export function mapCloudflareHttpError(status: number, body: CloudflareErrorBody
       code = "INVALID_IMAGE";
       break;
     case 429:
-      code = /neuron|daily|quota|allocation|exceeded your/.test(lower) && !/per minute|rate limit/.test(lower) ? "QUOTA_EXCEEDED" : "RATE_LIMITED";
+      // 4006 "you have used up your daily free allocation" = the 10,000 free neurons are gone until 00:00 UTC
+      // (not retryable today); anything else is per-minute throttling.
+      code =
+        first?.code === 4006 || (/neuron|daily|quota|allocation|exceeded your/.test(lower) && !/per minute|rate limit/.test(lower))
+          ? "QUOTA_EXCEEDED"
+          : "RATE_LIMITED";
       break;
     default:
       code = status >= 500 ? "PROVIDER_UNAVAILABLE" : "UNKNOWN_ERROR";
@@ -69,7 +74,7 @@ export function cloudflareMessageFor(code: GenerationErrorCode): string {
     case "RATE_LIMITED":
       return "Cloudflare Workers AI rate limit reached. We'll retry automatically.";
     case "QUOTA_EXCEEDED":
-      return "Your Workers AI daily allocation is exhausted.";
+      return "Your free daily Workers AI allocation is used up; it resets at 00:00 UTC.";
     case "MODEL_UNAVAILABLE":
       return "This Workers AI model is not available.";
     case "MODEL_NOT_IN_PLAN":

@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { pacificMidnightBefore, UsageTracker } from "./usage-tracker";
+import { midnightBefore, pacificMidnightBefore, quotaDayStart, UsageTracker } from "./usage-tracker";
+
+describe("quotaDayStart", () => {
+  it("uses 00:00 UTC for Cloudflare and Pacific midnight for Gemini", () => {
+    const now = Date.parse("2026-09-11T22:30:00Z");
+    expect(new Date(quotaDayStart("cloudflare", now)).toISOString()).toBe("2026-09-11T00:00:00.000Z");
+    expect(new Date(quotaDayStart("gemini", now)).toISOString()).toBe("2026-09-11T07:00:00.000Z");
+    expect(new Date(midnightBefore(Date.parse("2026-09-11T00:00:30Z"), "UTC")).toISOString()).toBe("2026-09-11T00:00:00.000Z");
+  });
+});
 
 describe("pacificMidnightBefore", () => {
   it("returns the previous midnight in America/Los_Angeles", () => {

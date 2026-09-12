@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/Misc";
 import { LISTING_COPY_LIMITS } from "@/domain/services/listing-copy";
 import { MOCK_PROVIDER_ID } from "@/infrastructure/providers/mock/MockImageProvider";
 import { useT, type MessageKey } from "@/i18n";
+import { errorMessage } from "@/i18n/errors";
 
 /** Title + description generated from the original photo, editable and copyable. */
 export function ListingCopyPanel() {
@@ -70,7 +71,7 @@ export function ListingCopyPanel() {
       {busy && <div className="shimmer h-16 rounded-lg" aria-busy />}
       {error && !busy && (
         <p className="text-xs text-danger" role="alert">
-          {t(`error.${error.code}` as MessageKey)}
+          {errorMessage(error, copyProviderId)}
           {error.detail ? <span className="text-fg-subtle"> — {error.detail}</span> : null}
         </p>
       )}

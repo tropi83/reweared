@@ -91,6 +91,15 @@ describe("CloudflareErrors", () => {
     expect(mapCloudflareHttpError(404, { errors: [{ code: 5007, message: "No such model" }] }, null).code).toBe("MODEL_UNAVAILABLE");
     expect(mapCloudflareHttpError(429, { errors: [{ message: "Rate limit exceeded" }] }, "7").retryAfterMs).toBe(7000);
     expect(mapCloudflareHttpError(429, { errors: [{ message: "Daily neuron allocation exceeded" }] }, null).code).toBe("QUOTA_EXCEEDED");
+    // Live response seen 2026-09-12 once the 10,000 free neurons were spent.
+    const spent = mapCloudflareHttpError(
+      429,
+      { success: false, errors: [{ code: 4006, message: "AiError: AiError: you have used up your daily free allocation" }] },
+      null,
+    );
+    expect(spent.code).toBe("QUOTA_EXCEEDED");
+    expect(spent.retryable).toBe(false);
+    expect(spent.detail).toContain("4006");
     expect(mapCloudflareHttpError(400, { errors: [{ message: "invalid image_b64" }] }, null).code).toBe("INVALID_IMAGE");
     expect(mapCloudflareHttpError(503, "gateway", null)).toMatchObject({ code: "PROVIDER_UNAVAILABLE", retryable: true });
     expect(mapCloudflareEnvelopeError({ success: false, errors: [{ code: 3030, message: "NSFW content detected" }] }).code).toBe("CONTENT_REJECTED");

@@ -4,6 +4,7 @@ import { navigate } from "@/app/router";
 import { getServices } from "@/app/services";
 import type { UsageSnapshot } from "@/domain/services/usage-tracker";
 import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
+import { CF_WORKERS_AI_DASHBOARD } from "@/features/settings/CloudflareCard";
 import { openExternal } from "@/lib/open-external";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/cn";
@@ -85,6 +86,16 @@ export function UsageMeter({ providerId, modelId }: { providerId: string; modelI
             onClick={() => void openExternal(GOOGLE_RATE_LIMIT_DASHBOARD)}
           >
             {t("usage.googleDashboard")} <ExternalLink className="size-3" />
+          </button>
+        )}
+        {providerId === "cloudflare" && (
+          <button
+            type="button"
+            className="inline-flex items-center gap-0.5 text-accent hover:underline"
+            title={t("usage.openCloudflareDashboard")}
+            onClick={() => void openExternal(CF_WORKERS_AI_DASHBOARD)}
+          >
+            {t("usage.cloudflareDashboard")} <ExternalLink className="size-3" />
           </button>
         )}
       </div>

@@ -13,6 +13,7 @@ import type { GoogleCloudProject } from "@/infrastructure/auth/GoogleOAuthCreden
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import type { MockScenario } from "@/infrastructure/providers/mock/MockImageProvider";
 import { useT, type MessageKey } from "@/i18n";
+import { errorMessage } from "@/i18n/errors";
 import { cn } from "@/lib/cn";
 import { openExternal } from "@/lib/open-external";
 import { CloudflareCard } from "./CloudflareCard";
@@ -85,7 +86,7 @@ export function ProvidersSection() {
 
         {auth.lastError && (
           <p className="mt-3 text-sm text-danger" role="alert">
-            {t(`error.${auth.lastError.code}` as MessageKey)}
+            {errorMessage(auth.lastError, "gemini")}
             {auth.lastError.detail ? <span className="text-fg-subtle"> — {auth.lastError.detail}</span> : null}
           </p>
         )}

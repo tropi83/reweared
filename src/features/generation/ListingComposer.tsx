@@ -19,6 +19,7 @@ import { buildListingShots, LISTING_CATEGORIES, listingRecipeId } from "@/domain
 import { interpolate } from "@/domain/services/recipes";
 import { MOCK_PROVIDER_ID } from "@/infrastructure/providers/mock/MockImageProvider";
 import { useLocale, useT, type MessageKey } from "@/i18n";
+import { errorMessage } from "@/i18n/errors";
 import { cn } from "@/lib/cn";
 import { UsageMeter } from "./UsageMeter";
 
@@ -149,7 +150,7 @@ export function ListingComposer() {
       if (settings.lastModelByProvider[providerId] !== model.id)
         void updateSettings({ lastModelByProvider: { ...settings.lastModelByProvider, [providerId]: model.id } });
     } catch (err) {
-      toast.error(t(`error.${toGenerationError(err).code}` as MessageKey));
+      toast.error(errorMessage(toGenerationError(err), providerId));
     }
   }
 

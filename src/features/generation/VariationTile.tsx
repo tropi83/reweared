@@ -11,7 +11,8 @@ import type { GenerationJob, ProjectDocument } from "@/domain/models";
 import { exportSingle } from "@/infrastructure/image/export";
 import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
 import { openExternal } from "@/lib/open-external";
-import { useLocale, useT, type MessageKey } from "@/i18n";
+import { useLocale, useT } from "@/i18n";
+import { errorMessage } from "@/i18n/errors";
 import { cn } from "@/lib/cn";
 
 interface Props {
@@ -127,7 +128,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
             )}
           </span>
           {job.attempt > 1 && <span className="text-[11px] text-fg-subtle">{t("generation.attempt", { attempt: job.attempt })}</span>}
-          {job.error && job.nextRetryAt && <span className="text-[11px] text-warning">{t(`error.${job.error.code}` as MessageKey)}</span>}
+          {job.error && job.nextRetryAt && <span className="text-[11px] text-warning">{errorMessage(job.error, job.provider)}</span>}
         </div>
         <button
           type="button"
@@ -154,7 +155,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
       {isCancelled ? <X className="size-5 text-fg-subtle" /> : <AlertTriangle className="size-5 text-danger" />}
       <span className="text-xs font-medium">{shotName}</span>
       <span className="text-[11px] text-fg-muted">
-        {isCancelled ? t("generation.status.cancelled") : job.error ? t(`error.${job.error.code}` as MessageKey) : t("generation.status.failed")}
+        {isCancelled ? t("generation.status.cancelled") : job.error ? errorMessage(job.error, job.provider) : t("generation.status.failed")}
       </span>
       {job.error?.detail && !isCancelled && (
         <span className="line-clamp-2 text-[10px] text-fg-subtle" title={job.error.detail}>

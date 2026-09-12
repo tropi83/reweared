@@ -13,7 +13,8 @@ import { useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
 import { openExternal } from "@/lib/open-external";
 
-const CF_TOKEN_URL = "https://dash.cloudflare.com/?to=/:account/ai/workers-ai";
+export const CF_WORKERS_AI_DASHBOARD = "https://dash.cloudflare.com/?to=/:account/ai/workers-ai";
+const CF_TOKEN_URL = CF_WORKERS_AI_DASHBOARD;
 const CF_WORKER_TEMPLATE_URL = "https://github.com/tropi83/reweared/tree/main/cloudflare-worker";
 
 function StatusBadge({ status }: { status: AuthStatus | undefined }) {
