@@ -75,6 +75,17 @@ describe("ui store", () => {
     expect(useUiStore.getState().lightboxAssetId).toBeNull();
     expect(useUiStore.getState().compareMode).toBe(false);
   });
+
+  it("leaveListing drops the per-listing state (selection, viewer, compare) and keeps the rest", () => {
+    const ui = useUiStore.getState();
+    ui.selectMany(["x"]);
+    ui.openLightbox("x");
+    ui.setCompareMode(true);
+    ui.setFilter("toPost");
+    ui.leaveListing();
+    expect(useUiStore.getState()).toMatchObject({ selection: new Set(), lightboxAssetId: null, compareMode: false, filter: "toPost" });
+    ui.setFilter("all");
+  });
 });
 
 describe("composer store", () => {

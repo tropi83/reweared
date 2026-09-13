@@ -10,6 +10,12 @@ interface UiState {
   toggleSelected(assetId: string, additive?: boolean): void;
   selectMany(assetIds: string[]): void;
   clearSelection(): void;
+  /**
+   * Drops the state that belongs to one listing (selection, fullscreen viewer, compare) when the
+   * workspace opens or leaves a listing: it lives here, not in the view, so it would otherwise survive
+   * a trip through the sidebar and reappear on the way back.
+   */
+  leaveListing(): void;
   /** Fullscreen viewer: asset id currently shown, or null. */
   lightboxAssetId: string | null;
   openLightbox(assetId: string): void;
@@ -40,6 +46,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   selectMany: (assetIds) => set({ selection: new Set(assetIds) }),
   clearSelection: () => set({ selection: new Set() }),
+  leaveListing: () => set({ selection: new Set(), lightboxAssetId: null, compareMode: false }),
   lightboxAssetId: null,
   openLightbox: (lightboxAssetId) => set({ lightboxAssetId }),
   closeLightbox: () => set({ lightboxAssetId: null, compareMode: false }),

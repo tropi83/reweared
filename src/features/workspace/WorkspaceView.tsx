@@ -29,18 +29,20 @@ export function WorkspaceView({ listingId }: { listingId: string }) {
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const filter = useUiStore((s) => s.filter);
   const setFilter = useUiStore((s) => s.setFilter);
-  const clearSelection = useUiStore((s) => s.clearSelection);
+  const leaveListing = useUiStore((s) => s.leaveListing);
   // The Vinted window is open for this listing: the publication panel takes over the left column.
   const publishing = usePublishStore((s) => s.session.stage !== "closed" && s.session.listingId === listingId);
   useWorkspaceShortcuts();
 
   useEffect(() => {
-    clearSelection();
+    leaveListing();
     void open(listingId).then((doc) => {
       if (!doc) navigate({ name: "home" }, true);
       else bindListing(doc.listing.id);
     });
-  }, [listingId, open, bindListing, clearSelection]);
+    // Leaving through the sidebar (or to another listing): the viewer must not still be open on return.
+    return leaveListing;
+  }, [listingId, open, bindListing, leaveListing]);
 
   const doc = current?.listing.id === listingId ? current : null;
   const generationCount = doc ? Object.keys(doc.generations).length : 0;
