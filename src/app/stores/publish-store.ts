@@ -3,6 +3,7 @@ import { AppError, toGenerationError, type GenerationError, type ListingDocument
 import { canPost, stageForUrl, VINTED_SELL_PATH, type FillReport, type PublishBlocker, type PublishStage } from "@/domain/services/publish";
 import type { PollResult, PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import { createLogger } from "@/lib/logger";
+import { publishBarText } from "../publish-bar";
 import { buildPublishPayload } from "../publish-payload";
 import { getServices } from "../services";
 import { useListingsStore } from "./listings-store";
@@ -143,6 +144,17 @@ async function watchWindow(bridge: PublishBridge, session: number, set: Set, get
   }
 }
 
+/** The status bar above vinted.com follows the session (desktop only; the phone screen has its own). */
+function pushBarText(session: PublishSession, previous: PublishSession) {
+  if (session === previous || session.stage === "closed") return;
+  const bridge = getServices().publish;
+  if (bridge.mode !== "windowed") return;
+  const text = publishBarText(session);
+  // A new session always gets its first line (the bar keeps it until the window shows it).
+  if (previous.stage !== "closed" && text === publishBarText(previous)) return;
+  bridge.status(text).catch((err: unknown) => log.debug("status bar not updated", err instanceof Error ? err.message : String(err)));
+}
+
 export const usePublishStore = create<PublishState>((set, get) => ({
   session: CLOSED,
 
@@ -239,3 +251,5 @@ export const usePublishStore = create<PublishState>((set, get) => ({
     set({ session: CLOSED });
   },
 }));
+
+usePublishStore.subscribe((state, previous) => pushBarText(state.session, previous.session));

@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Desktop Vinted window: a status bar above vinted.com**, like the status line of the phone screen — sign in → open the sell form → filling → “Photos 2/3 · Title ⧉ · Description ⧉ — click the ⧉ icons to paste the text” → ✓. The window now holds two webviews (bar + Vinted); the bar is an app page without any Tauri capability, fed by `eval` only.
+
 - **Delete a listing from every screen** — a “⋯” actions menu (rename, duplicate, delete) on the listing header, on the home cards and in the drawer rows (always visible on touch screens, revealed on hover with a mouse). Deleting asks for confirmation, stops a run or a Vinted session bound to that listing, leaves the workspace first, then removes the files — on this device only, never on Vinted.
 - **Post on Vinted from Android and iOS.** A native Vinted screen (plugin `vinted-webview`: Kotlin + Swift) opens over the app with the listing to pre-fill; the sell form is filled as soon as it appears, the screen never clicks “Add”, and closing it brings the report back to the app. Same allow-list and payload limits as the desktop window (shared Rust policy), session isolated in a dedicated WebView profile (Android, WebView 116+) or `WKWebsiteDataStore` (iOS 17+). The iOS half is written but not yet built (no Mac available) — see BUILDING.md.
 - **Icons for the catalogue**: every category (10) and subcategory (56) has a Lucide icon, shown in the category picker and chips of the listing card, on pack cards in the feed, in the built-in recipes and next to listing names in the sidebar and on the home page. A test fails when a new pack has no icon.

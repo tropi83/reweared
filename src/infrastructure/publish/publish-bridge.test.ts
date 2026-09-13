@@ -30,8 +30,10 @@ describe("TauriVintedBridge", () => {
     await b.open();
     await b.navigate("/items/new");
     await b.prefill({ title: "t", description: "d", photos: [] });
-    expect(invoke.mock.calls.map((c) => c[0])).toEqual(["vinted_open", "vinted_navigate", "vinted_prefill"]);
+    await b.status("Filling the form…");
+    expect(invoke.mock.calls.map((c) => c[0])).toEqual(["vinted_open", "vinted_navigate", "vinted_prefill", "vinted_status"]);
     expect(invoke.mock.calls[1]?.[1]).toEqual({ path: "/items/new" });
+    expect(invoke.mock.calls[3]?.[1]).toEqual({ text: "Filling the form…" });
     expect(await b.poll()).toMatchObject({ url: "https://www.vinted.fr/items/new", report: { pageOk: true } });
     // Script not injected yet (or still waiting for the form): the location alone.
     invoke.mockResolvedValueOnce({ url: "https://www.vinted.fr/", status: null });

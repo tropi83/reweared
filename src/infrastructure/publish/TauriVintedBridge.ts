@@ -45,6 +45,9 @@ export class TauriVintedBridge implements PublishBridge {
     if (!value || typeof value.url !== "string") return null;
     return { url: value.url, report: isFillReport(value.status) ? value.status : null };
   }
+  status(text: string) {
+    return this.call("vinted_status", { text });
+  }
   close() {
     return this.call("vinted_close");
   }

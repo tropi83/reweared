@@ -346,6 +346,13 @@ export const en = {
     "In Vinted, tap the paste icon at the end of the title and of the description, check everything and click “Add”. Nothing is published by the app.",
   "publish.step.delegated":
     "Vinted is open on top of the app. Log in if needed and open the sell form: the photos are attached and a paste icon appears next to the title and the description. Close it to come back here.",
+  "publish.bar.login": "Sign in to Vinted (e-mail, Facebook or Apple — not Google), then open the sell form.",
+  "publish.bar.browse": "Open the sell form (Sell): the photos are attached, the text is pasted when you click the icons.",
+  "publish.bar.filling": "Filling the form…",
+  "publish.bar.ready": "Photos {attached}/{requested} · Title {title} · Description {description} — click the ⧉ icons to paste the text.",
+  "publish.bar.filled": "Title {title} · Description {description} · Photos {attached}/{requested} — check, then click “Add” yourself.",
+  "publish.bar.notForm": "This page is not the sell form.",
+  "publish.bar.timeout": "The form did not answer. Reload the page to try again.",
   "publish.action.focus": "Show the Vinted window",
   "publish.action.openForm": "Open the sell form",
   "publish.action.fill": "Fill again: title, description, {count} photos",

@@ -42,6 +42,8 @@ interface FakeBridge extends PublishBridge {
   payload: PublishPayload | null;
   /** Resolves once the store handed the payload over for the n-th time, i.e. when that fill's poll loop is about to start. */
   prefilled(n?: number): Promise<void>;
+  /** What the status bar above vinted.com showed, in order. */
+  bar: string[];
 }
 
 const HOME = "https://www.vinted.fr/";
@@ -66,6 +68,8 @@ function fakeBridge(): FakeBridge {
       b.calls.push("prefill");
     },
     poll: async () => ({ url: b.url, report: b.report }),
+    bar: [] as string[],
+    status: async (text: string) => void b.bar.push(text),
     close: async () => void b.calls.push("close"),
     clearSession: async () => void b.calls.push("clear"),
     onPage: (cb: (u: string) => void) => {
@@ -157,6 +161,15 @@ describe("publish-store", () => {
     // Leaving the form drops back to browsing.
     bridge.emitPage(HOME);
     expect(session().stage).toBe("browsing");
+    // The status bar above vinted.com followed every step, without repeating itself.
+    expect(bridge.bar).toEqual([
+      "Open the sell form (Sell): the photos are attached, the text is pasted when you click the icons.",
+      "Sign in to Vinted (e-mail, Facebook or Apple — not Google), then open the sell form.",
+      "Open the sell form (Sell): the photos are attached, the text is pasted when you click the icons.",
+      "Filling the form…",
+      "Photos 1/1 · Title ⧉ · Description ⧉ — click the ⧉ icons to paste the text.",
+      "Open the sell form (Sell): the photos are attached, the text is pasted when you click the icons.",
+    ]);
 
     await usePublishStore.getState().finish();
     expect(bridge.calls).toContain("close");
@@ -335,6 +348,7 @@ describe("publish-store on phones (delegated bridge)", () => {
     navigate: async () => undefined,
     prefill: async () => undefined,
     poll: async () => null,
+    status: async () => undefined,
     close: async () => undefined,
     clearSession: async () => undefined,
     onPage: () => () => undefined,

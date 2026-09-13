@@ -12,6 +12,7 @@ export class UnsupportedBridge implements PublishBridge {
   prefill: PublishBridge["prefill"] = unsupported;
   poll: PublishBridge["poll"] = unsupported;
   close: PublishBridge["close"] = () => Promise.resolve();
+  status: PublishBridge["status"] = () => Promise.resolve();
   clearSession: PublishBridge["clearSession"] = unsupported;
   run: PublishBridge["run"] = unsupported;
   onPage: PublishBridge["onPage"] = () => () => undefined;

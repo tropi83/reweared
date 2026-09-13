@@ -9,6 +9,7 @@ pub fn run() {
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
         .manage(oauth::LoopbackState::default())
+        .manage(vinted::BarText::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -37,6 +38,7 @@ pub fn run() {
             vinted::vinted_navigate,
             vinted::vinted_prefill,
             vinted::vinted_poll,
+            vinted::vinted_status,
             vinted::vinted_close,
             vinted::vinted_clear_session,
         ])

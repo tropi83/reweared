@@ -28,6 +28,7 @@ function bridge(mode: PublishBridge["mode"]): PublishBridge {
     supported: true,
     mode,
     run: async () => null,
+    status: async () => undefined,
     open: async () => undefined,
     navigate: async () => undefined,
     prefill: async () => undefined,

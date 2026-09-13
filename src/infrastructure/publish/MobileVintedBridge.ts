@@ -46,6 +46,7 @@ export class MobileVintedBridge implements PublishBridge {
   navigate: (path: VintedPath) => Promise<void> = noop;
   prefill: (payload: PublishPayload) => Promise<void> = noop;
   poll = async (): Promise<PollResult | null> => null;
+  status: (text: string) => Promise<void> = noop;
   close = noop;
   onPage(): () => void {
     return () => undefined;

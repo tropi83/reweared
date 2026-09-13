@@ -29,6 +29,8 @@ export interface PublishBridge {
   prefill(payload: PublishPayload): Promise<void>;
   /** Windowed mode; `null` when the window is not open. */
   poll(): Promise<PollResult | null>;
+  /** Windowed mode: shows `text` in the status bar above vinted.com (a no-op when the window is closed). */
+  status(text: string): Promise<void>;
   close(): Promise<void>;
   clearSession(): Promise<void>;
   onPage(cb: (url: string) => void): () => void;

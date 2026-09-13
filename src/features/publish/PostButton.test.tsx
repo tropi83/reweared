@@ -33,6 +33,7 @@ function fakeBridge(supported = true): PublishBridge & { calls: string[] } {
     mode: "windowed",
     calls,
     run: async () => null,
+    status: async () => undefined,
     open: async () => void calls.push("open"),
     navigate: async () => undefined,
     prefill: async () => undefined,
