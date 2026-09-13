@@ -119,6 +119,12 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
 
   async open(listingId) {
     if (get().current?.listing.id === listingId) return get().current;
+    // Jobs of the listing being left would otherwise run on against a closed document and fail one by one.
+    const { queue } = getServices();
+    if (queue.activeCount > 0) {
+      queue.cancelAll();
+      await queue.settled();
+    }
     await get().flush();
     set({ loadingListing: true });
     try {
@@ -199,7 +205,9 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
 
   async remove(listingId) {
     if (get().current?.listing.id === listingId) {
+      // Running jobs abort on the next tick: wait for them so nothing is written into the folder being removed.
       getServices().queue.cancelAll();
+      await getServices().queue.settled();
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = null;
       set({ current: null });

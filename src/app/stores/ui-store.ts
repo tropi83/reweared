@@ -18,6 +18,9 @@ interface UiState {
   setCompareMode(v: boolean): void;
   filter: GalleryFilter;
   setFilter(f: GalleryFilter): void;
+  /** A photo is being turned into a listing (decode, thumbnail, save): the app shows it is busy. */
+  importing: boolean;
+  setImporting(v: boolean): void;
   /** Whether the composer is shown on small screens. */
   mobileComposerOpen: boolean;
   setMobileComposerOpen(v: boolean): void;
@@ -26,6 +29,8 @@ interface UiState {
 export const useUiStore = create<UiState>((set, get) => ({
   sidebarOpen: false,
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+  importing: false,
+  setImporting: (importing) => set({ importing }),
   selection: new Set(),
   toggleSelected: (assetId, additive = true) => {
     const next = additive ? new Set(get().selection) : new Set<string>();

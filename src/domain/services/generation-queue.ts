@@ -103,6 +103,12 @@ export class GenerationQueue {
     for (const job of [...this.pending, ...this.runningJobs()]) this.cancel(job.id);
   }
 
+  /** Resolves once no job is pending or running any more (running jobs need a tick to observe their abort). */
+  async settled(timeoutMs = 2000): Promise<void> {
+    const started = Date.now();
+    while (this.activeCount > 0 && Date.now() - started < timeoutMs) await new Promise((r) => setTimeout(r, 10));
+  }
+
   private runningJobs(): GenerationJob[] {
     return [...this.running.keys()].map((id) => this.jobs.get(id)).filter((j): j is GenerationJob => !!j);
   }

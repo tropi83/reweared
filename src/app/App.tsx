@@ -90,7 +90,23 @@ function Shell() {
         {route.name === "listing" && <WorkspaceView listingId={route.id} />}
         {route.name === "home" && <HomeView />}
       </main>
+      <ImportingOverlay />
       <Toaster />
+    </div>
+  );
+}
+
+/** Full-screen busy state while a photo becomes a listing — on phones this takes a noticeable moment. */
+function ImportingOverlay() {
+  const t = useT();
+  const importing = useUiStore((s) => s.importing);
+  if (!importing) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-bg/70 backdrop-blur-sm" role="status" aria-live="polite" aria-busy>
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm shadow-app">
+        <span className="size-5 animate-spin rounded-full border-2 border-fg-subtle border-t-transparent" aria-hidden />
+        {t("import.working")}
+      </div>
     </div>
   );
 }

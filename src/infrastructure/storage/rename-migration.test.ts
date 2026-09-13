@@ -111,6 +111,7 @@ describe("schema v3 (project → listing)", () => {
 function fakeFs() {
   const files = new Map<string, string>();
   const dirs = new Set<string>();
+  const calls: string[] = [];
   const parent = (p: string) => p.split("/").slice(0, -1).join("/");
   const rename = (from: string, to: string) => {
     for (const d of [...dirs]) {
@@ -137,7 +138,10 @@ function fakeFs() {
         isFile: files.has(child),
         isSymlink: false,
       })),
-    rename: async (from: string, to: string) => rename(from, to),
+    rename: async (from: string, to: string) => {
+      calls.push(`rename ${from} -> ${to}`);
+      rename(from, to);
+    },
     readTextFile: async (p: string) => {
       const v = files.get(p);
       if (v === undefined) throw new Error(`ENOENT ${p}`);
@@ -145,6 +149,7 @@ function fakeFs() {
     },
     writeTextFile: async (p: string, v: string) => void files.set(p, v),
     remove: async (p: string) => {
+      calls.push(`remove ${p}`);
       files.delete(p);
       dirs.delete(p);
       for (const k of [...files.keys()]) if (k.startsWith(`${p}/`)) files.delete(k);
@@ -154,7 +159,7 @@ function fakeFs() {
     readFile: async () => new Uint8Array(),
     stat: async () => ({ size: 0 }),
   };
-  return { api, files, dirs };
+  return { api, files, dirs, calls };
 }
 
 describe("TauriFsStorage layout migration", () => {
@@ -180,6 +185,48 @@ describe("TauriFsStorage layout migration", () => {
     // Idempotent: a second init on the migrated layout changes nothing.
     await new TauriFsStorage().init();
     expect([...fs.files.keys()].sort()).toEqual(["listings/prj_11111111/listing.json", "listings/prj_11111111/original/img_aaaaaaaa.png"]);
+    vi.doUnmock("@tauri-apps/plugin-fs");
+    vi.doUnmock("@tauri-apps/api/path");
+  });
+});
+
+describe("TauriFsStorage atomic writes", () => {
+  async function storageWith(fs: ReturnType<typeof fakeFs>) {
+    vi.doMock("@tauri-apps/plugin-fs", () => fs.api);
+    vi.doMock("@tauri-apps/api/path", () => ({ appDataDir: async () => "/appdata" }));
+    const { TauriFsStorage } = await import("./TauriFsStorage");
+    const storage = new TauriFsStorage();
+    await storage.init();
+    return storage;
+  }
+  const doc = () => migrateListingDocument(structuredClone(V2_DOC));
+
+  it("replaces listing.json by renaming the temp file over it — the old file is never removed first", async () => {
+    const fs = fakeFs();
+    const storage = await storageWith(fs);
+    await storage.saveListing(doc());
+    await storage.saveListing({ ...doc(), listing: { ...doc().listing, name: "v2" } });
+    expect(fs.calls.filter((c) => c.startsWith("remove listings/"))).toEqual([]);
+    expect(fs.calls.filter((c) => c.includes("listing.json.tmp -> "))).toHaveLength(2);
+    expect(fs.files.has("listings/prj_11111111/listing.json")).toBe(true);
+    expect(fs.files.has("listings/prj_11111111/listing.json.tmp")).toBe(false);
+    expect((await storage.getListing("prj_11111111"))?.listing.name).toBe("v2");
+    vi.doUnmock("@tauri-apps/plugin-fs");
+    vi.doUnmock("@tauri-apps/api/path");
+  });
+
+  it("recovers a listing whose write died between the temp file and the rename", async () => {
+    const fs = fakeFs();
+    fs.dirs.add("listings");
+    fs.dirs.add("listings/prj_11111111");
+    // The app was killed after writing the temp file: only listing.json.tmp is left.
+    fs.files.set("listings/prj_11111111/listing.json.tmp", JSON.stringify(V2_DOC));
+    const storage = await storageWith(fs);
+    expect((await storage.listListings()).map((l) => l.id)).toEqual(["prj_11111111"]);
+    expect((await storage.getListing("prj_11111111"))?.listing.name).toBe("Chemise");
+    // Repaired on disk, not only in memory.
+    expect(fs.files.has("listings/prj_11111111/listing.json")).toBe(true);
+    expect(fs.files.has("listings/prj_11111111/listing.json.tmp")).toBe(false);
     vi.doUnmock("@tauri-apps/plugin-fs");
     vi.doUnmock("@tauri-apps/api/path");
   });

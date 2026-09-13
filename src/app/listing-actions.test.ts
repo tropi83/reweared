@@ -18,6 +18,9 @@ import { __setServices, createServices, getServices } from "./services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "./stores/generation-store";
 import { useListingsStore } from "./stores/listings-store";
 import { usePublishStore } from "./stores/publish-store";
+import { ensureModels } from "./query/models";
+import { useComposerStore } from "./stores/composer-store";
+import { useGenerationStore } from "./stores/generation-store";
 import { useToastStore } from "./stores/toast-store";
 
 const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])], { type: "image/png" });
@@ -75,5 +78,33 @@ describe("deleteListing", () => {
     await deleteListing(doc.listing.id);
     expect(useToastStore.getState().toasts.at(-1)?.kind).toBe("error");
     expect(await storage.getListing(doc.listing.id)).not.toBeNull();
+  });
+
+  it("cancels the photos being generated for the listing before removing it (no quota burnt, no write into a deleted folder)", async () => {
+    const doc = await useListingsStore.getState().createFromFile(PNG, "busy.png");
+    const services = getServices();
+    services.mock.setOptions({ latencyMs: 2000, scenario: "success" });
+    services.queue.configure({ concurrency: 2, maxAttempts: 1, timeoutMs: 10_000 });
+    useComposerStore.getState().setProvider("mock");
+    await ensureModels("mock");
+    const gen = await useGenerationStore.getState().start({
+      sourceImageId: doc.listing.originalImageId!,
+      prompt: "studio",
+      providerId: "mock",
+      modelId: "mock-fast",
+      aspectRatio: "original",
+      variationCount: 3,
+    });
+    expect(services.queue.activeCount).toBe(3);
+
+    await deleteListing(doc.listing.id);
+
+    expect(services.queue.activeCount).toBe(0);
+    expect(useListingsStore.getState().current).toBeNull();
+    expect(await storage.getListing(doc.listing.id)).toBeNull();
+    // The cancelled jobs never persisted a result for the deleted listing.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await storage.readImage(doc.listing.id, "generation", gen.jobIds[0]!)).toBeNull();
+    services.mock.setOptions({ latencyMs: 5, scenario: "success" });
   });
 });

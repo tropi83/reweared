@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Copy, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { deleteListing } from "@/app/listing-actions";
 import { navigate } from "@/app/router";
@@ -13,8 +14,15 @@ import { cn } from "@/lib/cn";
  * Rename / duplicate / delete a listing — on this device only, never on Vinted. One component for the
  * sidebar rows, the home cards and the workspace header, so every screen offers the same actions with
  * the same confirmation. The trigger is a real button (visible on touch screens; callers may fade it
- * in on hover for fine pointers through `className`).
+ * in on hover for fine pointers through `className`). The menu itself is portalled to <body> with a
+ * fixed position computed from the trigger: it is never clipped by a scrolling container nor covered
+ * by the drawer, and its backdrop sits above everything, so one tap outside closes it. Only one menu is
+ * open at a time.
  */
+const MENU_WIDTH = 176;
+const MENU_HEIGHT_ESTIMATE = 132;
+let closeOpenMenu: (() => void) | null = null;
+
 export function ListingActionsMenu({
   listing,
   className,
@@ -29,7 +37,50 @@ export function ListingActionsMenu({
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [name, setName] = useState(listing.name);
+  const [position, setPosition] = useState<CSSProperties>({});
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
   const { rename, duplicate } = useListingsStore.getState();
+
+  const openMenu = () => {
+    const rect = trigger.current?.getBoundingClientRect();
+    if (!rect) return;
+    closeOpenMenu?.();
+    const below = rect.bottom + 4 + MENU_HEIGHT_ESTIMATE <= window.innerHeight || rect.top < MENU_HEIGHT_ESTIMATE;
+    setPosition({
+      position: "fixed",
+      zIndex: 70,
+      width: MENU_WIDTH,
+      ...(below ? { top: rect.bottom + 4 } : { bottom: window.innerHeight - rect.top + 4 }),
+      ...(align === "right" ? { right: Math.max(8, window.innerWidth - rect.right) } : { left: Math.max(8, rect.left) }),
+    });
+    setOpen(true);
+    closeOpenMenu = () => setOpen(false);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    // Belt and braces with the backdrop: any pointer press outside the menu and its trigger closes it.
+    const onPointer = (e: Event) => {
+      const target = e.target as Node | null;
+      if (target && (menu.current?.contains(target) || trigger.current?.contains(target))) return;
+      close();
+    };
+    document.addEventListener("pointerdown", onPointer, true);
+    document.addEventListener("click", onPointer, true);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer, true);
+      document.removeEventListener("click", onPointer, true);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [open]);
 
   const submitRename = async () => {
     const next = name.trim();
@@ -40,59 +91,62 @@ export function ListingActionsMenu({
   return (
     <div className={cn("relative", className)}>
       <button
+        ref={trigger}
         type="button"
         aria-label={t("listings.actions")}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((v) => !v);
+          if (open) setOpen(false);
+          else openMenu();
         }}
         className="rounded-md p-1.5 text-fg-subtle hover:bg-bg-sunken hover:text-fg focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
       >
         <MoreHorizontal className="size-4" />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
-          <div
-            className={cn(
-              "fade-in absolute top-full z-50 mt-1 w-44 rounded-lg border border-border bg-bg-elevated p-1 shadow-app",
-              align === "right" ? "right-0" : "left-0",
-            )}
-            role="menu"
-            aria-label={t("listings.actions")}
-          >
-            <MenuItem
-              icon={<Pencil className="size-3.5" />}
-              label={t("common.rename")}
-              onClick={() => {
-                setOpen(false);
-                setName(listing.name);
-                setRenaming(true);
-              }}
-            />
-            <MenuItem
-              icon={<Copy className="size-3.5" />}
-              label={t("common.duplicate")}
-              onClick={async () => {
-                setOpen(false);
-                const copy = await duplicate(listing.id);
-                if (copy) navigate({ name: "listing", id: copy.listing.id });
-              }}
-            />
-            <MenuItem
-              icon={<Trash2 className="size-3.5" />}
-              label={t("common.delete")}
-              danger
-              onClick={() => {
-                setOpen(false);
-                setDeleting(true);
-              }}
-            />
-          </div>
-        </>
-      )}
+      {open &&
+        createPortal(
+          <>
+            <div style={{ position: "fixed", inset: 0, zIndex: 60 }} onClick={() => setOpen(false)} aria-hidden />
+            <div
+              ref={menu}
+              className="fade-in rounded-lg border border-border bg-bg-elevated p-1 shadow-app"
+              style={position}
+              role="menu"
+              aria-label={t("listings.actions")}
+            >
+              <MenuItem
+                icon={<Pencil className="size-3.5" />}
+                label={t("common.rename")}
+                onClick={() => {
+                  setOpen(false);
+                  setName(listing.name);
+                  setRenaming(true);
+                }}
+              />
+              <MenuItem
+                icon={<Copy className="size-3.5" />}
+                label={t("common.duplicate")}
+                onClick={async () => {
+                  setOpen(false);
+                  const copy = await duplicate(listing.id);
+                  if (copy) navigate({ name: "listing", id: copy.listing.id });
+                }}
+              />
+              <MenuItem
+                icon={<Trash2 className="size-3.5" />}
+                label={t("common.delete")}
+                danger
+                onClick={() => {
+                  setOpen(false);
+                  setDeleting(true);
+                }}
+              />
+            </div>
+          </>,
+          document.body,
+        )}
       <Dialog
         open={renaming}
         onClose={() => setRenaming(false)}

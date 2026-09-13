@@ -58,6 +58,7 @@ export const en = {
   "import.browse": "browse files",
   "import.replace": "Replace image",
   "import.formats": "PNG, JPEG, WebP, GIF, BMP, AVIF · up to {maxMb} MB",
+  "import.working": "Preparing your listing…",
   "import.error.tooLarge": "This file is larger than {maxMb} MB.",
   "import.error.unsupported": "Unsupported image format.",
   "import.error.decode": "This image could not be decoded.",

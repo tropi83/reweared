@@ -90,6 +90,16 @@ describe("ListingSetupCard", () => {
     expect(screen.getByRole("radio", { name: "Clothing" }).querySelector("svg.lucide-shirt")).not.toBeNull();
   });
 
+  it("asks for the category and subcategory first, then the brand", () => {
+    act(() => useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" }));
+    renderWithQuery(<ListingSetupCard />);
+    const category = screen.getByRole("combobox", { name: "Category" });
+    const subcategory = screen.getByRole("radiogroup", { name: "Subcategory" });
+    const brand = screen.getByLabelText(/Brand/);
+    expect(category.compareDocumentPosition(brand) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(subcategory.compareDocumentPosition(brand) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("stores the brand as typed", async () => {
     const user = userEvent.setup();
     renderWithQuery(<ListingSetupCard />);

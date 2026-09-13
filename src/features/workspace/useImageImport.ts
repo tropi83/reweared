@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { navigate } from "@/app/router";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
+import { useUiStore } from "@/app/stores/ui-store";
 import { MAX_IMPORT_BYTES, toGenerationError } from "@/domain/models";
 import { t } from "@/i18n";
 import { createLogger } from "@/lib/logger";
@@ -10,6 +11,8 @@ const log = createLogger("import");
 
 /** Creates a listing from a file and navigates to it. Shared by every import entry point. */
 export async function importImageFile(file: Blob, fileName?: string): Promise<boolean> {
+  const ui = useUiStore.getState();
+  ui.setImporting(true);
   try {
     const doc = await useListingsStore.getState().createFromFile(file, fileName ?? (file instanceof File ? file.name : undefined));
     navigate({ name: "listing", id: doc.listing.id });
@@ -28,6 +31,8 @@ export async function importImageFile(file: Blob, fileName?: string): Promise<bo
             : t("import.error.generic");
     toast.error(message);
     return false;
+  } finally {
+    ui.setImporting(false);
   }
 }
 

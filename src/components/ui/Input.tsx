@@ -48,10 +48,8 @@ export function Switch({
           checked ? "border-accent bg-accent" : "border-border-strong bg-bg-sunken",
         )}
       >
-        <span
-          className={cn("absolute top-0.5 size-3.5 rounded-full bg-white shadow transition-transform", checked ? "left-0 translate-x-4.5" : "left-0.5")}
-          style={{ transform: checked ? "translateX(18px)" : undefined }}
-        />
+        {/* One translation only: Tailwind's `translate-x-*` and an inline `transform` would add up and push the knob out of the track. */}
+        <span className={cn("absolute top-0.5 left-0.5 size-3.5 rounded-full bg-white shadow transition-transform", checked && "translate-x-4")} />
       </button>
       {label && <span className="text-sm">{label}</span>}
     </label>

@@ -71,4 +71,38 @@ describe("ListingActionsMenu", () => {
     await user.type(input, "Robe rouge{Enter}");
     await vi.waitFor(() => expect(useListingsStore.getState().summaries.find((s) => s.id === doc.listing.id)?.name).toBe("Robe rouge"));
   });
+  it("renders the menu in a portal above everything, closes on outside click / Escape, and opens one at a time", async () => {
+    const user = userEvent.setup();
+    const a = await useListingsStore.getState().createFromFile(PNG, "a.png");
+    const b = await useListingsStore.getState().createFromFile(PNG, "b.png");
+    render(
+      <ul style={{ overflow: "hidden", position: "fixed", zIndex: 50 }}>
+        <li>
+          <ListingActionsMenu listing={{ id: a.listing.id, name: "A" }} />
+        </li>
+        <li>
+          <ListingActionsMenu listing={{ id: b.listing.id, name: "B" }} />
+        </li>
+      </ul>,
+    );
+    const [first, second] = screen.getAllByRole("button", { name: "Listing actions" });
+    await user.click(first!);
+    const menu = screen.getByRole("menu");
+    // Portalled to <body> (never clipped by a scrolling / overflow-hidden ancestor) and above the drawer (z-50).
+    expect(menu.closest("ul")).toBeNull();
+    expect(menu.parentElement).toBe(document.body);
+    expect(Number.parseInt(getComputedStyle(menu).zIndex, 10)).toBeGreaterThan(50);
+    expect(getComputedStyle(menu).position).toBe("fixed");
+    // Opening another closes the first: one menu at a time.
+    await user.click(second!);
+    expect(screen.getAllByRole("menu")).toHaveLength(1);
+    expect(screen.getByRole("menu")).toHaveAttribute("aria-label", "Listing actions");
+    // Escape and an outside click close it.
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    await user.click(second!);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    await user.click(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
 });

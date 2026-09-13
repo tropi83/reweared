@@ -93,20 +93,6 @@ export function ListingSetupCard() {
   return (
     <section className="space-y-4" aria-label={t("listing.title")}>
       <div className="space-y-1.5">
-        <Label htmlFor="listing-brand" hint={t("listing.brandHint")}>
-          {t("listing.brand")}
-        </Label>
-        <Input
-          id="listing-brand"
-          value={doc.listing.brand ?? ""}
-          maxLength={BRAND_MAX_LENGTH}
-          placeholder={t("listing.brandPlaceholder")}
-          autoComplete="off"
-          onChange={(e) => setBrand(e.target.value)}
-        />
-      </div>
-
-      <div className="space-y-1.5">
         <Label htmlFor="category">{t("listing.category")}</Label>
         <Select<CategoryId | "">
           id="category"
@@ -163,6 +149,20 @@ export function ListingSetupCard() {
           </div>
         </div>
       )}
+
+      <div className="space-y-1.5">
+        <Label htmlFor="listing-brand" hint={t("listing.brandHint")}>
+          {t("listing.brand")}
+        </Label>
+        <Input
+          id="listing-brand"
+          value={doc.listing.brand ?? ""}
+          maxLength={BRAND_MAX_LENGTH}
+          placeholder={t("listing.brandPlaceholder")}
+          autoComplete="off"
+          onChange={(e) => setBrand(e.target.value)}
+        />
+      </div>
 
       <div className="rounded-lg border border-border p-3">
         <div className="flex items-center justify-between gap-2">

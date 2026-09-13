@@ -35,6 +35,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A listing could vanish after a crash: the desktop/phone storage removed `listing.json` before renaming the temp file over it. It now renames in one atomic step, and a `listing.json.tmp` left by an interrupted write is recovered on the next read.
+- Leaving a listing whose photos are generating: opening another listing now cancels the running jobs (they were failing one by one against a closed document); deleting a listing waits for its cancelled jobs before removing the folder.
+- Switches: the knob was translated twice (Tailwind `translate-x` + inline transform) and stuck out of the track when on.
+- The listing actions menu (⋯) is rendered above everything with a fixed position: inside the phone drawer it was clipped, transparent to taps and several could stay open. It closes on a tap outside or Escape, one at a time.
+- Phones: a busy overlay (“Preparing your listing…”) covers the moment between taking a photo and the listing screen.
+- The brand field sits after the category and subcategory.
 - Cloudflare “Your output has been flagged” (3030) on close-ups of branded items (a Lacoste logo in frame was refused nine times over three shots while the shots with a person passed): after a rejection the retry now also drops the “keep logos and visible text” clause of the prompt, and the message explains the trigger.
 - Gemini `gemini-2.5-flash-lite` (the former default for the listing copy) answers 404 “no longer available to new users”: it is removed from the catalogue, `gemini-3.1-flash-lite` is the default, a saved setting pointing at the retired id falls back to it, and the “model not available” error now says to pick another model in Settings.
 - Cloudflare: “Your output has been flagged” (FLUX's safety filter, frequent false positives on product shots) was reported as “the source image could not be processed” because the message mentions “input image”. It is now a content-filter rejection with its own message, retried automatically, and every retry — automatic or manual — uses a different seed (the same seed reproduced the same rejected image).

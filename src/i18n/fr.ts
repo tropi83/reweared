@@ -56,6 +56,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "import.browse": "parcourez vos fichiers",
   "import.replace": "Remplacer l'image",
   "import.formats": "PNG, JPEG, WebP, GIF, BMP, AVIF · jusqu'à {maxMb} Mo",
+  "import.working": "Préparation de votre annonce…",
   "import.error.tooLarge": "Ce fichier dépasse {maxMb} Mo.",
   "import.error.unsupported": "Format d'image non pris en charge.",
   "import.error.decode": "Impossible de décoder cette image.",

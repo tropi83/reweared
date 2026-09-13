@@ -83,8 +83,27 @@ export class TauriFsStorage implements StorageProvider {
   private async writeJsonAtomic(path: string, value: unknown): Promise<void> {
     const tmp = `${path}.tmp`;
     await this.api.writeTextFile(tmp, JSON.stringify(value, null, 2), this.opts());
-    if (await this.api.exists(path, this.opts())) await this.api.remove(path, this.opts());
+    // One atomic rename over the previous file (std::fs::rename replaces on every platform). Removing
+    // the old file first left a window where a crash lost the document altogether.
     await this.api.rename(tmp, path, { oldPathBaseDir: this.base, newPathBaseDir: this.base });
+  }
+
+  /**
+   * A write that died after the temp file but before the rename leaves only `listing.json.tmp`: the
+   * document is intact there, so it is promoted back to `listing.json`. A stale temp file next to a
+   * valid document is just leftover and is dropped.
+   */
+  private async recoverListingFile(file: string): Promise<boolean> {
+    const tmp = `${file}.tmp`;
+    const hasFile = await this.api.exists(file, this.opts());
+    if (!(await this.api.exists(tmp, this.opts()))) return hasFile;
+    if (hasFile) {
+      await this.api.remove(tmp, this.opts()).catch(() => undefined);
+      return true;
+    }
+    log.warn("recovering listing from its temp file", file);
+    await this.api.rename(tmp, file, { oldPathBaseDir: this.base, newPathBaseDir: this.base });
+    return true;
   }
 
   async listListings(): Promise<ListingSummary[]> {
@@ -103,7 +122,7 @@ export class TauriFsStorage implements StorageProvider {
 
   async getListing(listingId: string): Promise<ListingDocument | null> {
     const file = `${this.listingDir(listingId)}/listing.json`;
-    if (!(await this.api.exists(file, this.opts()))) return null;
+    if (!(await this.recoverListingFile(file))) return null;
     const text = await this.api.readTextFile(file, this.opts());
     return migrateListingDocument(JSON.parse(text));
   }
