@@ -17,12 +17,10 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Mobile import** (Android/iOS): "Photo library" opens the system media picker through the Tauri dialog plugin (`pickerMode: "image"`; the returned `content://` / `file://` URI is read by the fs plugin), "Take a photo" uses `<input type=file accept="image/*" capture="environment">`, which the Android WebView and iOS WKWebView open as the camera.
 - Themed `Select` component (button + portalled listbox, keyboard navigation, type-ahead, flips when there is no room below, works inside modal dialogs) replacing every native `<select>`.
 
-### Changed
+### Changed
 
 - **A listing is named after its generated title.** Once the title and description are generated, the listing takes the title as its name (instead of the imported file name); editing the title in the copy panel renames it too.
-
 - **“Generate more like this” is gone** (it filled the free prompt, which no longer exists) — on every finished photo (tile and fullscreen viewer) it is replaced by **“Generate this photo again”**: one more photo of the same shot, with the same prompt, source and settings and a fresh seed, added to the same card; the previous photo is kept.
-
 - **Vinted: the text is pasted on your tap, not typed for you.** The injected script still attaches the photos, but the title and the description now get a paste icon at the end of the field; tapping it inserts the text (fewer automated actions on the page). The warning dialog on phones says to sign in with e-mail, Facebook or Apple — Google refuses OAuth inside embedded app screens. Photo count fixed on the sell form (Vinted renders the media grid outside the form; selectors checked on the live mobile site on 2026-09-13).
 - Code audit: `knip` guards unused files/exports/dependencies in `pnpm check`; dead helpers removed; the settings sections each live in their own file with shared primitives (no import cycle through `SettingsView`); the composer's saved defaults are applied once at startup instead of on every mount (opening Settings → Models no longer resets the chosen format).
 - **Provider metadata through TanStack Query.** Model lists and per-provider auth statuses are fetched, cached (5 min) and invalidated together when credentials change; the `loadModels` / `providerStatus` store fields are gone. Nothing refetches on focus or reconnect.
