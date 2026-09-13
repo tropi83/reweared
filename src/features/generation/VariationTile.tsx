@@ -215,9 +215,9 @@ function RegenerateButton({ jobId }: { jobId: string }) {
       }}
       aria-label={t("generation.regenerateShot")}
       title={t("generation.regenerateShot")}
-      className="inline-flex h-7 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-medium text-accent-fg shadow hover:brightness-110"
+      className="flex size-7 items-center justify-center rounded-md bg-accent text-accent-fg shadow hover:brightness-110"
     >
-      <RefreshCw className="size-3" /> {t("generation.regenerateShot")}
+      <RefreshCw className="size-3.5" />
     </button>
   );
 }
