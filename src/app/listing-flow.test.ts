@@ -19,10 +19,11 @@ import { AppError, type GenerationJob } from "@/domain/models";
 import type { ListingCopyProvider, ListingCopyRequest } from "@/domain/services/listing-copy";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { listingReadiness } from "./listing-readiness";
+import { ensureModels } from "./query/models";
+import { resetQueryClient, seedAuthStatus } from "@/test/render";
 import { __setServices, createServices, getServices } from "./services";
-import { useAuthStore } from "./stores/auth-store";
 import { useComposerStore } from "./stores/composer-store";
-import { applyJobUpdate, buildRequestForJob, persistJobResult, useGenerationStore } from "./stores/generation-store";
+import { applyJobUpdate, buildRequestForJob, persistJobResult } from "./stores/generation-store";
 import { useListingSetupStore } from "./stores/listing-setup-store";
 import { useListingsStore } from "./stores/listings-store";
 import { useSettingsStore } from "./stores/settings-store";
@@ -72,12 +73,13 @@ describe("generateListing", () => {
   beforeEach(async () => {
     copy = fakeCopy();
     __setServices({ ...getServices(), copyProviders: new Map([["gemini", copy.provider]]) });
-    useAuthStore.setState({ providerStatus: { gemini: { state: "authenticated", kind: "api_key" } } });
+    resetQueryClient();
+    seedAuthStatus("gemini", { state: "authenticated", kind: "api_key" });
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, copyProviderId: "gemini", mannequin: undefined } });
     await useListingsStore.getState().createFromFile(PNG, "baskets.png");
     useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" });
     useComposerStore.getState().setProvider("mock");
-    await useGenerationStore.getState().loadModels("mock", true);
+    await ensureModels("mock");
     useComposerStore.getState().setModel("mock-fast");
   });
 
@@ -114,7 +116,7 @@ describe("generateListing", () => {
   });
 
   it("makes the photos only when the copy provider is not connected", async () => {
-    useAuthStore.setState({ providerStatus: {} });
+    seedAuthStatus("gemini", { state: "unauthenticated", kind: "api_key" });
     const report = await useListingSetupStore.getState().generateListing();
     expect(report).toEqual({ photos: "done", text: "skipped-provider" });
     expect(copy.requests).toHaveLength(0);

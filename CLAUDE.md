@@ -17,7 +17,7 @@ Local-first workspace for AI image variations: React 19 + TypeScript 6 + Vite 8 
 
 ## Workflow
 
-1. Read the relevant skill in `.claude/skills/` (`project-context`, `code-conventions`, `security-review`, `testing`, `git-workflow`, `release`).
+1. Read the relevant skill in `.claude/skills/` (`project-context`, `code-conventions`, `security-review`, `testing`, `git-workflow`, `release`, `tanstack-query` for fetched provider metadata).
 2. Implement with tests (Vitest, colocated `*.test.ts(x)`; Rust `#[cfg(test)]`). No CI test may need a Google account — use `MockImageProvider` and `fake-indexeddb`.
 3. Before claiming done: `pnpm check` (typecheck + lint + prettier + tests) and `pnpm rust:check` when Rust changed. Run the app (`pnpm dev` / `pnpm tauri dev`) for UI changes.
 4. Commit with Conventional Commits; never commit `.env`, keys, tokens, screenshots containing credentials.

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { AppError, deriveGenerationStatus, type AspectRatio, type Generation, type GenerationJob, type ImageSize, type ModelInfo } from "@/domain/models";
+import { AppError, deriveGenerationStatus, type AspectRatio, type Generation, type GenerationJob, type ImageSize } from "@/domain/models";
 import type { CategorySelection, ShotSpec } from "@/domain/models";
 import {
   buildRequestForModel,
@@ -10,12 +10,10 @@ import {
 } from "@/domain/services/image-provider";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { createId, nowIso } from "@/lib/ids";
-import { createLogger } from "@/lib/logger";
+import { ensureModels, modelsSnapshot } from "../query/models";
 import { getServices } from "../services";
 import { useListingsStore } from "./listings-store";
 import { useSettingsStore } from "./settings-store";
-
-const log = createLogger("generation");
 
 export interface StartGenerationParams {
   sourceImageId: string;
@@ -37,9 +35,6 @@ export interface StartGenerationParams {
 
 interface GenerationState {
   /** Models per provider, refreshed when the provider or credentials change. */
-  modelsByProvider: Record<string, ModelInfo[]>;
-  modelsLoading: boolean;
-  loadModels(providerId: string, force?: boolean): Promise<ModelInfo[]>;
   start(params: StartGenerationParams): Promise<Generation>;
   retryJob(jobId: string): void;
   retryFailed(generationId: string): void;
@@ -68,8 +63,7 @@ export async function buildRequestForJob(job: GenerationJob, _signal: AbortSigna
   if (!doc || doc.listing.id !== job.listingId || !asset) {
     throw new AppError("INVALID_IMAGE", "The source image is no longer available.", { retryable: false });
   }
-  const models = useGenerationStore.getState().modelsByProvider[job.provider] ?? [];
-  const model = models.find((m) => m.id === job.model);
+  const model = modelsSnapshot(job.provider).find((m) => m.id === job.model);
   if (!model) throw new AppError("MODEL_UNAVAILABLE", "The selected model is not available.", { retryable: false });
 
   const spec = inputPreparationFor(
@@ -132,28 +126,7 @@ export function applyJobUpdate(job: GenerationJob): void {
   );
 }
 
-export const useGenerationStore = create<GenerationState>((set, get) => ({
-  modelsByProvider: {},
-  modelsLoading: false,
-
-  async loadModels(providerId, force = false) {
-    const cached = get().modelsByProvider[providerId];
-    if (cached && !force) return cached;
-    const provider = getServices().providers.get(providerId);
-    if (!provider) return [];
-    set({ modelsLoading: true });
-    try {
-      const models = await provider.getModels();
-      set({ modelsByProvider: { ...get().modelsByProvider, [providerId]: models } });
-      return models;
-    } catch (err) {
-      log.warn("loadModels failed", err);
-      return cached ?? [];
-    } finally {
-      set({ modelsLoading: false });
-    }
-  },
-
+export const useGenerationStore = create<GenerationState>((_set, get) => ({
   async start(params) {
     const listings = useListingsStore.getState();
     const doc = listings.current;
@@ -163,7 +136,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     const prompt = params.prompt.trim();
     const shots = params.shots?.filter((s) => s.prompt.trim().length > 0) ?? [];
     if (!prompt && shots.length === 0) throw new AppError("INVALID_REQUEST", "Prompt is empty.");
-    const models = await get().loadModels(params.providerId);
+    const models = await ensureModels(params.providerId);
     const model = models.find((m) => m.id === params.modelId);
     if (!model) throw new AppError("MODEL_UNAVAILABLE", "Select an available model.");
 

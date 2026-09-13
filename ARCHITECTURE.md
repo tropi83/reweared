@@ -132,6 +132,8 @@ Image bytes are never put in the JSON. Thumbnails (WebP, 512px) drive the galler
 
 Zustand stores in `app/stores`: `listings` (current `ListingDocument` + debounced atomic saves), `listing-setup` (category, brand, mannequin, the generation run), `generation` (models, start/retry/cancel), `composer`, `auth`, `settings`, `recipes`, `ui` (selection, lightbox, filter), `publish` (Vinted session), `toast`. `app/services.ts` is the composition root; tests build it with an in-memory IndexedDB.
 
+Provider metadata fetched from the network — the model list per provider and the auth status per provider — lives in **TanStack Query** (`app/query/`: `query-client.ts`, `keys.ts`, `models.ts`, `auth-status.ts`). Components use `useModels` / `useAuthStatus`; stores use the imperative accessors (`ensureModels`, `modelsSnapshot`, `authStatusSnapshot`). `auth-store.refresh()` invalidates both families after a credential change. No refetch on focus or reconnect (local-first). Everything else stays in zustand — see `.claude/skills/tanstack-query`.
+
 ## Routing
 
 A tiny hash router (`app/router.ts`): `#/`, `#/listing/:id` (legacy `#/project/:id` accepted), `#/recipes`, `#/settings/:section`.

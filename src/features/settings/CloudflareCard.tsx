@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CheckCircle2, Cloud, ExternalLink } from "lucide-react";
+import { useAuthStatus } from "@/app/query/auth-status";
 import { useAuthStore } from "@/app/stores/auth-store";
 import { toast } from "@/app/stores/toast-store";
 import { getServices } from "@/app/services";
@@ -33,7 +34,7 @@ function StatusBadge({ status }: { status: AuthStatus | undefined }) {
 export function CloudflareCard() {
   const t = useT();
   const auth = useAuthStore();
-  const status = auth.providerStatus.cloudflare;
+  const status = useAuthStatus("cloudflare");
   const platform = getPlatform();
   const directSupported = getServices().cloudflareAuth.directSupported;
   const [mode, setMode] = useState<CloudflareMode>(directSupported ? "direct" : "worker");

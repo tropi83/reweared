@@ -1,7 +1,7 @@
 import { Image, Type } from "lucide-react";
 import { getServices, MOCK_ENABLED } from "@/app/services";
 import { navigate } from "@/app/router";
-import { useAuthStore } from "@/app/stores/auth-store";
+import { useAuthStatus } from "@/app/query/auth-status";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { Label } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -95,11 +95,10 @@ function TextModelCard() {
   const t = useT();
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.update);
-  const providerStatus = useAuthStore((s) => s.providerStatus);
   const copyProviders = [...getServices().copyProviders.values()];
   const provider = getServices().copyProviders.get(settings.copyProviderId) ?? copyProviders[0];
   const model = provider ? resolveCopyModel(provider, settings.copyModelByProvider[provider.id]) : undefined;
-  const connected = !!provider && providerStatus[provider.id]?.state === "authenticated";
+  const connected = useAuthStatus(provider?.id ?? "")?.state === "authenticated";
   const pricing = (m: ListingCopyModel) =>
     m.pricing ? t("copy.pricing", { input: m.pricing.inputPerM, output: m.pricing.outputPerM, free: m.freeTier ? t("copy.freeTier") : "" }) : "";
 

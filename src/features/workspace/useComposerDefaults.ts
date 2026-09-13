@@ -1,17 +1,15 @@
 import { useEffect, useMemo } from "react";
+import { useModels } from "@/app/query/models";
 import { getServices } from "@/app/services";
-import { useAuthStore } from "@/app/stores/auth-store";
 import { useComposerStore } from "@/app/stores/composer-store";
-import { useGenerationStore } from "@/app/stores/generation-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { ALL_ASPECT_RATIOS, type AspectRatio } from "@/domain/models";
 
-/** Derived model data of the composer's image provider (no side effects). */
+/** Derived model data of the composer's image provider (the list itself comes from TanStack Query). */
 export function useComposerModels() {
   const composer = useComposerStore();
-  const modelsByProvider = useGenerationStore((s) => s.modelsByProvider);
   const providers = [...getServices().providers.values()];
-  const models = useMemo(() => modelsByProvider[composer.providerId] ?? [], [modelsByProvider, composer.providerId]);
+  const { models } = useModels(composer.providerId);
   const model = models.find((m) => m.id === composer.modelId);
   const aspectOptions = useMemo<AspectRatio[]>(
     () => ALL_ASPECT_RATIOS.filter((r) => r === "original" || model?.capabilities.supportedAspectRatios.includes(r)),
@@ -28,13 +26,7 @@ export function useComposerModels() {
 export function useComposerDefaults(): void {
   const { composer, models, model, aspectOptions, sizeOptions } = useComposerModels();
   const settings = useSettingsStore((s) => s.settings);
-  const authStatus = useAuthStore((s) => s.providerStatus[composer.providerId]);
-  const loadModels = useGenerationStore((s) => s.loadModels);
   const providerId = composer.providerId;
-
-  useEffect(() => {
-    void loadModels(providerId, true);
-  }, [providerId, authStatus?.state, authStatus?.projectId, loadModels]);
 
   useEffect(() => {
     if (models.length === 0) return;

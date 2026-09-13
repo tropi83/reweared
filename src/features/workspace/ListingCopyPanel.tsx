@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, Copy, FileText, RefreshCw, Settings2, Square } from "lucide-react";
 import { navigate } from "@/app/router";
 import { getServices } from "@/app/services";
-import { useAuthStore } from "@/app/stores/auth-store";
+import { useAuthStatus } from "@/app/query/auth-status";
 import { useListingSetupStore } from "@/app/stores/listing-setup-store";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
@@ -18,7 +18,6 @@ import { errorMessage } from "@/i18n/errors";
 export function ListingCopyPanel() {
   const t = useT();
   const doc = useListingsStore((s) => s.current);
-  const providerStatus = useAuthStore((s) => s.providerStatus);
   const settings = useSettingsStore((s) => s.settings);
   const busy = useListingSetupStore((s) => s.copyBusy);
   const error = useListingSetupStore((s) => s.copyError);
@@ -26,14 +25,14 @@ export function ListingCopyPanel() {
   const updateCopy = useListingSetupStore((s) => s.updateCopy);
   const cancelCopy = useListingSetupStore((s) => s.cancelCopy);
   const [copied, setCopied] = useState<"title" | "description" | "all" | null>(null);
-
-  if (!doc?.listing.originalImageId) return null;
-  const copy = doc.listing.copy;
   const copyProviders = [...getServices().copyProviders.values()];
   const copyProviderId = settings.copyProviderId;
   const provider = getServices().copyProviders.get(copyProviderId) ?? copyProviders[0];
+  const canGenerate = useAuthStatus(provider?.id ?? "")?.state === "authenticated";
+
+  if (!doc?.listing.originalImageId) return null;
+  const copy = doc.listing.copy;
   const model = provider ? resolveCopyModel(provider, settings.copyModelByProvider[provider.id]) : undefined;
-  const canGenerate = !!provider && providerStatus[provider.id]?.state === "authenticated";
 
   const copyText = async (what: "title" | "description" | "all") => {
     if (!copy) return;

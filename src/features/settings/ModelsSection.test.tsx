@@ -1,13 +1,14 @@
 /** Settings → Models: the image provider/model and the text provider/model, persisted in the settings. */
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { __setServices, createServices } from "@/app/services";
-import { useAuthStore } from "@/app/stores/auth-store";
 import { useComposerStore } from "@/app/stores/composer-store";
-import { applyJobUpdate, buildRequestForJob, persistJobResult, useGenerationStore } from "@/app/stores/generation-store";
+import { ensureModels } from "@/app/query/models";
+import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
+import { renderWithQuery, resetQueryClient, seedAuthStatus } from "@/test/render";
 import { ModelsSection } from "./ModelsSection";
 
 describe("ModelsSection", () => {
@@ -18,7 +19,8 @@ describe("ModelsSection", () => {
     await storage.init();
   });
   beforeEach(async () => {
-    useAuthStore.setState({ providerStatus: { gemini: { state: "authenticated", kind: "api_key" } } });
+    resetQueryClient();
+    seedAuthStatus("gemini", { state: "authenticated", kind: "api_key" });
     useSettingsStore.setState({
       settings: {
         ...useSettingsStore.getState().settings,
@@ -29,14 +31,14 @@ describe("ModelsSection", () => {
       },
     });
     useComposerStore.getState().setProvider("mock");
-    await useGenerationStore.getState().loadModels("mock", true);
+    await ensureModels("mock");
     useComposerStore.getState().setModel("mock-fast");
   });
   afterEach(cleanup);
 
   it("changes the image model and remembers it for the provider", async () => {
     const user = userEvent.setup();
-    render(<ModelsSection />);
+    renderWithQuery(<ModelsSection />);
     const images = screen.getByRole("group", { name: "Images" });
     await user.click(within(images).getByRole("combobox", { name: "Model" }));
     const other = screen.getAllByRole("option").find((o) => o.textContent?.includes("Mock") && !o.textContent.includes("Fast"));
@@ -49,7 +51,7 @@ describe("ModelsSection", () => {
 
   it("changes the text model and shows its price", async () => {
     const user = userEvent.setup();
-    render(<ModelsSection />);
+    renderWithQuery(<ModelsSection />);
     const text = screen.getByRole("group", { name: "Title & description" });
     expect(within(text).getByRole("combobox", { name: "Model" })).toHaveTextContent("Gemini 3.1 Flash-Lite");
     await user.click(within(text).getByRole("combobox", { name: "Model" }));
@@ -59,8 +61,8 @@ describe("ModelsSection", () => {
   });
 
   it("says when the text provider is not connected", () => {
-    useAuthStore.setState({ providerStatus: {} });
-    render(<ModelsSection />);
+    seedAuthStatus("gemini", { state: "unauthenticated", kind: "api_key" });
+    renderWithQuery(<ModelsSection />);
     expect(screen.getByText(/Connect Google Gemini in Settings/)).toBeInTheDocument();
   });
 });

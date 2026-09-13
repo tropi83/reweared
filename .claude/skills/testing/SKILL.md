@@ -31,6 +31,8 @@ Colocated `*.test.ts(x)` next to the code:
 - Deterministic timing: inject `sleep`/`random` into the queue; mock latency ≤ 5 ms.
 - A bug fix starts with a failing test that reproduces it.
 
+- Components that call `useModels` / `useAuthStatus` (TanStack Query) render with `renderWithQuery` from `src/test/render.tsx`; `resetQueryClient()` in `beforeEach`, seed statuses with `seedAuthStatus(id, status)` and model lists with `await ensureModels("mock")`. Never seed `useAuthStore` for provider statuses — that field no longer exists.
+
 ## Run
 
 ```bash

@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { toGenerationError, type AuthStatus, type CredentialKind, type GenerationError } from "@/domain/models";
 import type { GoogleCloudProject } from "@/infrastructure/auth/GoogleOAuthCredentialProvider";
+import { queryKeys } from "../query/keys";
+import { getQueryClient } from "../query/query-client";
 import { getServices } from "../services";
 
 interface AuthState {
   /** Gemini's active credential status (kept for the Gemini settings card). */
   status: AuthStatus;
-  /** Local auth status per provider id — what the composer uses to enable Generate. */
-  providerStatus: Record<string, AuthStatus>;
   cloudflareRemembered: boolean;
   apiKeyStatus: AuthStatus;
   oauthStatus: AuthStatus;
@@ -33,7 +33,6 @@ const NONE: AuthStatus = { state: "unauthenticated", kind: "none" };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   status: NONE,
-  providerStatus: {},
   cloudflareRemembered: false,
   apiKeyStatus: { state: "unauthenticated", kind: "api_key" },
   oauthStatus: { state: "unauthenticated", kind: "oauth" },
@@ -42,8 +41,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   lastError: null,
 
   async refresh() {
-    const { auth } = getServices();
-    const { providers, copyProviders, cloudflareAuth } = getServices();
+    const { auth, cloudflareAuth } = getServices();
     const [status, apiKeyStatus, oauthStatus, apiKeyRemembered, cloudflareRemembered] = await Promise.all([
       auth.getStatus(),
       auth.apiKey.getStatus(),
@@ -51,10 +49,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       auth.apiKey.isRemembered(),
       cloudflareAuth.isRemembered(),
     ]);
-    const providerStatus: Record<string, AuthStatus> = {};
-    for (const [id, provider] of providers) providerStatus[id] = await provider.getAuthStatus().catch(() => NONE);
-    for (const [id, provider] of copyProviders) providerStatus[id] ??= await provider.getAuthStatus().catch(() => NONE);
-    set({ status, apiKeyStatus, oauthStatus, apiKeyRemembered, cloudflareRemembered, providerStatus });
+    set({ status, apiKeyStatus, oauthStatus, apiKeyRemembered, cloudflareRemembered });
+    // Per-provider auth statuses and model lists live in TanStack Query; credentials changed, so they are stale.
+    const queryClient = getQueryClient();
+    await Promise.all([queryClient.invalidateQueries({ queryKey: queryKeys.allAuthStatus }), queryClient.invalidateQueries({ queryKey: queryKeys.allModels })]);
   },
 
   async setActiveKind(kind) {

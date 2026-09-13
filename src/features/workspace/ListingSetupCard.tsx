@@ -3,9 +3,9 @@ import { ChevronDown, Sparkles, Square, UserRound, WandSparkles } from "lucide-r
 import { listingReadiness, type ListingReadiness } from "@/app/listing-readiness";
 import { navigate } from "@/app/router";
 import { getServices } from "@/app/services";
-import { useAuthStore } from "@/app/stores/auth-store";
+import { useProviderStatuses } from "@/app/query/auth-status";
+import { useModels } from "@/app/query/models";
 import { useComposerStore } from "@/app/stores/composer-store";
-import { useGenerationStore } from "@/app/stores/generation-store";
 import { BRAND_MAX_LENGTH, photoPartReady, textPartReady, useListingSetupStore, type ListingRunReport } from "@/app/stores/listing-setup-store";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { useRecipesStore } from "@/app/stores/recipes-store";
@@ -36,9 +36,9 @@ export function ListingSetupCard() {
   const lastRun = useListingSetupStore((s) => (s.lastRunListingId === doc?.listing.id ? s.lastRun : null));
   const settings = useSettingsStore((s) => s.settings);
   const composerProviderId = useComposerStore((s) => s.providerId);
-  // Subscriptions that change readiness (photoPartReady/textPartReady read these stores).
-  useAuthStore((s) => s.providerStatus);
-  useGenerationStore((s) => s.modelsByProvider);
+  // Subscriptions that change readiness (photoPartReady/textPartReady read the query snapshots and the composer).
+  useProviderStatuses();
+  useModels(composerProviderId);
   useComposerStore((s) => s.modelId);
   const customRecipes = useRecipesStore((s) => s.custom);
   useComposerDefaults();

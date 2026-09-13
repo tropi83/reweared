@@ -7,8 +7,9 @@ import { MOCK_PROVIDER_ID } from "@/infrastructure/providers/mock/MockImageProvi
 import { nowIso } from "@/lib/ids";
 import { createLogger } from "@/lib/logger";
 import { listingReadiness } from "../listing-readiness";
+import { authStatusSnapshot } from "../query/auth-status";
+import { modelsSnapshot } from "../query/models";
 import { getServices } from "../services";
-import { useAuthStore } from "./auth-store";
 import { useComposerStore } from "./composer-store";
 import { useGenerationStore } from "./generation-store";
 import { useListingsStore } from "./listings-store";
@@ -59,15 +60,15 @@ let copyController: AbortController | null = null;
 /** The composer's image provider can run: authenticated (or Mock) with an available model selected. */
 export function photoPartReady(): boolean {
   const { providerId, modelId } = useComposerStore.getState();
-  const authOk = providerId === MOCK_PROVIDER_ID || useAuthStore.getState().providerStatus[providerId]?.state === "authenticated";
-  const model = useGenerationStore.getState().modelsByProvider[providerId]?.find((m) => m.id === modelId);
+  const authOk = providerId === MOCK_PROVIDER_ID || authStatusSnapshot(providerId)?.state === "authenticated";
+  const model = modelsSnapshot(providerId).find((m) => m.id === modelId);
   return authOk && !!model?.available;
 }
 
 /** The copy provider chosen in settings exists and is authenticated. */
 export function textPartReady(): boolean {
   const { copyProviderId } = useSettingsStore.getState().settings;
-  return getServices().copyProviders.has(copyProviderId) && useAuthStore.getState().providerStatus[copyProviderId]?.state === "authenticated";
+  return getServices().copyProviders.has(copyProviderId) && authStatusSnapshot(copyProviderId)?.state === "authenticated";
 }
 
 async function startPhotos(

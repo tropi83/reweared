@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/Misc";
 import { useT } from "@/i18n";
 import { RecipesView } from "@/features/recipes/RecipesView";
@@ -8,6 +9,7 @@ import { HomeView } from "@/features/workspace/HomeView";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import { useGlobalImport } from "@/features/workspace/useImageImport";
 import { bootstrap } from "./bootstrap";
+import { getQueryClient } from "./query/query-client";
 import { useRoute } from "./router";
 import { useUiStore } from "./stores/ui-store";
 import { cn } from "@/lib/cn";
@@ -39,7 +41,11 @@ export function App() {
       </div>
     );
   }
-  return <Shell />;
+  return (
+    <QueryClientProvider client={getQueryClient()}>
+      <Shell />
+    </QueryClientProvider>
+  );
 }
 
 function Shell() {

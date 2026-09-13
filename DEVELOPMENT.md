@@ -112,7 +112,8 @@ Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, st
 - `src/domain/services/recipes.test.ts` — interpolation; `src/domain/models/models.test.ts` — errors, status derivation, request builder, catalogue.
 - `src/infrastructure/providers/gemini/GeminiProvider.test.ts` — request mapping, response parsing, error normalization, model listing fallback, host allowlist.
 - `src/infrastructure/auth/auth.test.ts` — SecretStore tiers, API-key provider, PKCE, OAuth loopback flow, concurrent refresh, `invalid_grant`.
-- `src/infrastructure/storage/IndexedDbStorage.test.ts` — round trips, deletion, orphans, unsafe ids, migrations.
+- `src/infrastructure/storage/IndexedDbStorage.test.ts` — round trips, deletion, orphans, unsafe ids, migrations; `rename-migration.test.ts` — schema v3, IndexedDB v1→v2 upgrade, desktop layout migration.
+- `src/app/query/query.test.tsx` — model lists and auth statuses through TanStack Query (cache, degraded errors, invalidation). Components that use query hooks render with `renderWithQuery` from `src/test/render.tsx`.
 - `src/infrastructure/image/image-processing.test.ts` — MIME sniffing, validation, resizing math.
 - `src/app/workflow.test.tsx` — import → generate 4 → branch → reload; partial failure + retry; deletion without orphans.
 - `src/app/app-units.test.ts`, `src/lib/lib.test.ts` — i18n, router, stores, ids, log redaction, backoff, timeouts.
