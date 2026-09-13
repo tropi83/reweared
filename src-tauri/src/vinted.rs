@@ -26,19 +26,37 @@ struct PageEvent {
     url: String,
 }
 
+/// What one `vinted_poll` reads from the window: where it is (`scheme://host[:port]/path`, like
+/// `vinted:page`) and the script's status (`None` until the script has decided). Vinted is a
+/// single-page app: reaching the sell form through its own menu fires no page-load event, so the
+/// store follows the location through this poll.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct PollResult {
+    pub url: String,
+    pub status: Option<serde_json::Value>,
+}
+
+const POLL_EXPRESSION: &str =
+    "JSON.stringify({url: String(location.href), status: (window.__aivPrefill && window.__aivPrefill.status) || null})";
+
 /// `eval_with_callback` hands back the JSON serialisation of the expression's value; since the
 /// expression is `JSON.stringify(...)`, the value is itself a JSON string (double-encoded).
-fn parse_poll_result(raw: &str) -> Option<serde_json::Value> {
+fn parse_poll_result(raw: &str) -> Option<PollResult> {
     let outer: serde_json::Value = serde_json::from_str(raw).ok()?;
     let inner = match outer {
         serde_json::Value::String(s) => serde_json::from_str::<serde_json::Value>(&s).ok()?,
         other => other,
     };
-    if inner.is_null() {
-        None
-    } else {
-        Some(inner)
-    }
+    let object = inner.as_object()?;
+    // The location is stripped like page events: a login redirect may carry OAuth parameters.
+    let url = object
+        .get("url")
+        .and_then(|u| u.as_str())
+        .and_then(|u| url::Url::parse(u).ok())
+        .map(|u| page_event_url(&u))
+        .unwrap_or_default();
+    let status = object.get("status").filter(|s| !s.is_null()).cloned();
+    Some(PollResult { url, status })
 }
 
 /// `origin + path` only: OAuth redirects carry `code`/`state` in the query, which must never reach
@@ -136,21 +154,18 @@ pub async fn vinted_prefill<R: Runtime>(app: AppHandle<R>, payload: PrefillPaylo
 }
 
 #[tauri::command]
-pub async fn vinted_poll<R: Runtime>(app: AppHandle<R>) -> Result<Option<serde_json::Value>, String> {
+pub async fn vinted_poll<R: Runtime>(app: AppHandle<R>) -> Result<Option<PollResult>, String> {
     let Some(window) = app.get_webview_window(LABEL) else {
         return Ok(None);
     };
     let (tx, rx) = mpsc::channel::<String>();
     let tx = Mutex::new(Some(tx));
     window
-        .eval_with_callback(
-            "JSON.stringify((window.__aivPrefill && window.__aivPrefill.status) || null)",
-            move |result| {
-                if let Some(tx) = tx.lock().ok().and_then(|mut guard| guard.take()) {
-                    let _ = tx.send(result);
-                }
-            },
-        )
+        .eval_with_callback(POLL_EXPRESSION, move |result| {
+            if let Some(tx) = tx.lock().ok().and_then(|mut guard| guard.take()) {
+                let _ = tx.send(result);
+            }
+        })
         .map_err(|e| e.to_string())?;
     let raw = tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(Duration::from_secs(5)))
         .await
@@ -211,12 +226,28 @@ mod tests {
     }
 
     #[test]
-    fn poll_result_unwraps_double_encoded_json() {
+    fn poll_result_unwraps_double_encoded_json_and_strips_the_url() {
         assert_eq!(parse_poll_result("null"), None);
         assert_eq!(parse_poll_result("\"null\""), None);
-        let v = parse_poll_result("\"{\\\"pageOk\\\":true}\"").unwrap();
-        assert_eq!(v["pageOk"], serde_json::Value::Bool(true));
-        let direct = parse_poll_result("{\"pageOk\":false}").unwrap();
-        assert_eq!(direct["pageOk"], serde_json::Value::Bool(false));
+        assert_eq!(parse_poll_result("\"oops"), None);
+        // Double-encoded (the expression is JSON.stringify): status present.
+        let raw = serde_json::to_string(r#"{"url":"https://www.vinted.fr/items/new?ref=1#x","status":{"pageOk":true}}"#).unwrap();
+        let v = parse_poll_result(&raw).unwrap();
+        assert_eq!(v.url, "https://www.vinted.fr/items/new");
+        assert_eq!(v.status.unwrap()["pageOk"], serde_json::Value::Bool(true));
+        // Direct object, no status yet (script not injected or still waiting for the form).
+        let v = parse_poll_result(r#"{"url":"https://accounts.google.com/o/oauth2/v2/auth?code=SECRET","status":null}"#).unwrap();
+        assert_eq!(
+            v,
+            PollResult {
+                url: "https://accounts.google.com/o/oauth2/v2/auth".into(),
+                status: None
+            }
+        );
+        // Unparsable location: empty url, never a panic.
+        let v = parse_poll_result(r#"{"url":"about:blank#","status":null}"#).unwrap();
+        assert_eq!(v.url, "about://blank");
+        assert_eq!(parse_poll_result(r#"{"url":42}"#).unwrap().url, "");
+        assert_eq!(parse_poll_result("[]"), None);
     }
 }

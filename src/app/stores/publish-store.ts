@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { AppError, toGenerationError, type GenerationError, type ListingDocument } from "@/domain/models";
 import { canPost, stageForUrl, VINTED_SELL_PATH, type FillReport, type PublishBlocker, type PublishStage } from "@/domain/services/publish";
-import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
+import type { PollResult, PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import { createLogger } from "@/lib/logger";
 import { buildPublishPayload } from "../publish-payload";
 import { getServices } from "../services";
@@ -11,6 +11,8 @@ import { useSettingsStore } from "./settings-store";
 const log = createLogger("publish");
 export const POLL_INTERVAL_MS = 300;
 export const POLL_TIMEOUT_MS = 20_000;
+/** How often the open Vinted window is read (location + script status) while a session lasts. */
+export const WATCH_INTERVAL_MS = 500;
 
 /**
  * Where the user is in the Vinted window: closed → login | browsing → form → filled → closed.
@@ -39,7 +41,11 @@ interface PublishState {
   focus(): Promise<void>;
   /** Navigates the Vinted window to the sell form. */
   openForm(): Promise<void>;
-  /** Injects the copy and photos into the sell form and waits for the script's report. */
+  /**
+   * Injects the copy and photos into the sell form and waits for the script's report. Runs by itself
+   * as soon as the window reaches the sell form (page load or client-side navigation); the panel's
+   * button runs it again by hand.
+   */
   fill(): Promise<void>;
   /** Closes the Vinted window and drops the session. */
   finish(): Promise<void>;
@@ -76,12 +82,7 @@ export function postEligibility(doc: ListingDocument | null | undefined): { ok: 
  * Phones: the native screen does the whole job while the app's WebView is paused underneath, so the
  * payload goes over up front and the session only changes when the screen comes back.
  */
-async function runDelegated(
-  bridge: PublishBridge,
-  doc: ListingDocument,
-  session: number,
-  set: (partial: Partial<PublishState> | ((s: PublishState) => Partial<PublishState>)) => void,
-): Promise<void> {
+async function runDelegated(bridge: PublishBridge, doc: ListingDocument, session: number, set: Set): Promise<void> {
   const listingId = doc.listing.id;
   set({ session: { stage: "browsing", busy: true, listingId } });
   try {
@@ -102,6 +103,46 @@ async function runDelegated(
   }
 }
 
+type Set = (partial: Partial<PublishState> | ((s: PublishState) => Partial<PublishState>)) => void;
+
+/** A page event or a poll said where the window is: derive the stage (the form keeps "filled" after a fill). */
+function applyUrl(set: Set, url: string) {
+  const stage = stageForUrl(url);
+  set((s) => ({ session: { ...s.session, url, stage: s.session.stage === "filled" && stage === "form" ? "filled" : stage, error: undefined } }));
+}
+
+/**
+ * Desktop: follows the window while the session lasts. Vinted is a single-page app, so its own
+ * "Sell" entry reaches the form without a page-load event — the poll's `url` catches that. Fills on
+ * arrival on the form and again when the document was replaced (the script and its status are gone);
+ * meanwhile reflects the paste taps (`ready` → `filled`). Poll failures (window navigating) are skipped.
+ */
+async function watchWindow(bridge: PublishBridge, session: number, set: Set, get: () => PublishState): Promise<void> {
+  let previous: PublishStage | undefined;
+  while (session === epoch) {
+    await sleep(WATCH_INTERVAL_MS);
+    if (session !== epoch) return;
+    let result: PollResult | null;
+    try {
+      result = await bridge.poll();
+    } catch (err) {
+      log.debug("watch poll skipped", err instanceof Error ? err.message : String(err));
+      continue;
+    }
+    if (session !== epoch || !result) continue;
+    const stage = stageForUrl(result.url);
+    if (result.url !== get().session.url) applyUrl(set, result.url);
+    const current = get().session;
+    if (stage === "form" && !current.busy) {
+      const arrived = previous !== "form";
+      const reloaded = !!current.report && result.report === null;
+      if (arrived || reloaded) void get().fill();
+      else if (result.report) set((s) => ({ session: { ...s.session, report: result.report ?? undefined } }));
+    }
+    previous = stage;
+  }
+}
+
 export const usePublishStore = create<PublishState>((set, get) => ({
   session: CLOSED,
 
@@ -115,9 +156,9 @@ export const usePublishStore = create<PublishState>((set, get) => ({
     const session = epoch;
     if (bridge.mode === "delegated") return runDelegated(bridge, doc, session, set);
     const offPage = bridge.onPage((url) => {
-      const stage = stageForUrl(url);
-      // Staying on (or reloading) the form after a fill keeps "filled"; any other page resets to its own stage.
-      set((s) => ({ session: { ...s.session, url, stage: s.session.stage === "filled" && stage === "form" ? "filled" : stage, error: undefined } }));
+      applyUrl(set, url);
+      // A real load of the form (navigate, reload): fill without waiting for the next poll.
+      if (stageForUrl(url) === "form") void get().fill();
     });
     const offClosed = bridge.onClosed(() => {
       endSession();
@@ -136,7 +177,10 @@ export const usePublishStore = create<PublishState>((set, get) => ({
       if (session !== epoch) return;
       endSession();
       set({ session: { ...CLOSED, listingId, error } });
+      return;
     }
+    if (session !== epoch) return;
+    void watchWindow(bridge, session, set, get);
   },
 
   async focus() {
@@ -174,7 +218,7 @@ export const usePublishStore = create<PublishState>((set, get) => ({
         await sleep(POLL_INTERVAL_MS);
         // Finished, window closed or a new session started while we were waiting.
         if (stale()) return;
-        report = await publish.poll();
+        report = (await publish.poll())?.report ?? null;
         if (report && !report.pageOk) break;
       }
       if (stale()) return;

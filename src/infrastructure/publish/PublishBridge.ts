@@ -10,13 +10,25 @@ export type VintedPath = "/items/new" | "/";
  */
 export type PublishMode = "windowed" | "delegated";
 
+/**
+ * One read of the Vinted window: where it is (`scheme://host[:port]/path`, query and fragment already
+ * stripped by Rust) and the script's report — `null` until the script has decided, or when it is not in
+ * the page (new document). Vinted is a single-page app: its own menu reaches the sell form without any
+ * page-load event, so the store follows `url` through this poll.
+ */
+export interface PollResult {
+  url: string;
+  report: FillReport | null;
+}
+
 export interface PublishBridge {
   readonly supported: boolean;
   readonly mode: PublishMode;
   open(): Promise<void>;
   navigate(path: VintedPath): Promise<void>;
   prefill(payload: PublishPayload): Promise<void>;
-  poll(): Promise<FillReport | null>;
+  /** Windowed mode; `null` when the window is not open. */
+  poll(): Promise<PollResult | null>;
   close(): Promise<void>;
   clearSession(): Promise<void>;
   onPage(cb: (url: string) => void): () => void;

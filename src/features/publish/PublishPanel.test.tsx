@@ -68,7 +68,7 @@ describe("PublishPanel (delegated)", () => {
     render(<PublishPanel />);
     expect(screen.getByText("2 / 3 attached")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Fill:/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Fill again:/ })).toBeNull();
   });
 });
 

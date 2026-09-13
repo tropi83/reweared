@@ -1,7 +1,7 @@
 import { AppError } from "@/domain/models";
-import { isFillReport, type FillReport, type PublishPayload } from "@/domain/services/publish";
+import { isFillReport, type PublishPayload } from "@/domain/services/publish";
 import { createLogger } from "@/lib/logger";
-import type { PublishBridge, VintedPath } from "./PublishBridge";
+import type { PollResult, PublishBridge, VintedPath } from "./PublishBridge";
 
 const log = createLogger("vinted-bridge");
 
@@ -40,9 +40,10 @@ export class TauriVintedBridge implements PublishBridge {
   prefill(payload: PublishPayload) {
     return this.call("vinted_prefill", { payload });
   }
-  async poll(): Promise<FillReport | null> {
-    const value = await this.call<unknown>("vinted_poll");
-    return isFillReport(value) ? value : null;
+  async poll(): Promise<PollResult | null> {
+    const value = await this.call<{ url?: unknown; status?: unknown } | null>("vinted_poll");
+    if (!value || typeof value.url !== "string") return null;
+    return { url: value.url, report: isFillReport(value.status) ? value.status : null };
   }
   close() {
     return this.call("vinted_close");

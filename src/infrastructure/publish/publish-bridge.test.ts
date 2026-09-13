@@ -17,7 +17,9 @@ describe("UnsupportedBridge", () => {
 describe("TauriVintedBridge", () => {
   it("maps calls to commands, validates poll results and wires events", async () => {
     const invoke = vi.fn<TauriIpc["invoke"]>(async (cmd: string) =>
-      cmd === "vinted_poll" ? { pageOk: true, title: "filled", description: "filled", photos: { requested: 1, attached: 1 } } : undefined,
+      cmd === "vinted_poll"
+        ? { url: "https://www.vinted.fr/items/new", status: { pageOk: true, title: "filled", description: "filled", photos: { requested: 1, attached: 1 } } }
+        : undefined,
     );
     const handlers: Record<string, (e: { payload: unknown }) => void> = {};
     const listen = vi.fn(async (name: string, cb: (e: { payload: unknown }) => void) => {
@@ -30,7 +32,16 @@ describe("TauriVintedBridge", () => {
     await b.prefill({ title: "t", description: "d", photos: [] });
     expect(invoke.mock.calls.map((c) => c[0])).toEqual(["vinted_open", "vinted_navigate", "vinted_prefill"]);
     expect(invoke.mock.calls[1]?.[1]).toEqual({ path: "/items/new" });
-    expect(await b.poll()).toMatchObject({ pageOk: true });
+    expect(await b.poll()).toMatchObject({ url: "https://www.vinted.fr/items/new", report: { pageOk: true } });
+    // Script not injected yet (or still waiting for the form): the location alone.
+    invoke.mockResolvedValueOnce({ url: "https://www.vinted.fr/", status: null });
+    expect(await b.poll()).toEqual({ url: "https://www.vinted.fr/", report: null });
+    // A status that is not a report is dropped, never trusted.
+    invoke.mockResolvedValueOnce({ url: "https://www.vinted.fr/items/new", status: { junk: 1 } });
+    expect(await b.poll()).toEqual({ url: "https://www.vinted.fr/items/new", report: null });
+    // Window closed.
+    invoke.mockResolvedValueOnce(null);
+    expect(await b.poll()).toBeNull();
     invoke.mockResolvedValueOnce({ junk: 1 });
     expect(await b.poll()).toBeNull();
 

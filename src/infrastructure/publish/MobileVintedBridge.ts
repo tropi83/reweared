@@ -1,7 +1,7 @@
 import { AppError } from "@/domain/models";
 import { isFillReport, type FillReport, type PublishPayload } from "@/domain/services/publish";
 import { createLogger } from "@/lib/logger";
-import type { PublishBridge, VintedPath } from "./PublishBridge";
+import type { PollResult, PublishBridge, VintedPath } from "./PublishBridge";
 
 const log = createLogger("vinted-mobile");
 
@@ -45,7 +45,7 @@ export class MobileVintedBridge implements PublishBridge {
   open = noop;
   navigate: (path: VintedPath) => Promise<void> = noop;
   prefill: (payload: PublishPayload) => Promise<void> = noop;
-  poll = async (): Promise<FillReport | null> => null;
+  poll = async (): Promise<PollResult | null> => null;
   close = noop;
   onPage(): () => void {
     return () => undefined;

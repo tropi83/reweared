@@ -110,11 +110,41 @@ describe("vinted prefill", () => {
     expect(pasteButton("description")).toBeNull();
   });
 
-  it("reports pageOk=false and does nothing outside the sell form", () => {
+  it("waits for the form to render, then reports pageOk=false and does nothing outside the sell form", async () => {
     document.body.innerHTML = "<main><h1>Vinted</h1></main>";
     const prefill = createPrefill(window, VINTED_SELECTORS);
     prefill.run(payload);
+    // Undecided while Vinted may still be rendering the form: the host keeps polling.
+    expect(prefill.status).toBeNull();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(prefill.status).toBeNull();
+    await vi.advanceTimersByTimeAsync(6_000);
     expect(prefill.status).toEqual({ pageOk: false, title: "not_found", description: "not_found", photos: { requested: 2, attached: 0 } });
+  });
+
+  it("fills a form that appears after the run (client-side routing renders it after the load event)", async () => {
+    document.body.innerHTML = "<main><h1>Vinted</h1></main>";
+    const prefill = createPrefill(window, VINTED_SELECTORS);
+    prefill.run(payload);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const { seen } = mountForm();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(prefill.status).toEqual({ pageOk: true, title: "ready", description: "ready", photos: { requested: 2, attached: 2 } });
+    pasteButton("title")!.click();
+    expect(seen.title.at(-1)).toBe("Chemise blanche");
+  });
+
+  it("a run while waiting replaces the payload and keeps a single wait", async () => {
+    document.body.innerHTML = "<main><h1>Vinted</h1></main>";
+    const prefill = createPrefill(window, VINTED_SELECTORS);
+    prefill.run(payload);
+    await vi.advanceTimersByTimeAsync(1_000);
+    prefill.run({ ...payload, title: "Nouveau titre" });
+    mountForm();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(document.querySelectorAll('button[data-aiv-paste="title"]')).toHaveLength(1);
+    pasteButton("title")!.click();
+    expect((document.querySelector('[name="title"]') as HTMLInputElement).value).toBe("Nouveau titre");
   });
 
   it("does not count the page's other images (logo, avatar) as attached photos", async () => {

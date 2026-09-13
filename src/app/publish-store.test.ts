@@ -1,6 +1,6 @@
 /**
  * The Vinted publish state machine through the store with a fake bridge and in-memory IndexedDB:
- *   start -> login/browsing (page events) -> form -> filled -> closed.
+ *   start -> login/browsing (page events or polled location) -> form (fills by itself) -> filled -> closed.
  * Image decoding is stubbed because jsdom has no canvas.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,35 +32,40 @@ import { useSettingsStore } from "./stores/settings-store";
 import { usePublishStore } from "./stores/publish-store";
 
 interface FakeBridge extends PublishBridge {
+  /** A real page load: fires the page event and moves the window's location. */
   emitPage(url: string): void;
   emitClosed(): void;
+  /** Where the window is, as `poll()` reports it (client-side navigation changes it without a page event). */
+  url: string;
   report: FillReport | null;
   calls: string[];
   payload: PublishPayload | null;
-  /** Resolves once the store handed the payload over, i.e. when the poll loop is about to start. */
-  prefilled: Promise<void>;
+  /** Resolves once the store handed the payload over for the n-th time, i.e. when that fill's poll loop is about to start. */
+  prefilled(n?: number): Promise<void>;
 }
+
+const HOME = "https://www.vinted.fr/";
+const FORM = "https://www.vinted.fr/items/new";
 
 function fakeBridge(): FakeBridge {
   let page: ((u: string) => void) | undefined;
   let closed: (() => void) | undefined;
-  let markPrefilled: () => void = () => undefined;
-  const b = {
+  const b: FakeBridge = {
     supported: true,
     mode: "windowed" as const,
     run: async () => null,
+    url: HOME,
     calls: [] as string[],
     report: null as FillReport | null,
     payload: null as PublishPayload | null,
-    prefilled: new Promise<void>((resolve) => (markPrefilled = resolve)),
+    prefilled: (n = 1) => vi.waitFor(() => expect(b.calls.filter((c) => c === "prefill")).toHaveLength(n), { timeout: 3_000 }),
     open: async () => void b.calls.push("open"),
     navigate: async (p: string) => void b.calls.push(`navigate:${p}`),
     prefill: async (payload: PublishPayload) => {
       b.payload = payload;
       b.calls.push("prefill");
-      markPrefilled();
     },
-    poll: async () => b.report,
+    poll: async () => ({ url: b.url, report: b.report }),
     close: async () => void b.calls.push("close"),
     clearSession: async () => void b.calls.push("clear"),
     onPage: (cb: (u: string) => void) => {
@@ -71,11 +76,19 @@ function fakeBridge(): FakeBridge {
       closed = cb;
       return () => (closed = undefined);
     },
-    emitPage: (u: string) => page?.(u),
+    emitPage: (u: string) => {
+      b.url = u;
+      page?.(u);
+    },
     emitClosed: () => closed?.(),
   };
   return b;
 }
+
+const FILLED: FillReport = { pageOk: true, title: "filled", description: "filled", photos: { requested: 1, attached: 1 } };
+const READY: FillReport = { ...FILLED, title: "ready", description: "ready" };
+const session = () => usePublishStore.getState().session;
+const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Fakes only the poll loop's clock. fake-indexeddb resolves through setImmediate, so faking every
@@ -114,123 +127,152 @@ describe("publish-store", () => {
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, vintedAutomationAcknowledged: true } });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.useRealTimers();
+    // Ends the session so its watch loop stops before the next test swaps the bridge.
+    await usePublishStore.getState().finish();
   });
 
-  it("opens the window, follows page events and fills the form", async () => {
+  it("opens the window, follows page events and fills the form by itself once a page load lands on it", async () => {
     await prepareListing();
 
     await usePublishStore.getState().start();
     expect(bridge.calls).toEqual(["open"]);
     bridge.emitPage("https://www.vinted.fr/member/login");
-    expect(usePublishStore.getState().session.stage).toBe("login");
-    bridge.emitPage("https://www.vinted.fr/");
-    expect(usePublishStore.getState().session.stage).toBe("browsing");
+    expect(session().stage).toBe("login");
+    bridge.emitPage(HOME);
+    expect(session().stage).toBe("browsing");
 
     await usePublishStore.getState().openForm();
     expect(bridge.calls).toContain("navigate:/items/new");
-    bridge.emitPage("https://www.vinted.fr/items/new");
-    expect(usePublishStore.getState().session.stage).toBe("form");
-
-    bridge.report = { pageOk: true, title: "filled", description: "filled", photos: { requested: 1, attached: 1 } };
-    await usePublishStore.getState().fill();
-    expect(bridge.calls).toContain("prefill");
+    bridge.emitPage(FORM);
+    expect(session()).toMatchObject({ stage: "form", busy: true });
+    await bridge.prefilled();
     expect(bridge.payload).toMatchObject({ title: "Chemise", description: "Blanche" });
     expect(bridge.payload?.photos).toHaveLength(1);
     expect(bridge.payload?.photos[0]).toMatchObject({ name: "photo-1.jpg", mimeType: "image/jpeg" });
-    expect(usePublishStore.getState().session).toMatchObject({ stage: "filled", report: bridge.report, busy: false });
+    bridge.report = READY;
+    await vi.waitFor(() => expect(session()).toMatchObject({ stage: "filled", report: READY, busy: false }));
 
-    // Navigating away from the form after a fill drops back to browsing; the form itself keeps "filled".
-    bridge.emitPage("https://www.vinted.fr/items/new");
-    expect(usePublishStore.getState().session.stage).toBe("filled");
-    bridge.emitPage("https://www.vinted.fr/");
-    expect(usePublishStore.getState().session.stage).toBe("browsing");
+    // Leaving the form drops back to browsing.
+    bridge.emitPage(HOME);
+    expect(session().stage).toBe("browsing");
 
     await usePublishStore.getState().finish();
     expect(bridge.calls).toContain("close");
-    expect(usePublishStore.getState().session.stage).toBe("closed");
+    expect(session().stage).toBe("closed");
     // Listeners are gone: a late page event no longer moves the store.
-    bridge.emitPage("https://www.vinted.fr/items/new");
-    expect(usePublishStore.getState().session.stage).toBe("closed");
+    bridge.emitPage(FORM);
+    expect(session().stage).toBe("closed");
+    expect(bridge.calls.filter((c) => c === "prefill")).toHaveLength(1);
+  });
+
+  it("fills when Vinted's own menu reaches the form (client-side navigation, no page event)", async () => {
+    await prepareListing();
+    await usePublishStore.getState().start();
+    bridge.emitPage(HOME);
+    bridge.url = FORM;
+    await bridge.prefilled();
+    expect(session()).toMatchObject({ stage: "form", url: FORM, busy: true });
+    bridge.report = READY;
+    await vi.waitFor(() => expect(session()).toMatchObject({ stage: "filled", report: READY, busy: false }));
+    // Fills once: staying on the form does not send the photos again.
+    await settle(1_200);
+    expect(bridge.calls.filter((c) => c === "prefill")).toHaveLength(1);
+  });
+
+  it("reflects the paste taps after the fill and fills again once the document was replaced", async () => {
+    await prepareListing();
+    await usePublishStore.getState().start();
+    bridge.report = READY;
+    bridge.emitPage(FORM);
+    await vi.waitFor(() => expect(session()).toMatchObject({ stage: "filled", report: READY }));
+    // The user taps the two paste icons in Vinted.
+    bridge.report = FILLED;
+    await vi.waitFor(() => expect(session().report).toEqual(FILLED), { timeout: 3_000 });
+    // A reload (or a new document): the script and its status are gone - the form is filled again.
+    bridge.report = null;
+    await bridge.prefilled(2);
+    bridge.report = READY;
+    await vi.waitFor(() => expect(session()).toMatchObject({ stage: "filled", report: READY, busy: false }));
   });
 
   it("times out when the script never reports", async () => {
     await prepareListing();
     await usePublishStore.getState().start();
-    bridge.emitPage("https://www.vinted.fr/items/new");
     useFakePollClock();
-    const filling = usePublishStore.getState().fill();
-    await bridge.prefilled;
+    bridge.emitPage(FORM);
+    await bridge.prefilled();
     await vi.advanceTimersByTimeAsync(21_000);
-    await filling;
-    expect(usePublishStore.getState().session.error?.code).toBe("TIMEOUT");
-    expect(usePublishStore.getState().session).toMatchObject({ stage: "form", busy: false });
+    await vi.waitFor(() => expect(session().error?.code).toBe("TIMEOUT"));
+    expect(session()).toMatchObject({ stage: "form", busy: false });
+    // No report and no arrival: nothing fills again by itself.
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(bridge.calls.filter((c) => c === "prefill")).toHaveLength(1);
     vi.useRealTimers();
   });
 
   it("keeps a partial report when the text is filled but photos lag past the timeout", async () => {
     await prepareListing();
     await usePublishStore.getState().start();
-    bridge.emitPage("https://www.vinted.fr/items/new");
-    bridge.report = { pageOk: true, title: "filled", description: "filled", photos: { requested: 1, attached: 0 } };
+    bridge.report = { ...FILLED, photos: { requested: 1, attached: 0 } };
     useFakePollClock();
-    const filling = usePublishStore.getState().fill();
-    await bridge.prefilled;
+    bridge.emitPage(FORM);
+    await bridge.prefilled();
     await vi.advanceTimersByTimeAsync(21_000);
-    await filling;
-    const session = usePublishStore.getState().session;
-    expect(session.error).toBeUndefined();
-    expect(session).toMatchObject({ stage: "filled", busy: false, report: { photos: { requested: 1, attached: 0 } } });
+    await vi.waitFor(() => expect(session().busy).toBe(false));
+    expect(session().error).toBeUndefined();
+    expect(session()).toMatchObject({ stage: "filled", report: { photos: { requested: 1, attached: 0 } } });
     vi.useRealTimers();
   });
 
   it("stays on the form when the script reports a page it does not recognise", async () => {
     await prepareListing();
     await usePublishStore.getState().start();
-    bridge.emitPage("https://www.vinted.fr/items/new");
     bridge.report = { pageOk: false, title: "not_found", description: "not_found", photos: { requested: 1, attached: 0 } };
-    await usePublishStore.getState().fill();
-    expect(usePublishStore.getState().session).toMatchObject({ stage: "form", busy: false, report: bridge.report });
+    bridge.emitPage(FORM);
+    await vi.waitFor(() => expect(session()).toMatchObject({ stage: "form", busy: false, report: bridge.report }));
   });
 
   it("drops a fill that finishes after its session was replaced", async () => {
     await prepareListing();
     await usePublishStore.getState().start();
-    bridge.emitPage("https://www.vinted.fr/items/new");
-    const filling = usePublishStore.getState().fill();
-    await bridge.prefilled;
+    bridge.emitPage(FORM);
+    await bridge.prefilled();
 
     // The user clicks "Done" and starts a new session while the first fill is still polling.
     await usePublishStore.getState().finish();
+    bridge.url = HOME;
     await usePublishStore.getState().start();
-    bridge.report = { pageOk: true, title: "filled", description: "filled", photos: { requested: 1, attached: 1 } };
-    await filling;
+    bridge.report = FILLED;
+    await settle(700);
 
-    const session = usePublishStore.getState().session;
-    expect(session).toMatchObject({ stage: "browsing", busy: false });
-    expect(session.report).toBeUndefined();
+    expect(session()).toMatchObject({ stage: "browsing", busy: false });
+    expect(session().report).toBeUndefined();
+    expect(bridge.calls.filter((c) => c === "prefill")).toHaveLength(1);
   });
 
   it("binds the session to its listing: another listing never fills through it", async () => {
     const first = await prepareListing();
     await usePublishStore.getState().start();
-    expect(usePublishStore.getState().session.listingId).toBe(first.listing.id);
-    bridge.emitPage("https://www.vinted.fr/items/new");
+    expect(session().listingId).toBe(first.listing.id);
 
     // The user switches to another (postable) listing while the Vinted window is still open.
     await prepareListing();
+    bridge.emitPage(FORM);
     await usePublishStore.getState().fill();
+    await settle(700);
     expect(bridge.calls).not.toContain("prefill");
-    expect(usePublishStore.getState().session).toMatchObject({ stage: "form", busy: false, listingId: first.listing.id });
+    expect(session()).toMatchObject({ stage: "form", busy: false, listingId: first.listing.id });
   });
 
   it("refuses to fill once the listing is no longer postable", async () => {
     const doc = await prepareListing();
     await usePublishStore.getState().start();
-    bridge.emitPage("https://www.vinted.fr/items/new");
     useListingsStore.getState().toggleToPost(doc.listing.originalImageId!);
+    bridge.emitPage(FORM);
     await usePublishStore.getState().fill();
+    await settle(700);
     expect(bridge.calls).not.toContain("prefill");
   });
 

@@ -324,15 +324,15 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "publish.terms.continue": "Continuer",
   "publish.panel.title": "Publication sur Vinted",
   "publish.step.login": "Connectez-vous à Vinted dans la fenêtre qui vient de s'ouvrir.",
-  "publish.step.browse": "Ouvrez ensuite le formulaire de vente.",
-  "publish.step.form": "Vous êtes sur le formulaire de vente.",
+  "publish.step.browse": "Ouvrez ensuite le formulaire de vente — depuis le menu de Vinted ou le bouton ci-dessous.",
+  "publish.step.form": "Vous êtes sur le formulaire de vente : les photos s'attachent et une icône de collage apparaît au bout du titre et de la description.",
   "publish.step.delegated":
     "Vinted est ouvert par-dessus l'application. Connectez-vous si besoin et ouvrez le formulaire de vente : les photos sont attachées et une icône de collage apparaît à côté du titre et de la description. Fermez-le pour revenir ici.",
   "publish.step.filled":
     "Dans Vinted, touchez l'icône de collage au bout du titre et de la description, vérifiez, puis cliquez « Ajouter ». Rien n'est publié par l'app.",
   "publish.action.focus": "Afficher la fenêtre Vinted",
   "publish.action.openForm": "Ouvrir le formulaire Vends",
-  "publish.action.fill": "Remplir : titre, description, {count} photos",
+  "publish.action.fill": "Remplir à nouveau : titre, description, {count} photos",
   "publish.action.filling": "Remplissage…",
   "publish.action.finish": "Terminer",
   "publish.action.exportPhotos": "Exporter les photos",

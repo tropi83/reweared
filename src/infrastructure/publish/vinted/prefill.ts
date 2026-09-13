@@ -8,6 +8,9 @@ export interface Prefill {
 
 const THUMBNAIL_WAIT_MS = 10_000;
 const THUMBNAIL_POLL_MS = 250;
+/** Vinted renders the form after the load event (client-side routing, lazy chunks): how long to wait for it. */
+const FORM_WAIT_MS = 10_000;
+const FORM_POLL_MS = 250;
 const PASTE_ATTR = "data-aiv-paste";
 /** Lucide "clipboard-paste", inlined: nothing from the app exists on vinted.com. */
 const PASTE_ICON =
@@ -27,7 +30,8 @@ type TextField = "title" | "description";
  * description fields — the text goes in only when the user taps the icon (their action, not an
  * automated fill). Self-contained on purpose: it is bundled into the Tauri binary and evaluated inside
  * vinted.com, where nothing from the app exists. Never clicks submit.
- * `status` stays a plain object so the host can `JSON.stringify(window.__aivPrefill.status)`.
+ * `status` stays a plain object so the host can `JSON.stringify(window.__aivPrefill.status)`; it is `null`
+ * until the script has decided (the form may still be rendering when the host runs it).
  */
 export function createPrefill(win: Window & typeof globalThis, selectors: VintedSelectors): Prefill {
   const doc = win.document;
@@ -164,26 +168,51 @@ export function createPrefill(win: Window & typeof globalThis, selectors: Vinted
     win.setTimeout(tick, THUMBNAIL_POLL_MS);
   };
 
+  let waitToken = 0;
+  const formPresent = () => !!find(selectors.sellFormRoot) && !!find(selectors.titleInput);
+  const notForm = (payload: PublishPayload): FillReport => ({
+    pageOk: false,
+    title: "not_found",
+    description: "not_found",
+    photos: { requested: payload.photos.length, attached: 0 },
+  });
+
+  /** The form is on screen: photos now, paste icons for the text. */
+  const apply = (payload: PublishPayload) => {
+    const title = find<HTMLInputElement>(selectors.titleInput);
+    const description = find<HTMLTextAreaElement>(selectors.descriptionInput);
+    status = {
+      pageOk: true,
+      title: title ? mountPasteIcon("title", title) : "not_found",
+      description: description ? mountPasteIcon("description", description) : "not_found",
+      photos: { requested: payload.photos.length, attached: countThumbnails() },
+    };
+    attachPhotos(payload.photos, (attached) => {
+      status = status && { ...status, photos: { requested: payload.photos.length, attached } };
+    });
+  };
+
   return {
     get status() {
       return status;
     },
     run(payload) {
       current = payload;
-      const root = find(selectors.sellFormRoot);
-      const pageOk = !!root && !!find(selectors.titleInput);
-      status = { pageOk, title: "not_found", description: "not_found", photos: { requested: payload.photos.length, attached: 0 } };
-      if (!pageOk) return;
-      const title = find<HTMLInputElement>(selectors.titleInput);
-      const description = find<HTMLTextAreaElement>(selectors.descriptionInput);
-      status = {
-        ...status,
-        title: title ? mountPasteIcon("title", title) : "not_found",
-        description: description ? mountPasteIcon("description", description) : "not_found",
+      // Cancels a pending wait from a previous run (its tick checks the token).
+      const token = ++waitToken;
+      if (formPresent()) return apply(payload);
+      status = null;
+      const started = Date.now();
+      const tick = () => {
+        if (token !== waitToken || !current) return;
+        if (formPresent()) return apply(current);
+        if (Date.now() - started > FORM_WAIT_MS) {
+          status = notForm(current);
+          return;
+        }
+        win.setTimeout(tick, FORM_POLL_MS);
       };
-      attachPhotos(payload.photos, (attached) => {
-        status = status && { ...status, photos: { requested: payload.photos.length, attached } };
-      });
+      win.setTimeout(tick, FORM_POLL_MS);
     },
   };
 }

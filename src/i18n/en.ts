@@ -340,15 +340,15 @@ export const en = {
   "publish.terms.continue": "Continue",
   "publish.panel.title": "Publishing on Vinted",
   "publish.step.login": "Log in to Vinted in the window that just opened.",
-  "publish.step.browse": "Then open the sell form.",
-  "publish.step.form": "You are on the sell form.",
+  "publish.step.browse": "Then open the sell form — from Vinted's menu or the button below.",
+  "publish.step.form": "You are on the sell form: the photos are being attached and a paste icon appears at the end of the title and of the description.",
   "publish.step.filled":
     "In Vinted, tap the paste icon at the end of the title and of the description, check everything and click “Add”. Nothing is published by the app.",
   "publish.step.delegated":
     "Vinted is open on top of the app. Log in if needed and open the sell form: the photos are attached and a paste icon appears next to the title and the description. Close it to come back here.",
   "publish.action.focus": "Show the Vinted window",
   "publish.action.openForm": "Open the sell form",
-  "publish.action.fill": "Fill: title, description, {count} photos",
+  "publish.action.fill": "Fill again: title, description, {count} photos",
   "publish.action.filling": "Filling…",
   "publish.action.finish": "Done",
   "publish.action.exportPhotos": "Export the photos",
