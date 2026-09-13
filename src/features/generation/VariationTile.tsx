@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Download, ExternalLink, GitBranch, Maximize2, RefreshCw, RotateCw, X } from "lucide-react";
+import { AlertTriangle, Check, Download, ExternalLink, GitBranch, RefreshCw, RotateCw, X } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
@@ -93,10 +93,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
           </span>
         </div>
 
-        <div className="absolute top-2 right-2 flex items-center gap-1">
-          <TileButton onClick={() => openLightbox(asset.id)} label={t("gallery.fullscreen")}>
-            <Maximize2 className="size-3.5" />
-          </TileButton>
+        <div className="absolute top-2 right-2">
           <ToPostCheckbox assetId={asset.id} checked={isToPost} />
         </div>
 
