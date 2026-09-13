@@ -230,7 +230,7 @@ pnpm android:apk                                           # pre-flight, then ta
 adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
 ```
 
-The universal APK contains all four ABIs. For a quicker build aimed at recent phones only: `pnpm tauri android build --apk --debug --target aarch64`.
+The universal APK contains all four ABIs. For a quicker build aimed at recent phones only: `pnpm tauri android build --apk --debug --target aarch64`. **On the Android Studio emulator (x86_64 system images) build with `--target x86_64`**: an arm64-only APK runs the Rust library through ARM→x86 translation (`libndk_translation`), which is slow and freezes the UI thread in native callbacks ("isn't responding" dialogs as soon as a listing opens).
 
 ### 3.6 Release build (Play Store or sideloading)
 
@@ -253,18 +253,19 @@ The universal APK contains all four ABIs. For a quicker build aimed at recent ph
 
 ### 3.7 Troubleshooting
 
-| Symptom                                                                    | Cause                                                 | Fix                                                                                   |
-| -------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `Failed to create a symbolic link … not allowed for this system` (Windows) | Developer Mode is off                                 | §3.1 step 4                                                                           |
-| `keyring … At least one of the features 'v1' or 'cli' must be enabled`     | an old checkout declared `keyring` for mobile         | update the branch (keyring is desktop-only in `src-tauri/Cargo.toml`)                 |
-| NDK / linker / `JAVA_HOME` errors                                          | environment variables missing or not reloaded         | `pnpm android:doctor`, then open a new terminal                                       |
-| `adb devices` is empty or `unauthorized`                                   | USB debugging off, prompt not accepted, cable, driver | §3.3                                                                                  |
-| White screen or “connection refused” with `android:dev`                    | the phone cannot reach the dev server                 | same Wi-Fi, firewall ports 1420/1421, `--host`, or install a debug APK (§3.5) instead |
-| `Warn The bundle identifier … ends with .app`                              | known, harmless                                       | §6                                                                                    |
+| Symptom                                                                                       | Cause                                                     | Fix                                                                                   |
+| --------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `Failed to create a symbolic link … not allowed for this system` (Windows)                    | Developer Mode is off                                     | §3.1 step 4                                                                           |
+| `keyring … At least one of the features 'v1' or 'cli' must be enabled`                        | an old checkout declared `keyring` for mobile             | update the branch (keyring is desktop-only in `src-tauri/Cargo.toml`)                 |
+| NDK / linker / `JAVA_HOME` errors                                                             | environment variables missing or not reloaded             | `pnpm android:doctor`, then open a new terminal                                       |
+| `adb devices` is empty or `unauthorized`                                                      | USB debugging off, prompt not accepted, cable, driver     | §3.3                                                                                  |
+| White screen or “connection refused” with `android:dev`                                       | the phone cannot reach the dev server                     | same Wi-Fi, firewall ports 1420/1421, `--host`, or install a debug APK (§3.5) instead |
+| `Warn The bundle identifier … ends with .app`                                                 | known, harmless                                           | §6                                                                                    |
+| “AI Image Variations isn't responding” on the emulator, `libndk_translation` in the ANR trace | an arm64-only APK on an x86_64 emulator (translated code) | rebuild with `--target x86_64` (§3.5)                                                 |
 
 ### 3.8 What differs on phones
 
-- **Post on Vinted** is desktop-only in this version: the button is shown disabled.
+- **Post on Vinted** opens a native Vinted screen (plugin `src-tauri/plugins/vinted-webview`: Kotlin `VintedActivity`, Swift `VintedViewController`). The app hands the listing over once; the screen fills the sell form when it appears and returns a report on Close. Session isolation uses the WebView Profile API on Android (WebView 116+) and a dedicated `WKWebsiteDataStore` on iOS 17+ (SECURITY.md). **The iOS half has not been built yet** (no Mac was available when it was written): on macOS run `pnpm ios:dev`, fix any compiler complaint in `ios/Sources/VintedWebviewPlugin.swift`, then check that the screen opens on vinted.com, blocks a link to another site, fills the form once logged in and that Settings → Publishing → erase session works.
 - **Google sign-in** is not wired on mobile: use an API key. Keys are kept for the session only until the mobile keystore lands.
 - **Take a photo** opens the phone's camera app. On Android this relies on the `<queries>` entry for `android.media.action.IMAGE_CAPTURE` in `src-tauri/gen/android/app/src/main/AndroidManifest.xml` (Android 11+ hides other apps otherwise and the gallery opens instead); no `CAMERA` permission is needed (DEVELOPMENT.md → Mobile image import).
 - **Screen edges**: Android reserves the status bar, navigation bar and keyboard areas natively (`MainActivity.kt`, window background = the app background); iOS relies on `viewport-fit=cover` + `env(safe-area-inset-*)` padding in the web UI (`App.tsx`, toasts, lightbox).

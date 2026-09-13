@@ -42,7 +42,7 @@ guaranteed, the iOS scene replaces the app's UI, and the orchestration would sti
   the payload, then polls `window.__aivPrefill.status` every 300 ms for up to 20 s; the status line shows the
   outcome. Back / Close return the last report (or none).
 - **Session isolation**: with `androidx.webkit` `MULTI_PROFILE` (WebView 116+) the WebView uses a dedicated
-  profile `vinted` (own cookies, storage, cache); `clear_session` deletes that profile. Older WebViews share
+  profile `vinted` (own cookies, storage, cache); `clear_session` wipes that profile's cookies and storage (deleting the profile fails while a destroyed WebView is still attached to it). Older WebViews share
   the process-wide cookie jar: `clear_session` then removes all cookies/storage/cache — acceptable because the
   app's own WebView holds nothing of value (local-first, OAuth runs in the system browser) — documented.
 

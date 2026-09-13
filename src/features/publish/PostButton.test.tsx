@@ -6,8 +6,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const platform = vi.hoisted(() => ({ desktop: true }));
-
 vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/infrastructure/image/image-processing")>();
   const fakeBitmap = { width: 10, height: 10, close: () => undefined } as unknown as ImageBitmap;
@@ -16,10 +14,6 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
     decodeImage: async () => ({ bitmap: fakeBitmap, width: 10, height: 10 }),
     createThumbnail: async () => new Blob([Uint8Array.from([1, 2, 3])], { type: "image/webp" }),
   };
-});
-vi.mock("@/infrastructure/platform/capabilities", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/infrastructure/platform/capabilities")>();
-  return { ...actual, getPlatform: () => ({ ...actual.getPlatform(), isTauri: platform.desktop, isMobile: false }) };
 });
 
 import { __setServices, createServices, getServices } from "@/app/services";
@@ -32,11 +26,13 @@ import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { PostButton } from "./PostButton";
 
-function fakeBridge(): PublishBridge & { calls: string[] } {
+function fakeBridge(supported = true): PublishBridge & { calls: string[] } {
   const calls: string[] = [];
   return {
-    supported: true,
+    supported,
+    mode: "windowed",
     calls,
+    run: async () => null,
     open: async () => void calls.push("open"),
     navigate: async () => undefined,
     prefill: async () => undefined,
@@ -75,7 +71,6 @@ describe("PostButton", () => {
   beforeEach(() => {
     bridge = fakeBridge();
     __setServices({ ...getServices(), publish: bridge });
-    platform.desktop = true;
     setAcknowledged(false);
     usePublishStore.setState({ session: { stage: "closed", busy: false } });
     useToastStore.setState({ toasts: [] });
@@ -140,14 +135,15 @@ describe("PostButton", () => {
     expect(screen.queryByText(/Automatic pre-fill on Vinted/)).toBeNull();
   });
 
-  it("stays blocked outside the desktop app and says so on tap", async () => {
-    platform.desktop = false;
+  it("stays blocked where posting is unsupported (web) and says so on tap", async () => {
+    bridge = fakeBridge(false);
+    __setServices({ ...getServices(), publish: bridge });
     await makePostable();
     render(<PostButton />);
     const button = screen.getByRole("button", { name: "Post 1 photos on Vinted" });
     expect(button).toHaveAttribute("aria-disabled", "true");
     await userEvent.setup().click(button);
-    expect(useToastStore.getState().toasts.map((x) => x.message)).toEqual(["Available in the desktop app."]);
+    expect(useToastStore.getState().toasts.map((x) => x.message)).toEqual(["Available in the desktop and phone apps."]);
     expect(bridge.calls).toEqual([]);
   });
 

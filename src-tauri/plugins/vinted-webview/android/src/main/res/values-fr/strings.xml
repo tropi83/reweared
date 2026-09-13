@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vinted_close">Fermer</string>
+    <string name="vinted_status_login">Connectez-vous à Vinted puis ouvrez le formulaire de vente : l\'application le remplit.</string>
+    <string name="vinted_status_browse">Ouvrez le formulaire de vente (Vendre) pour qu\'il soit rempli.</string>
+    <string name="vinted_status_filling">Remplissage du formulaire…</string>
+    <string name="vinted_status_filled">Titre %1$s · Description %2$s · Photos %3$d/%4$d — vérifiez, puis ajoutez manuellement.</string>
+    <string name="vinted_status_not_form">Cette page n\'est pas le formulaire de vente.</string>
+    <string name="vinted_status_timeout">Le formulaire n\'a pas répondu. Rechargez la page pour réessayer.</string>
+</resources>

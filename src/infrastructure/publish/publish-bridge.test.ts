@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AppError } from "@/domain/models";
 import { UnsupportedBridge } from "./UnsupportedBridge";
+import { MobileVintedBridge } from "./MobileVintedBridge";
 import { TauriVintedBridge, type TauriIpc } from "./TauriVintedBridge";
 
 describe("UnsupportedBridge", () => {
@@ -97,5 +98,48 @@ describe("TauriVintedBridge", () => {
     await Promise.resolve();
 
     expect(() => off?.()).not.toThrow();
+  });
+});
+
+describe("MobileVintedBridge", () => {
+  const report = { pageOk: true, title: "filled", description: "filled", photos: { requested: 2, attached: 2 } };
+
+  it("delegates the whole job to the plugin and validates the report it returns", async () => {
+    const invoke = vi.fn(async (cmd: string) => (cmd === "plugin:vinted-webview|run" ? { report } : undefined));
+    const b = new MobileVintedBridge({ invoke });
+    expect(b.mode).toBe("delegated");
+    expect(b.supported).toBe(true);
+    const payload = { title: "t", description: "d", photos: [] };
+    expect(await b.run(payload)).toEqual(report);
+    await b.clearSession();
+    expect(invoke.mock.calls).toEqual([
+      ["plugin:vinted-webview|run", { payload }],
+      ["plugin:vinted-webview|clear_session", undefined],
+    ]);
+  });
+
+  it("returns null when the screen closed before the form was filled, or the shape is wrong", async () => {
+    const answers = [{ report: null }, { report: { nope: 1 } }, null];
+    const b = new MobileVintedBridge({ invoke: async () => answers.shift() });
+    for (let i = 0; i < 3; i++) expect(await b.run({ title: "", description: "", photos: [] })).toBeNull();
+  });
+
+  it("maps payload rejections to INVALID_REQUEST and the rest to UNKNOWN_ERROR", async () => {
+    const b = new MobileVintedBridge({ invoke: async () => Promise.reject(new Error("title too long")) });
+    await expect(b.run({ title: "", description: "", photos: [] })).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+    const c = new MobileVintedBridge({ invoke: async () => Promise.reject(new Error("boom")) });
+    await expect(c.clearSession()).rejects.toMatchObject({ code: "UNKNOWN_ERROR" });
+  });
+
+  it("has no window to drive: the windowed steps are no-ops", async () => {
+    const invoke = vi.fn(async () => undefined);
+    const b = new MobileVintedBridge({ invoke });
+    await b.open();
+    await b.navigate("/items/new");
+    await b.prefill({ title: "", description: "", photos: [] });
+    expect(await b.poll()).toBeNull();
+    await b.close();
+    expect(typeof b.onPage()).toBe("function");
+    expect(invoke).not.toHaveBeenCalled();
   });
 });

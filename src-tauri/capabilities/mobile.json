@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Phones only: the native Vinted screen (pre-fill the sell form, erase its session). Justified in SECURITY.md (\"Vinted screen on Android / iOS\").",
+  "platforms": ["android", "iOS"],
+  "windows": ["main"],
+  "permissions": ["vinted-webview:default"]
+}

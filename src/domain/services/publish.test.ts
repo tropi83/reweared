@@ -39,20 +39,20 @@ function doc(over: Partial<ListingDocument> = {}): ListingDocument {
 }
 
 describe("canPost", () => {
-  it("is ok on desktop with photos and copy", () => expect(canPost(doc(), { desktop: true })).toEqual({ ok: true, reasons: [] }));
+  it("is ok where posting is supported, with photos and copy", () => expect(canPost(doc(), { supported: true })).toEqual({ ok: true, reasons: [] }));
   it("lists every blocker", () => {
-    expect(canPost(doc({ toPost: [] }), { desktop: true }).reasons).toEqual(["noPhotos"]);
+    expect(canPost(doc({ toPost: [] }), { supported: true }).reasons).toEqual(["noPhotos"]);
     const noCopy = doc();
     delete noCopy.listing.copy;
-    expect(canPost(noCopy, { desktop: true }).reasons).toEqual(["noCopy"]);
-    expect(canPost(doc(), { desktop: false }).reasons).toEqual(["desktopOnly"]);
-    expect(canPost(null, { desktop: true }).reasons).toEqual(["noPhotos", "noCopy"]);
+    expect(canPost(noCopy, { supported: true }).reasons).toEqual(["noCopy"]);
+    expect(canPost(doc(), { supported: false }).reasons).toEqual(["unsupported"]);
+    expect(canPost(null, { supported: true }).reasons).toEqual(["noPhotos", "noCopy"]);
   });
   it("ignores marked ids whose image no longer exists and empty copy", () => {
-    expect(canPost(doc({ toPost: ["ghost"] }), { desktop: true }).reasons).toEqual(["noPhotos"]);
+    expect(canPost(doc({ toPost: ["ghost"] }), { supported: true }).reasons).toEqual(["noPhotos"]);
     const blank = doc();
     blank.listing.copy!.title = "  ";
-    expect(canPost(blank, { desktop: true }).reasons).toEqual(["noCopy"]);
+    expect(canPost(blank, { supported: true }).reasons).toEqual(["noCopy"]);
   });
 });
 

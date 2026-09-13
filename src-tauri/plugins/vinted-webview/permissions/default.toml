@@ -1,0 +1,9 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = """
+Post on Vinted from a phone: open the native Vinted screen with the listing to pre-fill (`run`) and
+erase the Vinted session kept by that screen (`clear-session`). Mobile only; the desktop app uses its own
+window instead. Nothing here lets the page reach the app.
+"""
+permissions = ["allow-run", "allow-clear-session"]

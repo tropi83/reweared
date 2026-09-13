@@ -20,7 +20,7 @@ export interface FillReport {
   photos: { requested: number; attached: number };
 }
 export type PublishStage = "closed" | "login" | "browsing" | "form" | "filled";
-export type PublishBlocker = "noPhotos" | "noCopy" | "desktopOnly";
+export type PublishBlocker = "noPhotos" | "noCopy" | "unsupported";
 
 /** Vinted's own form limits (title 100, description 5000, 20 photos) and our transfer cap per photo. */
 export const PUBLISH_LIMITS = { title: 100, description: 5000, photos: 20, photoBytes: 4 * 1024 * 1024 } as const;
@@ -111,11 +111,12 @@ export function orderedPhotoIds(doc: ListingDocument): string[] {
   return assets.slice(0, PUBLISH_LIMITS.photos).map((a) => a.id);
 }
 
-export function canPost(doc: ListingDocument | null | undefined, platform: { desktop: boolean }): { ok: boolean; reasons: PublishBlocker[] } {
+/** `supported`: whether this platform has a way to open Vinted (desktop window, phone screen) — the web has none. */
+export function canPost(doc: ListingDocument | null | undefined, platform: { supported: boolean }): { ok: boolean; reasons: PublishBlocker[] } {
   const reasons: PublishBlocker[] = [];
   if (!doc || orderedPhotoIds(doc).length === 0) reasons.push("noPhotos");
   const copy = doc?.listing.copy;
   if (!copy || !copy.title.trim() || !copy.description.trim()) reasons.push("noCopy");
-  if (!platform.desktop) reasons.push("desktopOnly");
+  if (!platform.supported) reasons.push("unsupported");
   return { ok: reasons.length === 0, reasons };
 }

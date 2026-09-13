@@ -20,6 +20,7 @@ vi.mock("@/infrastructure/platform/capabilities", async (importOriginal) => {
   return { ...actual, getPlatform: () => ({ ...actual.getPlatform(), isTauri: true, isMobile: false }) };
 });
 
+import { AppError } from "@/domain/models";
 import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import type { FillReport, PublishPayload } from "@/domain/services/publish";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
@@ -46,6 +47,8 @@ function fakeBridge(): FakeBridge {
   let markPrefilled: () => void = () => undefined;
   const b = {
     supported: true,
+    mode: "windowed" as const,
+    run: async () => null,
     calls: [] as string[],
     report: null as FillReport | null,
     payload: null as PublishPayload | null,
@@ -271,6 +274,69 @@ describe("publish-store", () => {
     // Listeners were released.
     bridge.emitPage("https://www.vinted.fr/");
     expect(usePublishStore.getState().session.stage).toBe("closed");
+  });
+});
+
+describe("publish-store on phones (delegated bridge)", () => {
+  const storage = new IndexedDbStorage("publish-delegated-test");
+  let runs: PublishPayload[];
+  let answer: FillReport | null | Error;
+  const delegated = (): PublishBridge => ({
+    supported: true,
+    mode: "delegated",
+    run: async (payload) => {
+      runs.push(payload);
+      if (answer instanceof Error) throw answer;
+      return answer;
+    },
+    open: async () => undefined,
+    navigate: async () => undefined,
+    prefill: async () => undefined,
+    poll: async () => null,
+    close: async () => undefined,
+    clearSession: async () => undefined,
+    onPage: () => () => undefined,
+    onClosed: () => () => undefined,
+  });
+
+  beforeAll(async () => {
+    __setServices(null);
+    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
+    await storage.init();
+  });
+  beforeEach(() => {
+    runs = [];
+    answer = null;
+    __setServices({ ...getServices(), publish: delegated() });
+    usePublishStore.setState({ session: { stage: "closed", busy: false } });
+    useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, vintedAutomationAcknowledged: true } });
+  });
+
+  it("hands the payload to the native screen up front and ends on 'filled' with its report", async () => {
+    const doc = await prepareListing();
+    answer = { pageOk: true, title: "filled", description: "filled", photos: { requested: 1, attached: 1 } };
+    const started = usePublishStore.getState().start();
+    await vi.waitFor(() => expect(usePublishStore.getState().session).toMatchObject({ stage: "browsing", busy: true, listingId: doc.listing.id }));
+    await started;
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.title).toBe("Chemise");
+    expect(runs[0]!.photos).toHaveLength(1);
+    expect(usePublishStore.getState().session).toMatchObject({ stage: "filled", busy: false, report: answer });
+    await usePublishStore.getState().finish();
+    expect(usePublishStore.getState().session.stage).toBe("closed");
+  });
+
+  it("reports a screen closed before the form was filled as cancelled", async () => {
+    await prepareListing();
+    await usePublishStore.getState().start();
+    expect(usePublishStore.getState().session).toMatchObject({ stage: "closed", error: { code: "CANCELLED" } });
+  });
+
+  it("surfaces a plugin failure and drops the session", async () => {
+    await prepareListing();
+    answer = new AppError("INVALID_REQUEST", "title too long", { retryable: false });
+    await usePublishStore.getState().start();
+    expect(usePublishStore.getState().session).toMatchObject({ stage: "closed", error: { code: "INVALID_REQUEST" } });
   });
 });
 

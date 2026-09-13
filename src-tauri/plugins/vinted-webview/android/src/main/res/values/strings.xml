@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vinted_close">Close</string>
+    <string name="vinted_status_login">Sign in to Vinted, then open the sell form: the app fills it in.</string>
+    <string name="vinted_status_browse">Open the sell form (Sell) to have it filled in.</string>
+    <string name="vinted_status_filling">Filling the form…</string>
+    <string name="vinted_status_filled">Title %1$s · Description %2$s · Photos %3$d/%4$d — check, then add manually.</string>
+    <string name="vinted_status_not_form">This page is not the sell form.</string>
+    <string name="vinted_status_timeout">The form did not answer. Reload the page to try again.</string>
+</resources>

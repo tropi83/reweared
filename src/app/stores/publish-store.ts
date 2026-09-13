@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { AppError, toGenerationError, type GenerationError, type ListingDocument } from "@/domain/models";
 import { canPost, stageForUrl, VINTED_SELL_PATH, type FillReport, type PublishBlocker, type PublishStage } from "@/domain/services/publish";
-import { getPlatform } from "@/infrastructure/platform/capabilities";
+import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import { createLogger } from "@/lib/logger";
 import { buildPublishPayload } from "../publish-payload";
 import { getServices } from "../services";
@@ -69,8 +69,37 @@ function sleep(ms: number) {
 
 /** Whether `doc` can be posted from this platform (single source for the store, the button and the panel). */
 export function postEligibility(doc: ListingDocument | null | undefined): { ok: boolean; reasons: PublishBlocker[] } {
-  const platform = getPlatform();
-  return canPost(doc, { desktop: platform.isTauri && !platform.isMobile });
+  return canPost(doc, { supported: getServices().publish.supported });
+}
+
+/**
+ * Phones: the native screen does the whole job while the app's WebView is paused underneath, so the
+ * payload goes over up front and the session only changes when the screen comes back.
+ */
+async function runDelegated(
+  bridge: PublishBridge,
+  doc: ListingDocument,
+  session: number,
+  set: (partial: Partial<PublishState> | ((s: PublishState) => Partial<PublishState>)) => void,
+): Promise<void> {
+  const listingId = doc.listing.id;
+  set({ session: { stage: "browsing", busy: true, listingId } });
+  try {
+    const { storage } = getServices();
+    const payload = await buildPublishPayload(doc, (asset) => storage.readImage(listingId, asset.kind, asset.id));
+    if (session !== epoch) return;
+    const report = await bridge.run(payload);
+    if (session !== epoch) return;
+    endSession();
+    if (report) set({ session: { stage: "filled", busy: false, listingId, report } });
+    else set({ session: { ...CLOSED, listingId, error: { code: "CANCELLED", message: "Vinted screen closed.", retryable: false } } });
+  } catch (err) {
+    const error = toGenerationError(err);
+    log.warn("delegated run failed", error.code);
+    if (session !== epoch) return;
+    endSession();
+    set({ session: { ...CLOSED, listingId, error } });
+  }
 }
 
 export const usePublishStore = create<PublishState>((set, get) => ({
@@ -84,6 +113,7 @@ export const usePublishStore = create<PublishState>((set, get) => ({
     const bridge = getServices().publish;
     endSession();
     const session = epoch;
+    if (bridge.mode === "delegated") return runDelegated(bridge, doc, session, set);
     const offPage = bridge.onPage((url) => {
       const stage = stageForUrl(url);
       // Staying on (or reloading) the form after a fill keeps "filled"; any other page resets to its own stage.

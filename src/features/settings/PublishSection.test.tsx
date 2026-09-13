@@ -72,10 +72,10 @@ describe("PublishSection", () => {
     expect(logout).toBeEnabled();
   });
 
-  it("disables the logout outside the desktop app", () => {
+  it("disables the logout where posting is unsupported (web)", () => {
     __setServices({ ...base, publish: new UnsupportedBridge() });
     render(<PublishSection />);
     expect(screen.getByRole("button", { name: "Log out of Vinted" })).toBeDisabled();
-    expect(screen.getByText("Available in the desktop app.")).toBeInTheDocument();
+    expect(screen.getByText("Available in the desktop and phone apps.")).toBeInTheDocument();
   });
 });

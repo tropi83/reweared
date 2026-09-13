@@ -62,6 +62,21 @@ Other guarantees:
 - Destroying the main window closes the Vinted window (`on_window_event` in `lib.rs`): it is never left running without the app that drives it.
 - The web inspector (devtools) exists on the Vinted window in debug builds only; release builds do not enable Tauri's `devtools` feature.
 
+### Vinted screen on Android / iOS (`vinted-webview:default`, `src-tauri/capabilities/mobile.json`)
+
+Phones cannot drive a second window from the app's JavaScript (the app's WebView is paused while another screen is in front), so the plugin `src-tauri/plugins/vinted-webview` opens a **native** screen and does the whole job itself. The capability is restricted to the `main` window on `android` / `iOS` and grants two commands:
+
+| Command                         | Why it exists                                                                     | Guard                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `vinted-webview\|run`           | Opens the Vinted screen with the listing (title, description, photos) to pre-fill | Payload validated in Rust with the desktop limits (`policy.rs`: 100/5000 chars, ≤ 20 photos, ≤ 4 MiB each, JPEG/PNG, safe names); the allow-list (Vinted marketplaces + the three login hosts, `https` only) is computed in Rust and enforced natively (`shouldOverrideUrlLoading` / `decidePolicyFor`); the script is the compiled bundle |
+| `vinted-webview\|clear_session` | Erases the Vinted session kept by that screen (Settings → Publishing)             | Android: the cookies and storage of the dedicated WebView profile (`androidx.webkit` Profile API) are wiped — a profile cannot be deleted while a destroyed WebView is still attached to it; iOS 17+: the dedicated `WKWebsiteDataStore` is removed by identifier                                                                          |
+
+- The native WebView / WKWebView has **no bridge object**: vinted.com cannot call into the app. The only channel is one-way — `evaluateJavascript` injects the script and reads its status back.
+- The request (script + payload) never touches an Intent or a file: it lives in process memory for the lifetime of the screen and is dropped when the screen returns (Binder would reject it anyway — the payload can weigh tens of MB).
+- The screen never clicks "Add"; closing it returns the last status report to the app, nothing else.
+- **Older Android WebViews without the Profile API** share one cookie jar per process: `clear_session` then removes all cookies, storage and cache of the app process — harmless here (the app's own WebView keeps no session: local-first, OAuth runs in the system browser), and documented. **iOS < 17** uses the default `WKWebsiteDataStore` for the same reason as macOS < 14.
+- The iOS half was written without a Mac and is marked untested until built (BUILDING.md).
+
 ## Content Security Policy (`src-tauri/tauri.conf.json`)
 
 `default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (inline `style` attributes for dynamic sizes); `img-src 'self' blob: data:`; `connect-src` restricted to `ipc:`, `http://ipc.localhost` and the Google hosts; `object-src 'none'`; `frame-ancestors 'none'`; `form-action 'none'`.

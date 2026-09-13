@@ -100,10 +100,16 @@ function ProviderUsage({ providerId, rows }: { providerId: string; rows: Row[] }
   const dashboard = DASHBOARDS[providerId];
   const name = providerName(providerId);
   return (
-    <fieldset className="space-y-3 rounded-xl border border-border bg-bg-elevated p-4 text-sm">
+    <fieldset className="min-w-0 space-y-3 rounded-xl border border-border bg-bg-elevated p-4 text-sm">
       <legend className="px-1 text-sm font-medium">{name}</legend>
       {dashboard && (
-        <Button size="sm" variant="secondary" rightIcon={<ExternalLink className="size-3.5" />} onClick={() => void openExternal(dashboard.url)}>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-auto min-h-8 py-1.5 text-left whitespace-normal"
+          rightIcon={<ExternalLink className="size-3.5 shrink-0" />}
+          onClick={() => void openExternal(dashboard.url)}
+        >
           {t(dashboard.label)}
         </Button>
       )}

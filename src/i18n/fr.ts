@@ -312,7 +312,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "publish.button.none": "Poster sur Vinted",
   "publish.reason.noPhotos": "Marquez au moins une photo « À publier ».",
   "publish.reason.noCopy": "Rédigez d'abord le titre et la description.",
-  "publish.reason.desktopOnly": "Disponible dans l'application desktop.",
+  "publish.reason.unsupported": "Disponible dans les applications desktop et mobile.",
   "publish.terms.title": "Pré-remplissage automatique sur Vinted",
   "publish.terms.body":
     "L'app va remplir le formulaire Vinted à votre place (titre, description, photos). Les conditions d'utilisation de Vinted interdisent les outils automatisés ; l'usage de cette fonction se fait à vos risques (restriction possible du compte). Rien n'est publié sans votre clic sur « Ajouter » dans Vinted.",
@@ -322,6 +322,8 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "publish.step.login": "Connectez-vous à Vinted dans la fenêtre qui vient de s'ouvrir.",
   "publish.step.browse": "Ouvrez ensuite le formulaire de vente.",
   "publish.step.form": "Vous êtes sur le formulaire de vente.",
+  "publish.step.delegated":
+    "Vinted est ouvert par-dessus l'application. Connectez-vous si besoin et ouvrez le formulaire de vente : il est rempli pour vous. Fermez-le pour revenir ici.",
   "publish.step.filled": "Vérifiez et cliquez « Ajouter » dans Vinted. Rien n'est publié par l'app.",
   "publish.action.focus": "Afficher la fenêtre Vinted",
   "publish.action.openForm": "Ouvrir le formulaire Vends",
@@ -358,10 +360,10 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "usage.limitDay": "Limite / jour",
   "usage.source": "Limites",
   "usage.sourceManual": "Manuelles",
-  "usage.sourceLearned": "Depuis Google",
+  "usage.sourceLearned": "Depuis le fournisseur",
   "usage.limitsUnknown":
-    "Comptage local à cet appareil. Les limites sont apprises des réponses de Google ou définies dans les réglages. Compteur journalier remis à zéro à {time}.",
-  "usage.limitsLearned": "Comptage local à cet appareil. Limites communiquées par Google. Compteur journalier remis à zéro à {time}.",
+    "Comptage local à cet appareil. Les limites sont apprises des réponses du fournisseur ou définies dans les réglages. Compteur journalier remis à zéro à {time}.",
+  "usage.limitsLearned": "Comptage local à cet appareil. Limites communiquées par le fournisseur. Compteur journalier remis à zéro à {time}.",
   "usage.limitsManual": "Comptage local à cet appareil. Limites définies manuellement. Compteur journalier remis à zéro à {time}.",
   "usage.throttled": "{count} limitée(s)",
   "usage.body":

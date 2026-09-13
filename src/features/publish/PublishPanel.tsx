@@ -49,6 +49,8 @@ export function PublishPanel() {
   const report = session.report;
   const incomplete = !!report && (report.title !== "filled" || report.description !== "filled" || report.photos.attached < report.photos.requested);
   const onForm = session.stage === "form" || session.stage === "filled";
+  // Phones: the native Vinted screen does the steps itself; the panel waits, then shows what it reported.
+  const delegated = getServices().publish.mode === "delegated";
 
   const copyText = async (text: string) => {
     try {
@@ -92,23 +94,25 @@ export function PublishPanel() {
       </div>
 
       <p className="text-sm text-fg-muted" role="status" aria-live="polite">
-        {t(STEP_KEY[session.stage])}
+        {delegated ? (session.busy ? t("publish.step.delegated") : t("publish.step.filled")) : t(STEP_KEY[session.stage])}
       </p>
 
-      <div className="flex flex-col gap-2">
-        <Button variant="secondary" leftIcon={<ExternalLink className="size-4" />} onClick={() => void focus()}>
-          {t("publish.action.focus")}
-        </Button>
-        {onForm ? (
-          <Button variant="primary" loading={session.busy} disabled={session.busy || !postable} onClick={() => void fill()}>
-            {session.busy ? t("publish.action.filling") : t("publish.action.fill", { count })}
+      {!delegated && (
+        <div className="flex flex-col gap-2">
+          <Button variant="secondary" leftIcon={<ExternalLink className="size-4" />} onClick={() => void focus()}>
+            {t("publish.action.focus")}
           </Button>
-        ) : (
-          <Button variant="primary" onClick={() => void openForm()}>
-            {t("publish.action.openForm")}
-          </Button>
-        )}
-      </div>
+          {onForm ? (
+            <Button variant="primary" loading={session.busy} disabled={session.busy || !postable} onClick={() => void fill()}>
+              {session.busy ? t("publish.action.filling") : t("publish.action.fill", { count })}
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => void openForm()}>
+              {t("publish.action.openForm")}
+            </Button>
+          )}
+        </div>
+      )}
 
       {session.error && (
         <p className="text-xs text-danger" role="alert">

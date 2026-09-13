@@ -33,7 +33,7 @@ export function PublishSection() {
     <Section id="publish" title={t("settings.section.publish")}>
       <div className="space-y-3 rounded-xl border border-border bg-bg-elevated p-4 text-sm">
         <p className="text-fg-muted">{t("publish.settings.body")}</p>
-        {!supported && <p className="text-xs text-fg-subtle">{t("publish.reason.desktopOnly")}</p>}
+        {!supported && <p className="text-xs text-fg-subtle">{t("publish.reason.unsupported")}</p>}
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"

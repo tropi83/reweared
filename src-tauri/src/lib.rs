@@ -6,12 +6,19 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
         .manage(oauth::LoopbackState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_http::init());
+    // Phones post on Vinted through a native screen; desktop keeps its own window (vinted.rs).
+    #[cfg(mobile)]
+    {
+        builder = builder.plugin(tauri_plugin_vinted_webview::init());
+    }
+    builder
         .on_window_event(|window, event| {
             // The Vinted window is only driven from the main one: never leave it orphaned (and keeping
             // the process alive) once the main window is gone.

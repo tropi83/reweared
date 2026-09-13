@@ -13,6 +13,7 @@ export interface TauriIpc {
 
 export class TauriVintedBridge implements PublishBridge {
   readonly supported = true;
+  readonly mode = "windowed" as const;
   constructor(private readonly ipc: TauriIpc) {}
 
   private async call<T = void>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -48,6 +49,9 @@ export class TauriVintedBridge implements PublishBridge {
   }
   clearSession() {
     return this.call("vinted_clear_session");
+  }
+  run(): Promise<never> {
+    return Promise.reject(new AppError("INVALID_REQUEST", "The desktop window is driven step by step.", { retryable: false }));
   }
 
   private subscribe(event: string, cb: (payload: unknown) => void): () => void {
