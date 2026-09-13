@@ -76,9 +76,3 @@ export const GEMINI_IMAGE_MODELS: ModelInfo[] = [
     },
   },
 ];
-
-export const DEFAULT_GEMINI_MODEL_ID = "gemini-3.1-flash-image";
-
-export function findGeminiModel(id: string): ModelInfo | undefined {
-  return GEMINI_IMAGE_MODELS.find((m) => m.id === id);
-}

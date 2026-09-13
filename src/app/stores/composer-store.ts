@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AspectRatio, ImageSize } from "@/domain/models";
+import type { AppSettings, AspectRatio, ImageSize } from "@/domain/models";
 
 interface ComposerState {
   listingId: string | null;
@@ -30,6 +30,8 @@ interface ComposerState {
   setRecipeValue(name: string, value: string): void;
   /** Called when a listing opens; resets per-listing state but keeps generation preferences. */
   bindListing(listingId: string | null): void;
+  /** Seeds the format and provider from the saved settings — once, at startup (bootstrap). */
+  applyDefaults(defaults: Pick<AppSettings, "defaultAspectRatio" | "defaultImageSize" | "activeProviderId">, registeredProviders: ReadonlySet<string>): void;
   loadFromGeneration(input: {
     prompt: string;
     sourceImageId: string | null;
@@ -69,6 +71,14 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   setAspectRatio: (aspectRatio) => set({ aspectRatio }),
   setImageSize: (imageSize) => set({ imageSize }),
   setProvider: (providerId) => set({ providerId, modelId: null }),
+  applyDefaults: (defaults, registeredProviders) => {
+    const provider = registeredProviders.has(defaults.activeProviderId) ? defaults.activeProviderId : get().providerId;
+    set({
+      aspectRatio: defaults.defaultAspectRatio,
+      imageSize: defaults.defaultImageSize,
+      ...(provider !== get().providerId ? { providerId: provider, modelId: null } : {}),
+    });
+  },
   setModel: (modelId) => set({ modelId }),
   setRecipe: (recipeId, values = {}) => set({ recipeId, recipeValues: values }),
   setRecipeValue: (name, value) => set({ recipeValues: { ...get().recipeValues, [name]: value } }),

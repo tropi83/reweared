@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { toGenerationError } from "@/domain/models";
 import { useT } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
-import { Section } from "./SettingsView";
+import { Section } from "./SettingsPrimitives";
 
 /** Settings → Publishing: bring the automation warning back and erase the isolated Vinted session. */
 export function PublishSection() {

@@ -9,7 +9,7 @@ import type { ModelInfo } from "@/domain/models";
 import { resolveCopyModel, type ListingCopyModel } from "@/domain/services/listing-copy";
 import { useT, type MessageKey } from "@/i18n";
 import { useComposerDefaults, useComposerModels } from "../workspace/useComposerDefaults";
-import { Section } from "./SettingsView";
+import { Section } from "./SettingsPrimitives";
 
 /** Catalogue tiers ("Fast", "Professional"…) are not names: show the id instead. */
 export function modelLabel(m: ModelInfo): string {

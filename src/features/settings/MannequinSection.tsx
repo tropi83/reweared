@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { normalizeMannequin } from "@/domain/services/mannequin";
 import { useT } from "@/i18n";
 import { MannequinDialog, MannequinSummary } from "../mannequin/MannequinDialog";
-import { Section } from "./SettingsView";
+import { Section } from "./SettingsPrimitives";
 
 /** Settings → Mannequin: summary, edit, delete. */
 export function MannequinSection() {

@@ -59,6 +59,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   vintedAutomationAcknowledged: false,
 };
 
+/**
+ * Reserved for the ads / supporter tier (out of scope for the MVP, see project-context): the only piece of that
+ * feature that exists. Kept so the settings model has a home for it.
+ * @public
+ */
 export interface Entitlement {
   adsEnabled: boolean;
   tier: "free" | "supporter";

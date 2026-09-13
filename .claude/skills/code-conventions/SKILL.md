@@ -42,9 +42,10 @@ description: Use when writing or reviewing TypeScript/React/Rust code in this re
 
 ## Clean-code checklist before finishing
 
-1. No dead code, no commented-out blocks, no `console.*` (use `createLogger`).
-2. No duplicated logic across stores/components — extract to `lib/` or a store action.
-3. Names say what, comments say why. JSDoc on exported functions with non-obvious behaviour.
-4. New behaviour has a test; changed behaviour has an updated test.
-5. `pnpm check` is green; UI changes were looked at in the browser or the desktop app.
-6. Docs updated when architecture, permissions, env vars or user-facing flows change.
+1. No dead code, no commented-out blocks, no `console.*` (use `createLogger`). `pnpm knip` (part of `pnpm check`) fails on unused files, exports and dependencies; an export kept on purpose for an external reader gets a `@public` JSDoc tag, never a blanket ignore.
+1. No import cycles between a view and the sections it renders: shared primitives live in their own module (`features/settings/SettingsPrimitives.tsx`, not `SettingsView`).
+1. No duplicated logic across stores/components — extract to `lib/` or a store action.
+1. Names say what, comments say why. JSDoc on exported functions with non-obvious behaviour.
+1. New behaviour has a test; changed behaviour has an updated test.
+1. `pnpm check` is green; UI changes were looked at in the browser or the desktop app.
+1. Docs updated when architecture, permissions, env vars or user-facing flows change.

@@ -78,6 +78,17 @@ describe("ui store", () => {
 });
 
 describe("composer store", () => {
+  it("applies the saved generation defaults once, at startup, and only for a registered provider", () => {
+    const c = useComposerStore.getState();
+    c.setProvider("mock");
+    c.setAspectRatio("1:1");
+    c.applyDefaults({ defaultAspectRatio: "3:4", defaultImageSize: "1K", activeProviderId: "cloudflare" }, new Set(["cloudflare", "mock"]));
+    expect(useComposerStore.getState()).toMatchObject({ aspectRatio: "3:4", imageSize: "1K", providerId: "cloudflare" });
+    c.applyDefaults({ defaultAspectRatio: "16:9", defaultImageSize: undefined, activeProviderId: "unknown" }, new Set(["cloudflare"]));
+    // An unregistered provider is ignored; the format still follows the settings.
+    expect(useComposerStore.getState()).toMatchObject({ aspectRatio: "16:9", providerId: "cloudflare" });
+  });
+
   it("clamps variation count and resets per-listing state", () => {
     const c = useComposerStore.getState();
     c.setVariationCount(99);

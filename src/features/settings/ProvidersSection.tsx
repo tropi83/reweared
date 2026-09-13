@@ -17,7 +17,7 @@ import { errorMessage } from "@/i18n/errors";
 import { cn } from "@/lib/cn";
 import { openExternal } from "@/lib/open-external";
 import { CloudflareCard } from "./CloudflareCard";
-import { Section } from "./SettingsView";
+import { Section } from "./SettingsPrimitives";
 
 const AI_STUDIO_KEYS_URL = "https://aistudio.google.com/api-keys";
 const AI_STUDIO_BILLING_URL = "https://aistudio.google.com/plan_information";

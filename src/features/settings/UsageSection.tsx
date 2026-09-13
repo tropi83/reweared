@@ -13,7 +13,7 @@ import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/G
 import { useT } from "@/i18n";
 import { openExternal } from "@/lib/open-external";
 import { CF_WORKERS_AI_DASHBOARD } from "./CloudflareCard";
-import { Section } from "./SettingsView";
+import { Section } from "./SettingsPrimitives";
 import { UsageGauge } from "./UsageGauge";
 
 /** Providers that always get a block, in this order; any other provider with recorded usage follows. */

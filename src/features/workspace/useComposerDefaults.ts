@@ -20,8 +20,9 @@ export function useComposerModels() {
 }
 
 /**
- * Keeps the composer on a usable provider/model/format. Mounted by the always-visible listing card, so it
- * runs even while "Advanced options" is collapsed. The effects only call store actions.
+ * Keeps the composer on a usable model and format for its provider. Mounted by the listing card and by
+ * Settings → Models; the saved defaults themselves are applied once at startup (`bootstrap`). The effects
+ * only call store actions.
  */
 export function useComposerDefaults(): void {
   const { composer, models, model, aspectOptions, sizeOptions } = useComposerModels();
@@ -34,13 +35,6 @@ export function useComposerDefaults(): void {
     const valid = models.find((m) => m.id === preferred && m.available) ?? models.find((m) => m.available) ?? models[0];
     if (valid && valid.id !== composer.modelId) composer.setModel(valid.id);
   }, [models, composer, providerId, settings.lastModelByProvider]);
-
-  useEffect(() => {
-    composer.setAspectRatio(settings.defaultAspectRatio);
-    if (settings.defaultImageSize) composer.setImageSize(settings.defaultImageSize);
-    if (getServices().providers.has(settings.activeProviderId)) composer.setProvider(settings.activeProviderId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (!model) return;

@@ -3,14 +3,6 @@ import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useToastStore } from "@/app/stores/toast-store";
 
-export function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border bg-bg-sunken px-1 font-mono text-[11px] text-fg-muted">
-      {children}
-    </kbd>
-  );
-}
-
 export function Badge({
   children,
   tone = "neutral",
@@ -135,8 +127,4 @@ export function Toaster() {
       ))}
     </div>
   );
-}
-
-export function Spinner({ className }: { className?: string }) {
-  return <span className={cn("inline-block size-4 animate-spin rounded-full border-2 border-fg-subtle border-t-transparent", className)} aria-hidden />;
 }

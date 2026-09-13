@@ -1,6 +1,7 @@
 import { createLogger } from "@/lib/logger";
 import { createServices, hasServices, USAGE_META_KEY } from "./services";
 import { useAuthStore } from "./stores/auth-store";
+import { useComposerStore } from "./stores/composer-store";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "./stores/generation-store";
 import { useListingsStore } from "./stores/listings-store";
 import { useRecipesStore } from "./stores/recipes-store";
@@ -21,6 +22,7 @@ export function bootstrap(): Promise<void> {
     const services = getServices();
     await services.storage.init();
     await useSettingsStore.getState().load();
+    useComposerStore.getState().applyDefaults(useSettingsStore.getState().settings, new Set(services.providers.keys()));
     services.usage.load(await services.storage.readMeta(USAGE_META_KEY));
     await services.auth.autoDetect();
     services.auth.subscribe(() => void useAuthStore.getState().refresh());
