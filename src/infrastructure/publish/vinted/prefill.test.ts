@@ -4,14 +4,20 @@ import { VINTED_SELECTORS, type VintedSelectors } from "./selectors";
 
 const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
-/** Minimal stand-in for Vinted's React-controlled sell form. */
+/**
+ * Stand-in for Vinted's React-controlled sell form, mirroring the live markup (checked on the mobile web
+ * on 2026-09-13): the media grid and the hidden file input live OUTSIDE the <form>; each field is an
+ * <input> inside `.web_ui__Input__content`.
+ */
 function mountForm({ withDescription = true, thumbnailDelayMs = 0 } = {}) {
   document.body.innerHTML = `
-    <form data-testid="item-upload-form">
-      <input type="file" accept="image/*" multiple data-testid="photo-input" />
-      <div data-testid="photo-thumbnails"></div>
-      <input name="title" data-testid="title--input" value="" />
-      ${withDescription ? '<textarea name="description" data-testid="description--input"></textarea>' : ""}
+    <div data-testid="media-upload">
+      <input type="file" accept="image/jpeg,image/png" multiple class="u-hidden" data-testid="add-photos-input" name="photos" />
+      <div data-testid="media-upload-grid"></div>
+    </div>
+    <form>
+      <label class="web_ui__Input__input" data-testid="title"><div class="web_ui__Input__content"><input class="web_ui__Input__value" id="title" name="title" data-testid="title--input" value="" /></div></label>
+      ${withDescription ? '<label class="web_ui__Input__input" data-testid="description"><div class="web_ui__Input__content"><textarea id="description" name="description" data-testid="description--input"></textarea></div></label>' : ""}
       <button type="submit">Ajouter</button>
     </form>`;
   const seen = { title: [] as string[], description: [] as string[] };
@@ -24,8 +30,10 @@ function mountForm({ withDescription = true, thumbnailDelayMs = 0 } = {}) {
   photoInput.addEventListener("change", () => {
     const files = Array.from(photoInput.files ?? []);
     const render = () => {
-      const box = document.querySelector('[data-testid="photo-thumbnails"]')!;
-      for (const f of files) box.insertAdjacentHTML("beforeend", `<img data-testid="photo-thumbnail" alt="${f.name}">`);
+      const box = document.querySelector('[data-testid="media-upload-grid"]')!;
+      files.forEach((f, i) =>
+        box.insertAdjacentHTML("beforeend", `<div data-testid="image-wrapper-${i}"><img src="https://images1.vinted.net/t/${f.name}" alt=""></div>`),
+      );
     };
     if (thumbnailDelayMs > 0) setTimeout(render, thumbnailDelayMs);
     else render();
@@ -48,16 +56,47 @@ describe("vinted prefill", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("fills title, description and photos through native setters + events, never submits", async () => {
+  const pasteButton = (field: "title" | "description") => document.querySelector<HTMLButtonElement>(`button[data-aiv-paste="${field}"]`);
+
+  it("attaches the photos, offers a paste icon per text field and writes nothing until it is tapped; never submits", async () => {
     const { seen, submit } = mountForm();
     const prefill = createPrefill(window, VINTED_SELECTORS);
     prefill.run(payload);
     await vi.advanceTimersByTimeAsync(600);
+    // Photos: automatic; thumbnails are counted where Vinted renders them (outside the form).
+    expect(document.querySelectorAll('[data-testid^="image-wrapper-"]')).toHaveLength(2);
+    expect(prefill.status).toEqual({ pageOk: true, title: "ready", description: "ready", photos: { requested: 2, attached: 2 } });
+    // Text: nothing typed for the user…
+    expect(seen.title).toEqual([]);
+    expect((document.querySelector('[name="title"]') as HTMLInputElement).value).toBe("");
+    const title = pasteButton("title")!;
+    expect(title.closest(".web_ui__Input__content")).not.toBeNull();
+    expect(title.closest(".web_ui__Input__content")!.getAttribute("style")).toContain("position: relative");
+    expect(title.style.position).toBe("absolute");
+    expect(title.style.right).toBe("8px");
+    expect(title.getAttribute("aria-label")).toMatch(/titre|title/i);
+    expect(title.querySelector("svg")).not.toBeNull();
+    // …until they tap the icon: native setter + input/change events, then the status says so.
+    title.click();
     expect(seen.title.at(-1)).toBe("Chemise blanche");
+    expect(prefill.status?.title).toBe("filled");
+    expect(prefill.status?.description).toBe("ready");
+    pasteButton("description")!.click();
     expect(seen.description.at(-1)).toBe("Coton, très bon état.");
-    expect(prefill.status).toEqual({ pageOk: true, title: "filled", description: "filled", photos: { requested: 2, attached: 2 } });
+    expect(prefill.status?.description).toBe("filled");
     expect(submit).not.toHaveBeenCalled();
     expect(window.__aivPrefill).toBeUndefined(); // createPrefill does not touch globals; entry.ts does
+  });
+
+  it("mounts one icon per field even when run again, and the icon pastes the latest payload", async () => {
+    mountForm();
+    const prefill = createPrefill(window, VINTED_SELECTORS);
+    prefill.run(payload);
+    prefill.run({ ...payload, title: "Nouveau titre" });
+    await vi.advanceTimersByTimeAsync(600);
+    expect(document.querySelectorAll('button[data-aiv-paste="title"]')).toHaveLength(1);
+    pasteButton("title")!.click();
+    expect((document.querySelector('[name="title"]') as HTMLInputElement).value).toBe("Nouveau titre");
   });
 
   it("uses fallback selectors and reports missing fields", async () => {
@@ -66,8 +105,9 @@ describe("vinted prefill", () => {
     const prefill = createPrefill(window, selectors);
     prefill.run(payload);
     await vi.advanceTimersByTimeAsync(600);
-    expect(prefill.status?.title).toBe("filled");
+    expect(prefill.status?.title).toBe("ready");
     expect(prefill.status?.description).toBe("not_found");
+    expect(pasteButton("description")).toBeNull();
   });
 
   it("reports pageOk=false and does nothing outside the sell form", () => {
@@ -77,13 +117,12 @@ describe("vinted prefill", () => {
     expect(prefill.status).toEqual({ pageOk: false, title: "not_found", description: "not_found", photos: { requested: 2, attached: 0 } });
   });
 
-  it("ignores blob images outside the sell form when deciding whether photos are attached", async () => {
+  it("does not count the page's other images (logo, avatar) as attached photos", async () => {
     mountForm();
-    document.body.insertAdjacentHTML("afterbegin", '<header><img src="blob:x" alt="avatar"></header>');
+    document.body.insertAdjacentHTML("afterbegin", '<header><img src="https://images1.vinted.net/t/avatar" alt="avatar"><img src="blob:x"></header>');
     const prefill = createPrefill(window, VINTED_SELECTORS);
     prefill.run(payload);
     await vi.advanceTimersByTimeAsync(600);
-    expect(document.querySelectorAll('form [data-testid="photo-thumbnail"]')).toHaveLength(2);
     expect(prefill.status?.photos).toEqual({ requested: 2, attached: 2 });
   });
 
@@ -94,7 +133,7 @@ describe("vinted prefill", () => {
     await vi.advanceTimersByTimeAsync(300);
     prefill.run(payload); // re-entrant while the first poll is in flight
     await vi.advanceTimersByTimeAsync(1500);
-    expect(document.querySelectorAll('[data-testid="photo-thumbnail"]')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-testid^="image-wrapper-"]')).toHaveLength(2);
     expect(prefill.status?.photos).toEqual({ requested: 2, attached: 2 });
   });
 
@@ -105,6 +144,6 @@ describe("vinted prefill", () => {
     await vi.advanceTimersByTimeAsync(600);
     prefill.run(payload);
     await vi.advanceTimersByTimeAsync(600);
-    expect(document.querySelectorAll('[data-testid="photo-thumbnail"]')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-testid^="image-wrapper-"]')).toHaveLength(2);
   });
 });

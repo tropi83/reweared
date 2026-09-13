@@ -315,7 +315,9 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "publish.reason.unsupported": "Disponible dans les applications desktop et mobile.",
   "publish.terms.title": "Pré-remplissage automatique sur Vinted",
   "publish.terms.body":
-    "L'app va remplir le formulaire Vinted à votre place (titre, description, photos). Les conditions d'utilisation de Vinted interdisent les outils automatisés ; l'usage de cette fonction se fait à vos risques (restriction possible du compte). Rien n'est publié sans votre clic sur « Ajouter » dans Vinted.",
+    "L'app attache les photos au formulaire Vinted et ajoute une icône de collage à côté du titre et de la description : le texte est inséré quand vous la touchez. Les conditions d'utilisation de Vinted interdisent les outils automatisés ; l'usage de cette fonction se fait à vos risques (restriction possible du compte). Rien n'est publié sans votre clic sur « Ajouter » dans Vinted.",
+  "publish.terms.noGoogle":
+    "Connectez-vous à Vinted avec votre e-mail, Facebook ou Apple. Google refuse « Se connecter avec Google » dans les écrans intégrés aux applications comme celui-ci.",
   "publish.terms.dontShow": "Ne plus afficher",
   "publish.terms.continue": "Continuer",
   "publish.panel.title": "Publication sur Vinted",
@@ -323,8 +325,9 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "publish.step.browse": "Ouvrez ensuite le formulaire de vente.",
   "publish.step.form": "Vous êtes sur le formulaire de vente.",
   "publish.step.delegated":
-    "Vinted est ouvert par-dessus l'application. Connectez-vous si besoin et ouvrez le formulaire de vente : il est rempli pour vous. Fermez-le pour revenir ici.",
-  "publish.step.filled": "Vérifiez et cliquez « Ajouter » dans Vinted. Rien n'est publié par l'app.",
+    "Vinted est ouvert par-dessus l'application. Connectez-vous si besoin et ouvrez le formulaire de vente : les photos sont attachées et une icône de collage apparaît à côté du titre et de la description. Fermez-le pour revenir ici.",
+  "publish.step.filled":
+    "Dans Vinted, touchez l'icône de collage au bout du titre et de la description, vérifiez, puis cliquez « Ajouter ». Rien n'est publié par l'app.",
   "publish.action.focus": "Afficher la fenêtre Vinted",
   "publish.action.openForm": "Ouvrir le formulaire Vends",
   "publish.action.fill": "Remplir : titre, description, {count} photos",
@@ -336,6 +339,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "publish.report.photos": "Photos",
   "publish.report.filled": "rempli",
   "publish.report.not_found": "introuvable",
+  "publish.report.ready": "touchez l'icône dans Vinted pour coller",
   "publish.report.failed": "échec",
   "publish.report.attached": "{attached} / {requested} attachées",
   "publish.report.notForm": "Ce n'est pas le formulaire de vente. Ouvrez-le, puis remplissez à nouveau.",

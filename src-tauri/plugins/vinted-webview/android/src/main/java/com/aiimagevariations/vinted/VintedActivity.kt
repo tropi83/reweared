@@ -34,7 +34,8 @@ import org.json.JSONTokener
 class VintedActivity : AppCompatActivity() {
   companion object {
     const val EXTRA_REPORT = "report"
-    private const val POLL_INTERVAL_MS = 300L
+    private const val POLL_INTERVAL_MS = 500L
+    /** Without any report after this, the script did not run (page changed?): say so. */
     private const val POLL_TIMEOUT_MS = 20_000L
   }
 
@@ -115,6 +116,10 @@ class VintedActivity : AppCompatActivity() {
         return !isAllowed(req.url)
       }
 
+      override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+        stopPolling()
+      }
+
       override fun onPageFinished(view: WebView, url: String?) {
         val uri = url?.let { Uri.parse(it) } ?: return
         if (!isAllowed(uri)) return
@@ -125,7 +130,12 @@ class VintedActivity : AppCompatActivity() {
 
   private fun isAllowed(uri: Uri): Boolean = uri.scheme == "https" && request.allowedHosts.contains(uri.host ?: "")
 
-  /** Injects the bundled script and runs it with the payload, then watches its status. */
+  private fun stopPolling() {
+    polling?.let { handler.removeCallbacks(it) }
+    polling = null
+  }
+
+  /** Injects the bundled script and runs it with the payload, then follows its status while the form is on screen. */
   private fun fillForm() {
     status.text = getString(R.string.vinted_status_filling)
     val payload = JSONObject().apply {
@@ -141,20 +151,21 @@ class VintedActivity : AppCompatActivity() {
     }
     // The bundle is idempotent; `run` stores its report on window.__aivPrefill.status.
     webView.evaluateJavascript("${request.script}\n;window.__aivPrefill.run($payload);", null)
-    polling?.let { handler.removeCallbacks(it) }
+    stopPolling()
     pollStartedAt = System.currentTimeMillis()
+    // Keeps going while the form is on screen: the paste icons change the status when the user taps them.
     val tick = object : Runnable {
       override fun run() {
+        if (polling !== this) return
         webView.evaluateJavascript("JSON.stringify((window.__aivPrefill && window.__aivPrefill.status) || null)") { raw ->
           val report = parseStatus(raw)
           if (report != null) {
             lastReport = report
             showReport(report)
+          } else if (System.currentTimeMillis() - pollStartedAt > POLL_TIMEOUT_MS) {
+            status.text = getString(R.string.vinted_status_timeout)
           }
-          val photos = report?.optJSONObject("photos")
-          val done = report != null && (!report.optBoolean("pageOk", true) || (photos != null && photos.optInt("attached") >= photos.optInt("requested")))
-          if (!done && System.currentTimeMillis() - pollStartedAt < POLL_TIMEOUT_MS) handler.postDelayed(this, POLL_INTERVAL_MS)
-          else if (report == null) status.text = getString(R.string.vinted_status_timeout)
+          if (polling === this) handler.postDelayed(this, POLL_INTERVAL_MS)
         }
       }
     }
@@ -182,16 +193,18 @@ class VintedActivity : AppCompatActivity() {
       return
     }
     val photos = report.optJSONObject("photos")
-    status.text = getString(
-      R.string.vinted_status_filled,
-      mark(report.optString("title")),
-      mark(report.optString("description")),
-      photos?.optInt("attached") ?: 0,
-      photos?.optInt("requested") ?: 0,
-    )
+    val title = report.optString("title")
+    val description = report.optString("description")
+    val template = if (title == "ready" || description == "ready") R.string.vinted_status_ready else R.string.vinted_status_filled
+    status.text = getString(template, mark(title), mark(description), photos?.optInt("attached") ?: 0, photos?.optInt("requested") ?: 0)
   }
 
-  private fun mark(result: String): String = if (result == "filled") "✓" else "✗"
+  /** ✓ pasted · ⧉ icon waiting for a tap · ✗ field not found. */
+  private fun mark(result: String): String = when (result) {
+    "filled" -> "✓"
+    "ready" -> "⧉"
+    else -> "✗"
+  }
 
   private fun finishWithReport() {
     val data = Intent()
@@ -201,7 +214,7 @@ class VintedActivity : AppCompatActivity() {
   }
 
   override fun onDestroy() {
-    polling?.let { handler.removeCallbacks(it) }
+    stopPolling()
     if (this::webView.isInitialized) {
       (webView.parent as? ViewGroup)?.removeView(webView)
       webView.destroy()

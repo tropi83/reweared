@@ -19,7 +19,12 @@ const STEP_KEY: Record<Exclude<PublishStage, "closed">, MessageKey> = {
   filled: "publish.step.filled",
 };
 
-const RESULT_TONE: Record<FieldFillResult, "success" | "warning" | "danger"> = { filled: "success", not_found: "warning", failed: "danger" };
+const RESULT_TONE: Record<FieldFillResult, "accent" | "success" | "warning" | "danger"> = {
+  ready: "accent",
+  filled: "success",
+  not_found: "warning",
+  failed: "danger",
+};
 
 function ResultRow({ label, value }: { label: string; value: FieldFillResult }) {
   const t = useT();

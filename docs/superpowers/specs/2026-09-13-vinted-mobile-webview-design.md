@@ -90,3 +90,10 @@ guaranteed, the iOS scene replaces the app's UI, and the orchestration would sti
   panel state, Settings → Publishing → erase session works. Filling the real form needs a Vinted account (not
   available here); the injected script is the desktop one, already covered by its unit tests.
 - iOS: not built here (documented).
+
+## 5. Amendment (2026-09-13, after the first run on a phone)
+
+- The title and the description are no longer typed by the script: it mounts a paste icon at the end of each field (Lucide clipboard-paste, inlined) and the text goes in when the user taps it (`FieldFillResult` gains `ready`). Photos stay automatic. Both platforms.
+- Selectors checked on the live mobile form: the media grid (`image-wrapper-N`) and the file input (`add-photos-input`) live outside the `<form>`; thumbnails are counted on the whole document.
+- The native status line polls while the form is on screen (500 ms) so taps are reflected; Android `clear_session` wipes the profile's cookies/storage instead of deleting the profile.
+- The warning dialog tells phone users not to sign in with Google (blocked inside WebViews).

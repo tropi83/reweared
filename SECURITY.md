@@ -43,7 +43,7 @@ No shell, no process, no notification, no clipboard plugin. `dragDropEnabled: fa
 | -------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `vinted_open`                          | Opens `https://www.vinted.com/` in a second window so the user can log in and post | Isolated `data_directory` (`vinted-webview/`), navigation allow-list (Vinted hosts + Google/Facebook/Apple login), no capability targets the window ⇒ no IPC from vinted.com |
 | `vinted_navigate`                      | Jumps to the sell form                                                             | Only `/items/new` and `/`                                                                                                                                                    |
-| `vinted_prefill`                       | Injects the pre-fill script with title/description/photos                          | Script compiled into the binary (`include_str!`); payload validated (100/5000 chars, ≤ 20 photos, ≤ 4 MiB each, JPEG/PNG, safe names); never logged                          |
+| `vinted_prefill`                       | Injects the script: photos attached, paste icons for title/description             | Script compiled into the binary (`include_str!`); payload validated (100/5000 chars, ≤ 20 photos, ≤ 4 MiB each, JPEG/PNG, safe names); never logged                          |
 | `vinted_poll`                          | Reads the script's status back                                                     | Read-only expression, 5 s timeout                                                                                                                                            |
 | `vinted_close`, `vinted_clear_session` | Close / erase the Vinted session                                                   | Window open: `clear_all_browsing_data` then close. Window closed: the stored profile is removed without creating a webview (see below)                                       |
 
@@ -57,7 +57,7 @@ Isolation of the Vinted profile per platform:
 
 Other guarantees:
 
-- The injected script only sets the title and description values, attaches the photos and writes a status object `{ pageOk, title, description, photos }`; it never clicks submit and never reads cookies, storage or credentials.
+- The injected script attaches the photos, mounts one paste icon next to the title and one next to the description — the text is written only when the user taps an icon (their gesture, not an automated fill) — and writes a status object `{ pageOk, title, description, photos }` (`ready` = icon waiting for a tap); it never clicks submit and never reads cookies, storage or credentials.
 - `vinted_open` and `vinted_prefill` are `async` commands: building a webview window from a synchronous command deadlocks on Windows (WebView2), and the payload (up to 20 base64 photos) is deserialised off the UI thread.
 - Destroying the main window closes the Vinted window (`on_window_event` in `lib.rs`): it is never left running without the app that drives it.
 - The web inspector (devtools) exists on the Vinted window in debug builds only; release builds do not enable Tauri's `devtools` feature.

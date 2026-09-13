@@ -74,7 +74,8 @@ class VintedWebviewPlugin: Plugin {
 }
 
 class VintedViewController: UIViewController, WKNavigationDelegate {
-  private static let pollInterval: TimeInterval = 0.3
+  private static let pollInterval: TimeInterval = 0.5
+  /// Without any report after this, the script did not run (page changed?): say so.
   private static let pollTimeout: TimeInterval = 20
 
   private let request: RunRequest
@@ -155,6 +156,11 @@ class VintedViewController: UIViewController, WKNavigationDelegate {
     decisionHandler(isAllowed(navigationAction.request.url) ? .allow : .cancel)
   }
 
+  func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+    pollTimer?.invalidate()
+    pollTimer = nil
+  }
+
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
     guard let url = webView.url, isAllowed(url) else { return }
     if url.path.hasPrefix(request.sellPath) {
@@ -164,7 +170,8 @@ class VintedViewController: UIViewController, WKNavigationDelegate {
     }
   }
 
-  /// Injects the bundled script and runs it with the payload, then watches its status.
+  /// Injects the bundled script and runs it with the payload, then follows its status while the form is on screen
+  /// (the paste icons change it when the user taps them).
   private func fillForm() {
     status.text = localized("vinted_status_filling")
     let payload: [String: Any] = [
@@ -189,15 +196,8 @@ class VintedViewController: UIViewController, WKNavigationDelegate {
       if let report = report {
         self.lastReport = report
         self.showReport(report)
-      }
-      let photos = report?["photos"] as? [String: Any]
-      let attached = photos?["attached"] as? Int ?? 0
-      let requested = photos?["requested"] as? Int ?? 0
-      let pageOk = report?["pageOk"] as? Bool ?? true
-      let done = report != nil && (!pageOk || attached >= requested)
-      if done || Date().timeIntervalSince(self.pollStartedAt) > Self.pollTimeout {
-        timer.invalidate()
-        if report == nil { self.status.text = self.localized("vinted_status_timeout") }
+      } else if Date().timeIntervalSince(self.pollStartedAt) > Self.pollTimeout {
+        self.status.text = self.localized("vinted_status_timeout")
       }
     }
   }
@@ -214,21 +214,35 @@ class VintedViewController: UIViewController, WKNavigationDelegate {
       return
     }
     let photos = report["photos"] as? [String: Any]
-    let title = mark(report["title"] as? String)
-    let description = mark(report["description"] as? String)
-    status.text = String(format: localized("vinted_status_filled"), title, description, photos?["attached"] as? Int ?? 0, photos?["requested"] as? Int ?? 0)
+    let title = report["title"] as? String
+    let description = report["description"] as? String
+    let key = (title == "ready" || description == "ready") ? "vinted_status_ready" : "vinted_status_filled"
+    let attached = photos?["attached"] as? Int ?? 0
+    let requested = photos?["requested"] as? Int ?? 0
+    status.text = key == "vinted_status_ready"
+      ? String(format: localized(key), attached, requested, mark(title), mark(description))
+      : String(format: localized(key), mark(title), mark(description), attached, requested)
   }
 
-  private func mark(_ result: String?) -> String { result == "filled" ? "✓" : "✗" }
+  /// ✓ pasted · ⧉ icon waiting for a tap · ✗ field not found.
+  private func mark(_ result: String?) -> String {
+    switch result {
+    case "filled": return "✓"
+    case "ready": return "⧉"
+    default: return "✗"
+    }
+  }
 
   /// Strings live here (a Swift package has no resources without extra setup); French follows the device language.
   private func localized(_ key: String) -> String {
     let fr = Locale.preferredLanguages.first?.hasPrefix("fr") == true
     switch key {
     case "vinted_status_login":
-      return fr ? "Connectez-vous à Vinted puis ouvrez le formulaire de vente : l'application le remplit." : "Sign in to Vinted, then open the sell form: the app fills it in."
+      return fr ? "Connectez-vous à Vinted (e-mail, Facebook ou Apple — pas Google), puis ouvrez le formulaire de vente." : "Sign in to Vinted (e-mail, Facebook or Apple — not Google), then open the sell form."
     case "vinted_status_browse":
-      return fr ? "Ouvrez le formulaire de vente (Vendre) pour qu'il soit rempli." : "Open the sell form (Sell) to have it filled in."
+      return fr ? "Ouvrez le formulaire de vente (Vendre) : les photos sont attachées, le texte est collé quand vous touchez les icônes." : "Open the sell form (Sell): the photos are attached, the text is pasted when you tap the icons."
+    case "vinted_status_ready":
+      return fr ? "Photos %d/%d · Titre %@ · Description %@ — touchez les icônes ⧉ pour coller le texte." : "Photos %d/%d · Title %@ · Description %@ — tap the ⧉ icons to paste the text."
     case "vinted_status_filling":
       return fr ? "Remplissage du formulaire…" : "Filling the form…"
     case "vinted_status_filled":

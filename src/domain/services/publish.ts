@@ -11,7 +11,8 @@ export interface PublishPayload {
   description: string;
   photos: PublishPhoto[];
 }
-export type FieldFillResult = "filled" | "not_found" | "failed";
+/** `ready`: the paste icon is in place next to the field, waiting for the user to tap it. */
+export type FieldFillResult = "ready" | "filled" | "not_found" | "failed";
 /** Written by the injected script to `window.__aivPrefill.status`, read back by Rust. */
 export interface FillReport {
   pageOk: boolean;
@@ -86,7 +87,7 @@ export function stageForUrl(url: string | undefined): Exclude<PublishStage, "fil
   return "browsing";
 }
 
-const FIELD_RESULTS: ReadonlySet<string> = new Set(["filled", "not_found", "failed"]);
+const FIELD_RESULTS: ReadonlySet<string> = new Set(["ready", "filled", "not_found", "failed"]);
 
 export function isFillReport(value: unknown): value is FillReport {
   if (typeof value !== "object" || value === null) return false;
