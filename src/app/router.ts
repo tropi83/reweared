@@ -50,6 +50,11 @@ export function navigate(route: Route, replace = false) {
   listeners.forEach((l) => l());
 }
 
+/** The current route outside React (stores, actions). */
+export function currentRoute(): Route {
+  return current;
+}
+
 export function useRoute(): Route {
   return useSyncExternalStore(
     (cb) => {

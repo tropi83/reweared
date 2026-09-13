@@ -1,17 +1,14 @@
-import { useState } from "react";
-import { BookOpen, Images, MoreHorizontal, Plus, Settings, Sparkles } from "lucide-react";
+import { BookOpen, Images, Plus, Settings, Sparkles } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { navigate, useRoute } from "@/app/router";
 import { useListingsStore } from "@/app/stores/listings-store";
-import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
-import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
-import { Input } from "@/components/ui/Input";
 import type { ListingSummary } from "@/domain/models";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { useT } from "@/i18n";
 import { CategoryBadge } from "../catalog/CategoryBadge";
+import { ListingActionsMenu } from "./ListingActionsMenu";
 import { cn } from "@/lib/cn";
 import { importImageFile, pickImageFile } from "../workspace/useImageImport";
 
@@ -102,11 +99,6 @@ function NavItem({ active, icon, label, onClick }: { active: boolean; icon: Reac
 function ListingRow({ listing, active }: { listing: ListingSummary; active: boolean }) {
   const t = useT();
   const url = useImageUrl(listing.id, "thumbnail", listing.coverImageId);
-  const [menu, setMenu] = useState(false);
-  const [renaming, setRenaming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [name, setName] = useState(listing.name);
-  const { rename, remove, duplicate } = useListingsStore.getState();
 
   return (
     <li className="group relative">
@@ -130,107 +122,11 @@ function ListingRow({ listing, active }: { listing: ListingSummary; active: bool
           <div className="truncate text-[11px] text-fg-subtle">{t("listings.imageCount", { count: listing.imageCount })}</div>
         </div>
       </button>
-      <button
-        type="button"
-        aria-label={t("common.edit")}
-        onClick={() => setMenu((v) => !v)}
-        className={cn(
-          "absolute top-1/2 right-1.5 -translate-y-1/2 rounded-md p-1.5 text-fg-subtle hover:bg-bg-sunken hover:text-fg",
-          menu ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100",
-        )}
-      >
-        <MoreHorizontal className="size-4" />
-      </button>
-      {menu && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} aria-hidden />
-          <div className="fade-in absolute top-full right-1 z-50 mt-1 w-40 rounded-lg border border-border bg-bg-elevated p-1 shadow-app" role="menu">
-            <MenuItem
-              label={t("common.rename")}
-              onClick={() => {
-                setMenu(false);
-                setName(listing.name);
-                setRenaming(true);
-              }}
-            />
-            <MenuItem
-              label={t("common.duplicate")}
-              onClick={async () => {
-                setMenu(false);
-                const copy = await duplicate(listing.id);
-                if (copy) navigate({ name: "listing", id: copy.listing.id });
-              }}
-            />
-            <MenuItem
-              label={t("common.delete")}
-              danger
-              onClick={() => {
-                setMenu(false);
-                setDeleting(true);
-              }}
-            />
-          </div>
-        </>
-      )}
-      <Dialog
-        open={renaming}
-        onClose={() => setRenaming(false)}
-        title={t("listings.rename.title")}
-        size="sm"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setRenaming(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={async () => {
-                await rename(listing.id, name);
-                setRenaming(false);
-              }}
-            >
-              {t("common.save")}
-            </Button>
-          </>
-        }
-      >
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            await rename(listing.id, name);
-            setRenaming(false);
-          }}
-        >
-          <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label={t("common.name")} />
-        </form>
-      </Dialog>
-      <ConfirmDialog
-        open={deleting}
-        onClose={() => setDeleting(false)}
-        title={t("listings.delete.title")}
-        body={t("listings.delete.body", { name: listing.name })}
-        confirmLabel={t("common.delete")}
-        danger
-        onConfirm={async () => {
-          setDeleting(false);
-          if (active) navigate({ name: "home" });
-          await remove(listing.id);
-          toast.info(t("listings.deleted"));
-        }}
+      {/* Always reachable on touch screens; a mouse reveals it on hover. */}
+      <ListingActionsMenu
+        listing={listing}
+        className="absolute top-1/2 right-1.5 -translate-y-1/2 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-within:opacity-100 pointer-fine:has-[[aria-expanded=true]]:opacity-100"
       />
     </li>
-  );
-}
-
-function MenuItem({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className={cn("flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-bg-sunken", danger ? "text-danger" : "text-fg")}
-    >
-      {label}
-    </button>
   );
 }

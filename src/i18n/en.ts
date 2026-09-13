@@ -49,6 +49,7 @@ export const en = {
   "listings.imageCount": "{count} images",
   "listings.updated": "Updated {when}",
   "listings.deleted": "Listing deleted",
+  "listings.actions": "Listing actions",
   "listings.count": "{count} listings on this device",
 
   // Import

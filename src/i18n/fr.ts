@@ -48,6 +48,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "listings.imageCount": "{count} images",
   "listings.updated": "Modifié {when}",
   "listings.deleted": "Annonce supprimée",
+  "listings.actions": "Actions de l'annonce",
   "listings.count": "{count} annonces sur cet appareil",
 
   "import.dropTitle": "Déposez une image ici",

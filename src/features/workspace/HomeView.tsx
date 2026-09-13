@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { MAX_IMPORT_BYTES, type ListingSummary } from "@/domain/models";
 import { useT } from "@/i18n";
 import { CategoryBadge } from "../catalog/CategoryBadge";
+import { ListingActionsMenu } from "../listings/ListingActionsMenu";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { cn } from "@/lib/cn";
 import { formatRelative } from "@/lib/format";
@@ -129,7 +130,7 @@ function ListingCard({ listing }: { listing: ListingSummary }) {
   const url = useImageUrl(listing.id, "thumbnail", listing.coverImageId);
   const updated = useMemo(() => formatRelative(listing.updatedAt), [listing.updatedAt]);
   return (
-    <li>
+    <li className="relative">
       <button
         type="button"
         onClick={() => navigate({ name: "listing", id: listing.id })}
@@ -152,6 +153,7 @@ function ListingCard({ listing }: { listing: ListingSummary }) {
           </div>
         </div>
       </button>
+      <ListingActionsMenu listing={listing} className="absolute top-2 right-2 rounded-md bg-bg-elevated/90 shadow-sm backdrop-blur" />
     </li>
   );
 }

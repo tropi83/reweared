@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Misc";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/cn";
+import { ListingActionsMenu } from "../listings/ListingActionsMenu";
 import { ListingCopyPanel } from "./ListingCopyPanel";
 import { ListingSetupCard } from "./ListingSetupCard";
 import { GenerationFeed } from "../generation/GenerationFeed";
@@ -56,6 +57,7 @@ export function WorkspaceView({ listingId }: { listingId: string }) {
           <Menu className="size-5" />
         </Button>
         <ListingTitle name={doc.listing.name} />
+        <ListingActionsMenu listing={{ id: doc.listing.id, name: doc.listing.name }} className="shrink-0" align="left" />
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <span className="hidden text-xs text-fg-subtle sm:inline">
             {t("history.generations", { count: generationCount })} · {t("listings.imageCount", { count: imageCount })}
