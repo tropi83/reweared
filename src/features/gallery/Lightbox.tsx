@@ -181,7 +181,7 @@ export function Lightbox() {
               <figcaption className="absolute top-3 left-3 rounded-md bg-black/60 px-2 py-0.5 text-xs">{t("gallery.source")}</figcaption>
             </figure>
           )}
-          <figure className="relative flex items-center justify-center overflow-hidden">
+          <figure className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden">
             {url ? (
               <img
                 src={url}
