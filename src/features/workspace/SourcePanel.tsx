@@ -6,7 +6,7 @@ import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Misc";
 import { useT } from "@/i18n";
-import { cn } from "@/lib/cn";
+import { ToPostCheckbox } from "../gallery/ToPostCheckbox";
 import { ImportDropzone } from "./HomeView";
 
 /** Shows the image that will be sent with the next generation (original or a chosen variation). */
@@ -16,7 +16,6 @@ export function SourcePanel() {
   const sourceImageId = useComposerStore((s) => s.sourceImageId);
   const setSource = useComposerStore((s) => s.setSource);
   const openLightbox = useUiStore((s) => s.openLightbox);
-  const toggleToPost = useListingsStore((s) => s.toggleToPost);
 
   const originalId = doc?.listing.originalImageId;
   const effectiveId = sourceImageId && doc?.images[sourceImageId] ? sourceImageId : originalId;
@@ -29,7 +28,6 @@ export function SourcePanel() {
     return <ImportDropzone compact />;
   }
   const isToPost = doc.toPost.includes(asset.id);
-  const toPostLabel = t(isToPost ? "gallery.unToPost" : "gallery.toPost");
 
   return (
     <div className="space-y-2">
@@ -58,26 +56,18 @@ export function SourcePanel() {
             <div className="shimmer h-48 w-full" />
           )}
         </div>
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-          <Button
-            variant="secondary"
-            size="icon-sm"
-            onClick={() => toggleToPost(asset.id)}
-            aria-label={toPostLabel}
-            aria-pressed={isToPost}
-            title={toPostLabel}
-          >
-            <CheckCircle2 className={cn("size-3.5", isToPost && "fill-accent text-white")} />
-          </Button>
+        <div className="absolute top-2 right-2 flex items-center gap-1">
           <Button
             variant="secondary"
             size="icon-sm"
             onClick={() => openLightbox(asset.id)}
             aria-label={t("gallery.fullscreen")}
             title={t("gallery.fullscreen")}
+            className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
           >
             <Maximize2 className="size-3.5" />
           </Button>
+          <ToPostCheckbox assetId={asset.id} checked={isToPost} />
         </div>
         <div className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] text-white backdrop-blur">
           {asset.width} × {asset.height}

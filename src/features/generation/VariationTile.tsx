@@ -1,9 +1,8 @@
 import { memo, useEffect, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, Download, ExternalLink, GitBranch, Maximize2, RotateCw, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Check, Download, ExternalLink, GitBranch, Maximize2, RotateCw, Sparkles, X } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
-import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { getServices } from "@/app/services";
@@ -14,6 +13,7 @@ import { openExternal } from "@/lib/open-external";
 import { useLocale, useT } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 import { cn } from "@/lib/cn";
+import { ToPostCheckbox } from "../gallery/ToPostCheckbox";
 
 interface Props {
   job: GenerationJob;
@@ -31,7 +31,6 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
   const selected = useUiStore((s) => (asset ? s.selection.has(asset.id) : false));
   const toggleSelected = useUiStore((s) => s.toggleSelected);
   const openLightbox = useUiStore((s) => s.openLightbox);
-  const toggleToPost = useListingsStore((s) => s.toggleToPost);
   const isToPost = !!asset && doc.toPost.includes(asset.id);
   const retryJob = useGenerationStore((s) => s.retryJob);
   const cancel = () => getServices().queue.cancel(job.id);
@@ -84,12 +83,10 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
         </div>
 
         <div className="absolute top-2 right-2 flex items-center gap-1">
-          <TileButton onClick={() => toggleToPost(asset.id)} label={t(isToPost ? "gallery.unToPost" : "gallery.toPost")} always={isToPost}>
-            <CheckCircle2 className={cn("size-3.5", isToPost && "fill-accent text-white")} />
-          </TileButton>
           <TileButton onClick={() => openLightbox(asset.id)} label={t("gallery.fullscreen")}>
             <Maximize2 className="size-3.5" />
           </TileButton>
+          <ToPostCheckbox assetId={asset.id} checked={isToPost} />
         </div>
 
         <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
@@ -188,7 +185,7 @@ function ratioFor(job: GenerationJob, sourceRatio: number): number {
   return w / h;
 }
 
-function TileButton({ children, onClick, label, always }: { children: React.ReactNode; onClick: () => void | Promise<void>; label: string; always?: boolean }) {
+function TileButton({ children, onClick, label }: { children: React.ReactNode; onClick: () => void | Promise<void>; label: string }) {
   return (
     <button
       type="button"
@@ -198,10 +195,7 @@ function TileButton({ children, onClick, label, always }: { children: React.Reac
       }}
       aria-label={label}
       title={label}
-      className={cn(
-        "flex size-7 items-center justify-center rounded-md bg-black/45 text-white backdrop-blur transition-opacity hover:bg-black/70",
-        always ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100",
-      )}
+      className="flex size-7 items-center justify-center rounded-md bg-black/45 text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 hover:bg-black/70 focus:opacity-100"
     >
       {children}
     </button>
