@@ -105,7 +105,7 @@ describe("generateListing", () => {
   it("does not apply the mannequin when the toggle is off", async () => {
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, mannequin: { build: "L", pose: "arched", skinTone: "deep" } } });
     await useListingSetupStore.getState().generateListing();
-    expect(jobsOf().find((j) => j.shotId === "worn")?.prompt).toContain("worn by a man, standing, cropped");
+    expect(jobsOf().find((j) => j.shotId === "worn")?.prompt).toContain("worn by a man, standing, framed from the knees down: both feet inside the shoes");
   });
 
   it("writes the text only when no image provider is usable", async () => {

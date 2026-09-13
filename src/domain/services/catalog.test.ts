@@ -64,6 +64,24 @@ describe("listing catalogue", () => {
     expect(buildShots({ categoryId: "electronics", subcategoryId: "phones" }).map((s) => s.id)).toEqual(["retouch", "studio", "hand", "back"]);
   });
 
+  it("footwear: shots with a person put the feet in the shoes, product shots keep them empty", () => {
+    const footwear = CATEGORIES.flatMap((c) => c.subcategories.filter((s) => s.kind === "footwear").map((s) => ({ categoryId: c.id, subcategoryId: s.id })));
+    expect(footwear.length).toBeGreaterThanOrEqual(5);
+    for (const selection of footwear) {
+      const byId = Object.fromEntries(buildShots(selection).map((s) => [s.id, s.prompt]));
+      for (const id of ["worn", "selfie"]) {
+        if (!byId[id]) continue; // kids: no selfie
+        expect(byId[id], `${selection.categoryId} ${id}`).toContain("both feet inside the shoes");
+        expect(byId[id], `${selection.categoryId} ${id}`).not.toMatch(/cropped at the ankles/);
+      }
+      expect(byId.worn).toContain("framed from the knees down: both feet inside the shoes, one foot per shoe");
+      expect(byId.worn).toContain("sandals, mules");
+      if (byId.selfie) expect(byId.selfie).toContain("full body visible from head to feet");
+      expect(byId.studio).toContain("empty pair");
+      expect(byId.profile).toContain("single empty shoe");
+    }
+  });
+
   it("adds the mirror selfie only to wearable kinds and never for kids", () => {
     const hasSelfie = (categoryId: Parameters<typeof buildShots>[0]["categoryId"], subcategoryId: string) =>
       buildShots({ categoryId, subcategoryId }).some((s) => s.id === "selfie");
@@ -84,7 +102,9 @@ describe("listing catalogue", () => {
     expect(buildShots({ categoryId: "women", subcategoryId: "clothing" }).find((s) => s.id === "worn")?.prompt).toContain(
       "worn by a woman, standing naturally,",
     );
-    expect(buildShots({ categoryId: "men", subcategoryId: "shoes" }).find((s) => s.id === "worn")?.prompt).toContain("worn by a man, standing, cropped");
+    expect(buildShots({ categoryId: "men", subcategoryId: "shoes" }).find((s) => s.id === "worn")?.prompt).toContain(
+      "worn by a man, standing, framed from the knees down: both feet inside the shoes",
+    );
   });
 
   it("puts the seller's mannequin in every shot with a person, with a single pose", () => {

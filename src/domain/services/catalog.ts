@@ -66,6 +66,10 @@ const SELFIE = (extra: string): ShotTemplate => ({
   excludeCategories: ["kids"],
 });
 
+/** Footwear shots with a person: the feet must be in the shoes and the legs must reach them. */
+const FEET_IN_SHOES =
+  "both feet inside the shoes, one foot per shoe, legs running naturally into ankles and feet, natural toes visible where the shoe is open (sandals, mules)";
+
 const PLANS: Record<ProductKind, ShotTemplate[]> = {
   garment: [
     RETOUCH("the garment neatly ironed with no wrinkles or creases, lint removed."),
@@ -82,19 +86,21 @@ const PLANS: Record<ProductKind, ShotTemplate[]> = {
       "The garment freshly ironed — no wrinkles, creases or folds marks, crisp smooth fabric — then neatly folded on a plain white surface, top-down flat lay, soft daylight, brand label or neckline visible if present.",
     ),
   ],
+  // Shots with a person say where the feet are: without it, image models happily render empty
+  // sandals "worn" by nobody, or legs that stop at the ankle. Product shots say the shoes are empty.
   footwear: [
     RETOUCH("the shoes cleaned, laces neat, scuffs and dust removed while keeping honest wear visible."),
-    STUDIO("The pair side by side at a three-quarter angle, both shoes fully visible."),
+    STUDIO("The empty pair side by side at a three-quarter angle, both shoes fully visible, nobody wearing them."),
     CONTEXT(
       "worn",
       L("Worn", "Portées"),
-      "The shoes worn by {{wearer}}, {{pose|standing}}, cropped at the ankles or knees, on a neutral floor, natural light.",
+      `The shoes worn by {{wearer}}, {{pose|standing}}, framed from the knees down: ${FEET_IN_SHOES}, on a neutral floor, natural light.`,
     ),
-    SELFIE("wearing the shoes with a simple everyday outfit, full body visible down to the shoes,"),
+    SELFIE("wearing the shoes with a simple everyday outfit, full body visible from head to feet, both feet inside the shoes,"),
     DETAIL(
       "profile",
       L("Side profile", "Profil"),
-      "A single shoe in strict side profile on a white surface, sole and heel shape clearly visible, close framing.",
+      "A single empty shoe in strict side profile on a white surface, sole and heel shape clearly visible, close framing, nobody wearing it.",
     ),
   ],
   bag: [
