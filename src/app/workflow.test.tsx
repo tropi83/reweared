@@ -142,6 +142,42 @@ describe("core workflow (mock provider)", () => {
     mock.generate = original;
   });
 
+  it("regenerates one photo: a new job in the same generation with the same prompt and shot, a fresh seed, the old result kept", async () => {
+    const current = useListingsStore.getState().current!;
+    const shots = buildShots({ categoryId: "men", subcategoryId: "shoes" });
+    const gen = await useGenerationStore.getState().start({
+      sourceImageId: current.listing.originalImageId!,
+      prompt: "pack",
+      shots,
+      category: { categoryId: "men", subcategoryId: "shoes" },
+      providerId: "mock",
+      modelId: "mock-fast",
+      aspectRatio: "original",
+      variationCount: 1,
+    });
+    await waitFor(() => useListingsStore.getState().current?.generations[gen.id]?.status === "completed");
+    const worn = gen.jobIds.map((id) => useListingsStore.getState().current!.jobs[id]!).find((j) => j.shotId === "worn")!;
+
+    const newId = useGenerationStore.getState().regenerateJob(worn.id)!;
+    expect(newId).toBeDefined();
+    expect(newId).not.toBe(worn.id);
+    const started = useListingsStore.getState().current!;
+    expect(started.generations[gen.id]!.jobIds).toEqual([...gen.jobIds, newId]);
+    expect(started.jobs[newId]).toMatchObject({ prompt: worn.prompt, shotId: "worn", shotLabel: worn.shotLabel, index: shots.length + 1 });
+    expect(started.jobs[newId]!.resultImageId).toBeUndefined();
+    expect(started.jobs[newId]!.seed).not.toBe(worn.seed);
+    // The regenerated job is not finished yet: asking again does nothing.
+    expect(useGenerationStore.getState().regenerateJob(newId)).toBeUndefined();
+
+    await waitFor(() => useListingsStore.getState().current?.jobs[newId]?.status === "completed");
+    const done = useListingsStore.getState().current!;
+    expect(done.jobs[worn.id]!.resultImageId).toBe(worn.resultImageId);
+    expect(done.jobs[newId]!.resultImageId).toBeDefined();
+    expect(done.jobs[newId]!.resultImageId).not.toBe(worn.resultImageId);
+    expect(done.generations[gen.id]!.status).toBe("completed");
+    expect(useGenerationStore.getState().regenerateJob("job_missing")).toBeUndefined();
+  });
+
   it("deletes images and generations without leaving orphaned files", async () => {
     const listings = useListingsStore.getState();
     const doc = useListingsStore.getState().current!;

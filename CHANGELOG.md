@@ -19,6 +19,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **“Generate more like this” is gone** (it filled the free prompt, which no longer exists) — on every finished photo (tile and fullscreen viewer) it is replaced by **“Generate this photo again”**: one more photo of the same shot, with the same prompt, source and settings and a fresh seed, added to the same card; the previous photo is kept.
+
 - **Vinted: the text is pasted on your tap, not typed for you.** The injected script still attaches the photos, but the title and the description now get a paste icon at the end of the field; tapping it inserts the text (fewer automated actions on the page). The warning dialog on phones says to sign in with e-mail, Facebook or Apple — Google refuses OAuth inside embedded app screens. Photo count fixed on the sell form (Vinted renders the media grid outside the form; selectors checked on the live mobile site on 2026-09-13).
 - Code audit: `knip` guards unused files/exports/dependencies in `pnpm check`; dead helpers removed; the settings sections each live in their own file with shared primitives (no import cycle through `SettingsView`); the composer's saved defaults are applied once at startup instead of on every mount (opening Settings → Models no longer resets the chosen format).
 - **Provider metadata through TanStack Query.** Model lists and per-provider auth statuses are fetched, cached (5 min) and invalidated together when credentials change; the `loadModels` / `providerStatus` store fields are gone. Nothing refetches on focus or reconnect.

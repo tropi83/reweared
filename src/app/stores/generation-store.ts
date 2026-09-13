@@ -42,6 +42,12 @@ interface GenerationState {
   start(params: StartGenerationParams): Promise<Generation>;
   retryJob(jobId: string): void;
   retryFailed(generationId: string): void;
+  /**
+   * Generates one more photo like this job's (same source, prompt, shot, model and options, fresh seed)
+   * as a new job in the same generation; the existing result is kept. Returns the new job's id, or
+   * undefined when the job is not finished or its source photo is gone.
+   */
+  regenerateJob(jobId: string): string | undefined;
   cancelGeneration(generationId: string): void;
   cancelAll(): void;
 }
@@ -210,6 +216,38 @@ export const useGenerationStore = create<GenerationState>((_set, get) => ({
     const patch = job.seed !== undefined ? { seed: randomSeed() } : {};
     if (queue.getJob(jobId)) queue.retry(jobId, patch);
     else queue.enqueue([{ ...job, ...patch, attempt: 0, resultImageId: undefined, completedAt: undefined }]);
+  },
+
+  regenerateJob(jobId) {
+    const listings = useListingsStore.getState();
+    const doc = listings.current;
+    const job = doc?.jobs[jobId];
+    const generation = job && doc?.generations[job.generationId];
+    if (!doc || !job || !generation || !doc.images[job.sourceImageId]) return undefined;
+    if (job.status === "queued" || job.status === "generating") return undefined;
+    const next: GenerationJob = {
+      ...job,
+      id: createId("job"),
+      index: generation.jobIds.length + 1,
+      ...(job.seed !== undefined ? { seed: randomSeed() } : {}),
+      status: "queued",
+      attempt: 0,
+      createdAt: nowIso(),
+    };
+    delete next.resultImageId;
+    delete next.startedAt;
+    delete next.completedAt;
+    delete next.error;
+    delete next.nextRetryAt;
+    listings.commit(
+      (draft) => {
+        draft.jobs[next.id] = next;
+        draft.generations[generation.id]?.jobIds.push(next.id);
+      },
+      { immediate: true },
+    );
+    getServices().queue.enqueue([next]);
+    return next.id;
   },
 
   retryFailed(generationId) {

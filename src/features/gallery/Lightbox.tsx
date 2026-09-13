@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Columns2, Download, GitBranch, Info, Sparkles, X, ZoomIn, ZoomOut } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Columns2, Download, GitBranch, Info, RefreshCw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
+import { useGenerationStore } from "@/app/stores/generation-store";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
@@ -24,7 +25,7 @@ export function Lightbox() {
   const setCompare = useUiStore((s) => s.setCompareMode);
   const toggleToPost = useListingsStore((s) => s.toggleToPost);
   const setSource = useComposerStore((s) => s.setSource);
-  const loadFromGeneration = useComposerStore((s) => s.loadFromGeneration);
+  const regenerateJob = useGenerationStore((s) => s.regenerateJob);
   const [info, setInfo] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -241,25 +242,14 @@ export function Lightbox() {
         <footer className="flex h-14 shrink-0 items-center justify-center gap-2 px-3">
           <Button
             variant="primary"
-            leftIcon={<Sparkles className="size-4" />}
+            leftIcon={<RefreshCw className="size-4" />}
             onClick={() => {
-              loadFromGeneration({
-                prompt: job.prompt,
-                sourceImageId: asset.id,
-                aspectRatio: job.aspectRatio,
-                imageSize: job.imageSize,
-                variationCount: useComposerStore.getState().variationCount,
-                providerId: job.provider,
-                modelId: job.model,
-                generationId: null,
-                ...(job.providerOptions ? { providerOptions: job.providerOptions } : {}),
-              });
+              if (!regenerateJob(job.id)) return;
               close();
-              toast.info(t("generation.sourceSet"));
-              document.getElementById("prompt")?.focus();
+              toast.info(t("generation.regenerateShot.started"));
             }}
           >
-            {t("generation.moreLikeThis")}
+            {t("generation.regenerateShot")}
           </Button>
           <Button
             variant="outline"

@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { AlertTriangle, Check, Download, ExternalLink, GitBranch, Maximize2, RotateCw, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Check, Download, ExternalLink, GitBranch, Maximize2, RefreshCw, RotateCw, X } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
@@ -90,7 +90,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
         </div>
 
         <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-          <MoreLikeThisButton assetId={asset.id} job={job} />
+          <RegenerateButton jobId={job.id} />
           <div className="flex items-center gap-1">
             <UseAsSourceButton assetId={asset.id} />
             <TileButton
@@ -202,31 +202,22 @@ function TileButton({ children, onClick, label }: { children: React.ReactNode; o
   );
 }
 
-function MoreLikeThisButton({ assetId, job }: { assetId: string; job: GenerationJob }) {
+/** One more photo of this shot (same prompt, source and settings, fresh seed) as a new tile in the same card. */
+function RegenerateButton({ jobId }: { jobId: string }) {
   const t = useT();
-  const loadFromGeneration = useComposerStore((s) => s.loadFromGeneration);
+  const regenerateJob = useGenerationStore((s) => s.regenerateJob);
   return (
     <button
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        loadFromGeneration({
-          prompt: job.prompt,
-          sourceImageId: assetId,
-          aspectRatio: job.aspectRatio,
-          imageSize: job.imageSize,
-          variationCount: useComposerStore.getState().variationCount,
-          providerId: job.provider,
-          modelId: job.model,
-          generationId: null,
-          ...(job.providerOptions ? { providerOptions: job.providerOptions } : {}),
-        });
-        toast.info(t("generation.sourceSet"));
-        document.getElementById("prompt")?.focus();
+        if (regenerateJob(jobId)) toast.info(t("generation.regenerateShot.started"));
       }}
+      aria-label={t("generation.regenerateShot")}
+      title={t("generation.regenerateShot")}
       className="inline-flex h-7 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-medium text-accent-fg shadow hover:brightness-110"
     >
-      <Sparkles className="size-3" /> {t("generation.moreLikeThis")}
+      <RefreshCw className="size-3" /> {t("generation.regenerateShot")}
     </button>
   );
 }
