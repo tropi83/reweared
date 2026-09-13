@@ -22,10 +22,21 @@ interface ShotTemplate {
   excludeCategories?: CategoryId[];
 }
 
+const FIDELITY_LOGOS = "Keep its shape, proportions, colors, pattern, material, logos and any visible text identical; do not add or remove elements.";
+const FIDELITY_SOFT = "Keep its shape, proportions, colors, pattern and material identical; do not add or remove elements.";
 /** Fidelity rules shared by every shot. */
-const PREAMBLE =
-  "Product photo of the exact same {{subject}} shown in the reference image. Keep its shape, proportions, colors, pattern, material, logos and any visible text identical; do not add or remove elements.";
+const PREAMBLE = `Product photo of the exact same {{subject}} shown in the reference image. ${FIDELITY_LOGOS}`;
 const QUALITY = "Sharp focus, realistic, high-resolution marketplace listing photo, no watermark, no added text.";
+
+/**
+ * Same prompt without the "logos and visible text" clause. Provider safety filters (Cloudflare's FLUX
+ * "output has been flagged") reject close-ups that reproduce a trademark prominently — the shots with a
+ * person, where the logo is tiny, pass. Used for a retry after such a rejection; prompts without the
+ * fidelity preamble (custom recipes) come back unchanged.
+ */
+export function softenForSafetyFilter(prompt: string): string {
+  return prompt.replace(FIDELITY_LOGOS, FIDELITY_SOFT);
+}
 
 function shot(id: string, label: Localized, body: string): ShotTemplate {
   return { id, label, template: `${PREAMBLE} ${body} ${QUALITY}` };

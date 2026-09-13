@@ -285,7 +285,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
     "Quota Gemini journalier atteint pour ce modèle. Il se réinitialise à minuit heure du Pacifique — {resetLocal} heure locale, dans {resetIn}. Vérifiez votre plan et la facturation dans Google AI Studio.",
   "error.cloudflare.RATE_LIMITED": "Limite de débit Cloudflare Workers AI atteinte. Nouvel essai automatique dès que possible.",
   "error.cloudflare.CONTENT_REJECTED":
-    "Le filtre de sécurité de Cloudflare a bloqué cette image, souvent à tort sur des photos de produit. Réessayez : chaque essai utilise une nouvelle seed.",
+    "Le filtre de sécurité de Cloudflare a bloqué cette image — un logo de marque en gros plan est le déclencheur habituel. Les essais suivants utilisent une nouvelle seed, puis un prompt qui ne demande plus de conserver logos et textes. Réessayez, ou cadrez l'article pour que le logo soit plus petit.",
   "error.cloudflare.QUOTA_EXCEEDED":
     "Votre allocation gratuite journalière Workers AI (10 000 neurones) est épuisée. Elle se réinitialise à 00:00 UTC — {resetLocal} heure locale, dans {resetIn}. Pour continuer aujourd'hui, activez l'usage payant dans le tableau de bord Cloudflare (Workers & Pages → Plans).",
   "error.FREE_TIER_NO_ACCESS":

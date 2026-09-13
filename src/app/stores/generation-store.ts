@@ -10,9 +10,13 @@ import {
 } from "@/domain/services/image-provider";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { createId, nowIso } from "@/lib/ids";
+import { softenForSafetyFilter } from "@/domain/services/catalog";
+import { createLogger } from "@/lib/logger";
 import { ensureModels, modelsSnapshot } from "../query/models";
 import { getServices } from "../services";
 import { useListingsStore } from "./listings-store";
+
+const log = createLogger("generation");
 import { useSettingsStore } from "./settings-store";
 
 export interface StartGenerationParams {
@@ -91,8 +95,12 @@ export async function buildRequestForJob(job: GenerationJob, _signal: AbortSigna
     setTimeout(() => preparedCache.delete(key), 5 * 60_000);
   }
   const source = await prepared;
+  // After a safety-filter rejection the retry drops the "logos and text" clause: close-ups that reproduce a
+  // trademark prominently are what the filter flags (a new seed alone never got through).
+  const prompt = job.attempt > 1 && job.error?.code === "CONTENT_REJECTED" ? softenForSafetyFilter(job.prompt) : job.prompt;
+  if (prompt !== job.prompt) log.info("content filter: retrying with the softened prompt", job.id, job.attempt);
   return buildRequestForModel(model, {
-    prompt: job.prompt,
+    prompt,
     sourceImage: { blob: source.blob, mimeType: source.mimeType, width: source.width, height: source.height },
     aspectRatio: job.aspectRatio,
     ...(job.imageSize ? { imageSize: job.imageSize } : {}),

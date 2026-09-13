@@ -20,6 +20,7 @@ import { __setServices, createServices } from "./services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult, useGenerationStore } from "./stores/generation-store";
 import { useListingsStore } from "./stores/listings-store";
 import { useComposerStore } from "./stores/composer-store";
+import { buildShots } from "@/domain/services/catalog";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 
 const PNG_HEADER = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13];
@@ -195,5 +196,34 @@ describe("listing packs", () => {
     useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, copyProviderId: "mock" } });
     expect(await useListingSetupStore.getState().generateCopy()).toBeNull();
     expect(useListingSetupStore.getState().copyError?.code).toBe("PROVIDER_UNAVAILABLE");
+  });
+  it("retries a content-filter rejection with a softened prompt (no logo clause), other errors keep the prompt", async () => {
+    const listings = useListingsStore.getState();
+    const file = new File([Uint8Array.from(PNG_HEADER)], "shoes.png", { type: "image/png" });
+    const doc = await listings.createFromFile(file, "shoes.png");
+    const [shot] = buildShots({ categoryId: "men", subcategoryId: "shoes" });
+    const base = {
+      id: "job_x",
+      listingId: doc.listing.id,
+      generationId: "gen_x",
+      sourceImageId: doc.listing.originalImageId!,
+      index: 0,
+      prompt: shot!.prompt,
+      provider: "mock",
+      model: "mock-fast",
+      aspectRatio: "original" as const,
+      status: "generating" as const,
+      createdAt: "",
+      seed: 7,
+    };
+    const first = await buildRequestForJob({ ...base, attempt: 1 }, new AbortController().signal);
+    expect(first.prompt).toContain("logos and any visible text identical");
+    const rejected = { code: "CONTENT_REJECTED" as const, message: "flagged", retryable: true };
+    const second = await buildRequestForJob({ ...base, attempt: 2, error: rejected }, new AbortController().signal);
+    expect(second.prompt).not.toContain("logos");
+    expect(second.prompt).toContain("do not add or remove elements");
+    const network = { code: "NETWORK_ERROR" as const, message: "net", retryable: true };
+    const third = await buildRequestForJob({ ...base, attempt: 2, error: network }, new AbortController().signal);
+    expect(third.prompt).toBe(shot!.prompt);
   });
 });

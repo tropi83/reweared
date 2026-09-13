@@ -35,6 +35,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- Cloudflare “Your output has been flagged” (3030) on close-ups of branded items (a Lacoste logo in frame was refused nine times over three shots while the shots with a person passed): after a rejection the retry now also drops the “keep logos and visible text” clause of the prompt, and the message explains the trigger.
 - Gemini `gemini-2.5-flash-lite` (the former default for the listing copy) answers 404 “no longer available to new users”: it is removed from the catalogue, `gemini-3.1-flash-lite` is the default, a saved setting pointing at the retired id falls back to it, and the “model not available” error now says to pick another model in Settings.
 - Cloudflare: “Your output has been flagged” (FLUX's safety filter, frequent false positives on product shots) was reported as “the source image could not be processed” because the message mentions “input image”. It is now a content-filter rejection with its own message, retried automatically, and every retry — automatic or manual — uses a different seed (the same seed reproduced the same rejected image).
 - Phones: saving an API key failed with “Unexpected error” — the keychain command (desktop-only) was still used as the persistent tier on Android/iOS. Phones now keep keys for the session (the “Remember” switch is replaced by a note); a desktop keychain refusal keeps the key for the session with a clear storage error; errors raised by Rust commands keep their text.

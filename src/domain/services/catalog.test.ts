@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { buildShots, findSubcategory, CATEGORIES, catalogRecipeId, categorySelectionFromRecipeId, PRODUCT_KINDS } from "./catalog";
+import { buildShots, softenForSafetyFilter, findSubcategory, CATEGORIES, catalogRecipeId, categorySelectionFromRecipeId, PRODUCT_KINDS } from "./catalog";
+
+describe("softenForSafetyFilter", () => {
+  it("drops the logo / text clause of the fidelity preamble and leaves other prompts alone", () => {
+    const shot = buildShots({ categoryId: "men", subcategoryId: "shoes" })[0]!;
+    const soft = softenForSafetyFilter(shot.prompt);
+    expect(shot.prompt).toContain("logos and any visible text identical");
+    expect(soft).not.toContain("logos");
+    expect(soft).toContain("Keep its shape, proportions, colors, pattern and material identical; do not add or remove elements.");
+    expect(soft.length).toBeLessThan(shot.prompt.length);
+    expect(softenForSafetyFilter("a custom prompt")).toBe("a custom prompt");
+  });
+});
 
 describe("listing catalogue", () => {
   it("covers the ten marketplace categories with unique ids and localized labels", () => {
