@@ -118,7 +118,6 @@ export const en = {
   "generation.empty": "Your variations will appear here",
   "generation.emptyBody": "Import an image, write a prompt and generate. Results appear progressively.",
   "generation.regenerateShot": "Generate this photo again",
-  "generation.regenerateShot.started": "A new photo is on its way.",
   "generation.useAsSource": "Use as source",
   "generation.sourceSet": "Source updated. Write a prompt and generate.",
   "generation.count": "{count} variations",

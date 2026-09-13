@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Download, ExternalLink, GitBranch, Maximize2, RefreshCw, RotateCw, X } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
@@ -13,6 +13,7 @@ import { openExternal } from "@/lib/open-external";
 import { useLocale, useT } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 import { cn } from "@/lib/cn";
+import { revealElement } from "@/lib/scroll";
 import { ToPostCheckbox } from "../gallery/ToPostCheckbox";
 
 interface Props {
@@ -34,6 +35,15 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
   const isToPost = !!asset && doc.toPost.includes(asset.id);
   const retryJob = useGenerationStore((s) => s.retryJob);
   const cancel = () => getServices().queue.cancel(job.id);
+  const reveal = useUiStore((s) => s.revealJobId === job.id);
+  const revealJob = useUiStore((s) => s.revealJob);
+  const tileRef = useRef<HTMLElement>(null);
+  // A photo just regenerated: bring its tile on screen (the card may be far below on a phone).
+  useEffect(() => {
+    if (!reveal) return;
+    revealElement(tileRef.current);
+    revealJob(null);
+  }, [reveal, revealJob]);
 
   const source = doc.images[job.sourceImageId];
   const ratio = asset ? asset.width / asset.height : ratioFor(job, source ? source.width / source.height : 1);
@@ -41,6 +51,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
   if (job.status === "completed" && asset) {
     return (
       <figure
+        ref={tileRef}
         className={cn(
           "group checkerboard fade-in relative overflow-hidden rounded-xl border bg-bg-sunken transition-[border,box-shadow]",
           selected ? "border-accent ring-2 ring-ring" : "border-border",
@@ -110,7 +121,12 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
 
   if (job.status === "queued" || job.status === "generating") {
     return (
-      <div className="relative overflow-hidden rounded-xl border border-border bg-bg-sunken" style={{ aspectRatio: ratio }} aria-busy>
+      <div
+        ref={tileRef as React.RefObject<HTMLDivElement>}
+        className="relative overflow-hidden rounded-xl border border-border bg-bg-sunken"
+        style={{ aspectRatio: ratio }}
+        aria-busy
+      >
         <div className="shimmer absolute inset-0" />
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
           <span className="size-2 animate-pulse rounded-full bg-accent" />
@@ -206,12 +222,14 @@ function TileButton({ children, onClick, label }: { children: React.ReactNode; o
 function RegenerateButton({ jobId }: { jobId: string }) {
   const t = useT();
   const regenerateJob = useGenerationStore((s) => s.regenerateJob);
+  const revealJob = useUiStore((s) => s.revealJob);
   return (
     <button
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        if (regenerateJob(jobId)) toast.info(t("generation.regenerateShot.started"));
+        const id = regenerateJob(jobId);
+        if (id) revealJob(id);
       }}
       aria-label={t("generation.regenerateShot")}
       title={t("generation.regenerateShot")}

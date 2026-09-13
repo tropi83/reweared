@@ -112,7 +112,6 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "generation.empty": "Vos variations apparaîtront ici",
   "generation.emptyBody": "Importez une image, écrivez un prompt et générez. Les résultats s'affichent progressivement.",
   "generation.regenerateShot": "Regénérer cette photo",
-  "generation.regenerateShot.started": "Une nouvelle photo arrive.",
   "generation.useAsSource": "Utiliser comme source",
   "generation.sourceSet": "Source mise à jour. Écrivez un prompt et générez.",
   "generation.count": "{count} variations",

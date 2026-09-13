@@ -26,6 +26,7 @@ export function Lightbox() {
   const toggleToPost = useListingsStore((s) => s.toggleToPost);
   const setSource = useComposerStore((s) => s.setSource);
   const regenerateJob = useGenerationStore((s) => s.regenerateJob);
+  const revealJob = useUiStore((s) => s.revealJob);
   const [info, setInfo] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -244,9 +245,10 @@ export function Lightbox() {
             variant="primary"
             leftIcon={<RefreshCw className="size-4" />}
             onClick={() => {
-              if (!regenerateJob(job.id)) return;
+              const id = regenerateJob(job.id);
+              if (!id) return;
               close();
-              toast.info(t("generation.regenerateShot.started"));
+              revealJob(id);
             }}
           >
             {t("generation.regenerateShot")}

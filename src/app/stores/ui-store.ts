@@ -27,6 +27,9 @@ interface UiState {
   /** A photo is being turned into a listing (decode, thumbnail, save): the app shows it is busy. */
   importing: boolean;
   setImporting(v: boolean): void;
+  /** A job whose tile should scroll into view once it is on screen (a photo just regenerated); the tile clears it. */
+  revealJobId: string | null;
+  revealJob(jobId: string | null): void;
   /** Whether the composer is shown on small screens. */
   mobileComposerOpen: boolean;
   setMobileComposerOpen(v: boolean): void;
@@ -54,6 +57,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setCompareMode: (compareMode) => set({ compareMode }),
   filter: "all",
   setFilter: (filter) => set({ filter }),
+  revealJobId: null,
+  revealJob: (revealJobId) => set({ revealJobId }),
   mobileComposerOpen: true,
   setMobileComposerOpen: (mobileComposerOpen) => set({ mobileComposerOpen }),
 }));

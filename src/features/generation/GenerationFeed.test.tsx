@@ -14,6 +14,7 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
 import { __setServices, createServices, getServices } from "@/app/services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { useListingsStore } from "@/app/stores/listings-store";
+import { useUiStore } from "@/app/stores/ui-store";
 import type { Generation } from "@/domain/models";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { GenerationFeed } from "./GenerationFeed";
@@ -39,11 +40,12 @@ function addGeneration(id: string, category?: Generation["category"]): void {
 
 describe("GenerationFeed › regenerate one photo", () => {
   const storage = new IndexedDbStorage("feed-regenerate-test");
+  const scrollIntoView = vi.fn();
   beforeAll(async () => {
     __setServices(null);
     createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
     await storage.init();
-    Element.prototype.scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
   });
   afterEach(() => cleanup());
 
@@ -86,6 +88,12 @@ describe("GenerationFeed › regenerate one photo", () => {
     expect(added).toMatchObject({ prompt: "the shoes worn", shotId: "worn", index: 2, sourceImageId: originalId });
     expect(added.seed).not.toBe(7);
     expect(added.resultImageId).toBeUndefined();
+    // The new tile (queued, aria-busy) is brought on screen, once.
+    const tile = document.querySelector("[aria-busy]")!;
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView.mock.instances[0]).toBe(tile);
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    expect(useUiStore.getState().revealJobId).toBeNull();
     getServices().queue.cancelAll();
   });
 });

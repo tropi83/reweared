@@ -13,6 +13,7 @@ import { useLocale, useT } from "@/i18n";
 import { findSubcategory } from "@/domain/services/catalog";
 import { CategoryIcon } from "../catalog/category-icons";
 import { formatRelative } from "@/lib/format";
+import { revealElement } from "@/lib/scroll";
 import { VariationTile } from "./VariationTile";
 
 export function GenerationFeed() {
@@ -50,8 +51,7 @@ function useScrollToNewGeneration(listingId: string | undefined, generations: Ge
     if (!previous || previous.listingId !== listingId) return;
     const fresh = generations.find((g) => !previous.ids.has(g.id));
     if (!fresh) return;
-    const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    document.getElementById(generationDomId(fresh.id))?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    revealElement(document.getElementById(generationDomId(fresh.id)), "start");
   }, [listingId, generations]);
 }
 
