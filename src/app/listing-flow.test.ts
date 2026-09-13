@@ -97,6 +97,13 @@ describe("generateListing", () => {
     expect(report).toEqual({ photos: "done", text: "done" });
     expect(copy.requests[0]?.brand).toBe("Nike");
     expect(useListingsStore.getState().current?.listing.copy?.brand).toBe("Nike");
+    // The listing takes the generated title as its name, and follows the title when it is edited.
+    expect(useListingsStore.getState().current?.listing.name).toBe("Baskets running");
+    useListingSetupStore.getState().updateCopy({ title: "  Baskets Adidas 42  " });
+    expect(useListingsStore.getState().current?.listing.name).toBe("Baskets Adidas 42");
+    useListingSetupStore.getState().updateCopy({ title: "   " });
+    expect(useListingsStore.getState().current?.listing.copy?.title).toBe("   ");
+    expect(useListingsStore.getState().current?.listing.name).toBe("Baskets Adidas 42");
     const worn = jobsOf().find((j) => j.shotId === "worn");
     expect(worn?.prompt).toContain("worn by a man with a slim build and olive skin, sitting on a stool,");
     expect(jobsOf().find((j) => j.shotId === "studio")?.prompt).not.toContain("olive skin");

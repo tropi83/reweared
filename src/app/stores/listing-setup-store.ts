@@ -15,6 +15,12 @@ import { useGenerationStore } from "./generation-store";
 import { useListingsStore } from "./listings-store";
 import { useSettingsStore } from "./settings-store";
 
+/** The listing name derived from a copy title: trimmed, or undefined when there is nothing to name it with. */
+function nameFromTitle(title: string): string | undefined {
+  const trimmed = title.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 const log = createLogger("listing");
 
 /** Vision models cap input resolution anyway; 1024 px keeps the request small and fast. */
@@ -187,6 +193,8 @@ export const useListingSetupStore = create<ListingState>((set, get) => ({
       useListingsStore.getState().commit(
         (draft) => {
           draft.listing.copy = copy;
+          // The listing is named after its generated title (the file name it was created with says nothing).
+          draft.listing.name = nameFromTitle(copy.title) ?? draft.listing.name;
         },
         { immediate: true },
       );
@@ -244,6 +252,8 @@ export const useListingSetupStore = create<ListingState>((set, get) => ({
     useListingsStore.getState().commit((doc) => {
       if (!doc.listing.copy) return;
       doc.listing.copy = { ...doc.listing.copy, ...patch };
+      // Editing the title keeps the listing's name in step; an emptied field keeps the last name.
+      if (patch.title !== undefined) doc.listing.name = nameFromTitle(patch.title) ?? doc.listing.name;
     });
   },
 

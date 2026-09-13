@@ -17,7 +17,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Mobile import** (Android/iOS): "Photo library" opens the system media picker through the Tauri dialog plugin (`pickerMode: "image"`; the returned `content://` / `file://` URI is read by the fs plugin), "Take a photo" uses `<input type=file accept="image/*" capture="environment">`, which the Android WebView and iOS WKWebView open as the camera.
 - Themed `Select` component (button + portalled listbox, keyboard navigation, type-ahead, flips when there is no room below, works inside modal dialogs) replacing every native `<select>`.
 
-### Changed
+### Changed
+
+- **A listing is named after its generated title.** Once the title and description are generated, the listing takes the title as its name (instead of the imported file name); editing the title in the copy panel renames it too.
 
 - **“Generate more like this” is gone** (it filled the free prompt, which no longer exists) — on every finished photo (tile and fullscreen viewer) it is replaced by **“Generate this photo again”**: one more photo of the same shot, with the same prompt, source and settings and a fresh seed, added to the same card; the previous photo is kept.
 
