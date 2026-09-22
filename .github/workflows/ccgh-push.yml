@@ -1,0 +1,28 @@
+# written by ccgh init; edits are overwritten
+name: ccgh-push
+
+on:
+  push:
+    branches-ignore: [main, 'fix/**']
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: ccgh-bridge-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  push:
+    if: "!startsWith(github.event.head_commit.message, '[bot]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: Hova25/ccgh-bridge@v1
+        with:
+          command: bridge push
