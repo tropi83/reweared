@@ -1,0 +1,44 @@
+# written by ccgh init; edits are overwritten
+name: ccgh-sync
+
+on:
+  issues:
+    types: [closed, reopened, deleted]
+  pull_request:
+    types: [closed]
+  # The issue closes the moment the merge lands, and the sync that fires on it can read a main
+  # that does not carry the merge yet. The push is what makes the second attempt certain,
+  # rather than leaving it to the nightly reconcile.
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: ccgh-bridge-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - if: github.event_name == 'pull_request' && github.event.pull_request.merged
+        uses: Hova25/ccgh-bridge@v1
+        with:
+          command: bridge complete
+        env:
+          BRIDGE_PR: ${{ github.event.pull_request.number }}
+          BRIDGE_PR_BODY: ${{ github.event.pull_request.body }}
+          BRIDGE_BASE: ${{ github.event.pull_request.base.ref }}
+          BRIDGE_MERGED_AT: ${{ github.event.pull_request.merged_at }}
+
+      - uses: Hova25/ccgh-bridge@v1
+        with:
+          command: bridge sync

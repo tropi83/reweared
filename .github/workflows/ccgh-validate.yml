@@ -1,0 +1,33 @@
+# written by ccgh init; edits are overwritten
+name: ccgh-validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: Hova25/ccgh-bridge@v1
+        with:
+          command: validate
+
+      - name: Every change belongs to an iteration or a fix
+        if: github.event_name == 'pull_request'
+        id: changed
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch origin "$BASE"
+          echo "files=$(git diff --name-only FETCH_HEAD...HEAD | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+
+      - if: github.event_name == 'pull_request'
+        uses: Hova25/ccgh-bridge@v1
+        with:
+          command: require-a-home ${{ github.event.pull_request.base.ref }} ${{ steps.changed.outputs.files }}
