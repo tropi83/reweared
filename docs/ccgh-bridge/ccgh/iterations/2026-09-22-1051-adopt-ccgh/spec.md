@@ -1,8 +1,10 @@
 ---
 title: Adopt ccgh
-status: draft
+status: ready
 depends_on: []
 impacts: []
+validated_by: unknown
+validated_at: '2026-09-22T10:52:47.942Z'
 ---
 
 # Adopt ccgh
