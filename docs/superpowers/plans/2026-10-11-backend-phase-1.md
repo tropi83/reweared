@@ -108,9 +108,9 @@
 
 **Files:** `apps/server/src/storage/{object-store.ts,s3-object-store.ts,memory-object-store.ts,keys.ts,keys.test.ts}`, `apps/server/test/storage.int.test.ts`.
 
-- [ ] **Step 1:** `interface ObjectStore { put(key, body: Buffer, contentType): Promise<void>; get(key): Promise<{ body: Readable; contentType; contentLength } | null>; delete(key): Promise<void>; deletePrefix(prefix): Promise<number>; ping(): Promise<void> }`. `keys.ts` builds keys from checked ids only (`assertSafeId` for listing/asset ids, the user-id pattern) and unit-tests traversal attempts.
-- [ ] **Step 2:** `S3ObjectStore` — `S3Client({ endpoint, region, forcePathStyle: true, credentials })`, `PutObject` with `ContentType` and `CacheControl`, `GetObject` (NoSuchKey → `null`), `DeleteObjects` in batches of 1000 for `deletePrefix` (paginated `ListObjectsV2`), `HeadBucket` for `ping`. `MemoryObjectStore` for unit tests.
-- [ ] **Step 3:** `storage.int.test.ts` against SeaweedFS: round trip, missing key, prefix deletion over > 1000 objects (generated small buffers), content type preserved. **Commit** `feat(storage): S3 object store for image bytes`.
+- [x] **Step 1:** `interface ObjectStore { put(key, body: Buffer, contentType): Promise<void>; get(key): Promise<{ body: Readable; contentType; contentLength } | null>; delete(key): Promise<void>; deletePrefix(prefix): Promise<number>; ping(): Promise<void> }`. `keys.ts` builds keys from checked ids only (`assertSafeId` for listing/asset ids, the user-id pattern) and unit-tests traversal attempts.
+- [x] **Step 2:** `S3ObjectStore` — `S3Client({ endpoint, region, forcePathStyle: true, credentials })`, `PutObject` with `ContentType` and `CacheControl`, `GetObject` (NoSuchKey → `null`), `DeleteObjects` in batches of 1000 for `deletePrefix` (paginated `ListObjectsV2`), `HeadBucket` for `ping`. `MemoryObjectStore` for unit tests.
+- [x] **Step 3:** `storage.int.test.ts` against SeaweedFS: round trip, missing key, prefix deletion over > 1000 objects (generated small buffers), content type preserved. **Commit** `feat(storage): S3 object store for image bytes`.
 
 ### Task 6: Listings, settings and recipes
 
@@ -193,3 +193,9 @@ Update this section after each task: task number, commit hash, deviations.
   - `buildApp` takes a pino instance (`loggerInstance`) shared with Better Auth's callbacks instead of logger options.
   - The CSRF origin check is exercised through a test-only guarded route registered by the harness (`/api/v1/__test/mutation`, never in the app). Mutation-checked: removing the origin check or trusting a client-supplied IP header makes the matching test fail.
   - One commit instead of two (`/me` and deletion are part of the account flow).
+- **Task 5 — done** (`4c94f5e`); 348 unit tests, 25 integration tests. Deviations and findings:
+  - **SeaweedFS 4.48** (GitHub release 2026-09-28, multi-arch image `chrislusf/seaweedfs:4.48` on Docker Hub) — pinned in `test/global-setup.ts`; task 8 uses the same tag. Identities come from an `-s3.config` JSON file; an anonymous request answers 403 once the gateway is up with authentication (used as the Testcontainers wait strategy). The gateway answers before the master has elected itself, so bucket creation is retried for up to 30 s. Checked by hand first: round trip, missing key → `null`, prefix deletion, wrong secret refused.
+  - `S3ObjectStore` gained `ensureBucket()` (creates the bucket when `HeadBucket` fails) and `close()`; `deletePrefix` refuses a prefix that does not end with `/`.
+  - `MemoryObjectStore` is not written yet: nothing uses it until a unit test needs a fake store (knip refuses unused files).
+  - Account deletion cleanup lives in `src/me/account-cleanup.ts` (`deleteUserObjects`) and is used by both `api.ts` and the test harness, so the integration test covers the production path: a photo stored under the user's prefix is gone after the confirmed deletion.
+  - `/api/v1/ready` now checks database, Redis and storage.
