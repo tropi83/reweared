@@ -61,6 +61,12 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...base, S3_SECRET_ACCESS_KEY_FILE: "/missing" }, noFiles)).toThrow(/S3_SECRET_ACCESS_KEY_FILE: cannot read the secret file/);
   });
 
+  it("refuses to start when Better Auth telemetry would be enabled", () => {
+    for (const value of ["1", "true", "YES", "on"])
+      expect(() => loadConfig({ ...base, BETTER_AUTH_TELEMETRY: value }, noFiles)).toThrow(/BETTER_AUTH_TELEMETRY/);
+    expect(loadConfig({ ...base, BETTER_AUTH_TELEMETRY: "0" }, noFiles).PORT).toBe(3000);
+  });
+
   it("requires Google client id and secret together, and SMTP_URL in smtp mode", () => {
     expect(() => loadConfig({ ...base, GOOGLE_CLIENT_ID: "id.apps.googleusercontent.com" }, noFiles)).toThrow(/GOOGLE_CLIENT_ID/);
     expect(() => loadConfig({ ...base, MAIL_MODE: "smtp" }, noFiles)).toThrow(/SMTP_URL/);

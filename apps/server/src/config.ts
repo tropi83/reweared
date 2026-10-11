@@ -39,6 +39,8 @@ function crossFieldProblems(env: Record<string, string | undefined>): string[] {
   const mode = env.MAIL_MODE ?? "resend";
   if (mode === "resend" && !env.RESEND_API_KEY) problems.push("RESEND_API_KEY: required when MAIL_MODE=resend");
   if (mode === "smtp" && !env.SMTP_URL) problems.push("SMTP_URL: required when MAIL_MODE=smtp");
+  // Better Auth sends telemetry whenever this variable is truthy, whatever its config says: refuse to start.
+  if (/^(1|true|yes|on)$/i.test(env.BETTER_AUTH_TELEMETRY ?? "")) problems.push("BETTER_AUTH_TELEMETRY: telemetry is not allowed; unset it or set it to 0");
   if (Boolean(env.GOOGLE_CLIENT_ID) !== Boolean(env.GOOGLE_CLIENT_SECRET))
     problems.push("GOOGLE_CLIENT_ID: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET go together");
   return problems;

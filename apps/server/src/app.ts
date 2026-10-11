@@ -1,7 +1,13 @@
-import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
+import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
+import type { Redis } from "ioredis";
 import { z } from "zod";
+import type { Auth } from "./auth/auth";
+import { registerAuthRoutes } from "./auth/routes";
+import { requireUser } from "./http/auth-guard";
 import { registerErrorHandling } from "./http/errors";
+import { registerMeRoutes } from "./me/routes";
 
 /** A dependency the API needs to serve requests (database, Redis, object store). */
 export interface ReadinessCheck {
@@ -10,14 +16,17 @@ export interface ReadinessCheck {
 }
 
 export interface AppDeps {
-  logger: FastifyServerOptions["logger"];
+  /** A pino instance (`loggerOptions()`), shared with Better Auth; `false` silences unit tests. */
+  logger: FastifyBaseLogger | false;
   readiness: ReadinessCheck[];
+  /** Accounts and the routes behind them; absent in unit tests of the bare app. */
+  accounts?: { auth: Auth; publicOrigin: string; redis: Redis };
 }
 
 /** Builds the API without listening, so tests drive it with `app.inject()`. */
-export function buildApp(deps: AppDeps): FastifyInstance {
+export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: deps.logger,
+    ...(deps.logger ? { loggerInstance: deps.logger } : { logger: false }),
     // Behind Caddy on the Docker network: X-Forwarded-For (client IP for logs and per-IP rate limits) is only
     // trusted from private addresses, so a client reaching the api directly cannot forge it.
     trustProxy: ["127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
@@ -25,6 +34,21 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
   registerErrorHandling(app);
+
+  if (deps.accounts) {
+    // Must be loaded before the routes are declared: it attaches itself to each route as it is added.
+    // Keyed by the proxy-aware client IP (it runs at onRequest, before the session is known); Better Auth
+    // limits /api/auth/* itself. Routes tighten it with `config: { rateLimit: { max, timeWindow } }`.
+    await app.register(rateLimit, {
+      global: true,
+      max: 300,
+      timeWindow: "1 minute",
+      redis: deps.accounts.redis,
+      nameSpace: "rl:api:",
+      keyGenerator: (req) => req.ip,
+      allowList: (req) => !req.url.startsWith("/api/v1/") || req.url.startsWith("/api/v1/health") || req.url.startsWith("/api/v1/ready"),
+    });
+  }
 
   const api = app.withTypeProvider<ZodTypeProvider>();
 
@@ -47,6 +71,12 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return { status: "ready" as const };
     },
   );
+
+  if (deps.accounts) {
+    const { auth, publicOrigin } = deps.accounts;
+    registerAuthRoutes(app, auth, publicOrigin);
+    registerMeRoutes(app, requireUser(auth, [publicOrigin]));
+  }
 
   return app;
 }
