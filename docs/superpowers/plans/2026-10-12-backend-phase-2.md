@@ -1,0 +1,135 @@
+# Backend phase 2 — worker, queues, credits, live progress, server-side providers — implementation plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Resuming?** Read the "Progress" section at the bottom first. Read the `backend` skill before any task; it lists the patterns phase 1 established (routes, guard at `onRequest`, harness, mutation checks).
+
+**Goal:** A signed-in user can ask the API for a listing's photo pack and its title/description; the request reserves credits and returns at once; a worker generates the images with the **platform's** provider keys, retries what can be retried, refunds what fails, and every step reaches the user live over SSE. Fair between users, within the providers' limits, safe across crashes. Exit criterion (spec §10): the Testcontainers suite proves every invariant of the `backend` skill; the compose smoke test generates with the Mock provider. **No client change** (phase 3).
+
+**Architecture:** `packages/providers` holds the Cloudflare, Gemini and copy adapters with an injected `HttpClient`, shared by the clients (unchanged behaviour) and the worker. The api enqueues in one Postgres transaction (generation + jobs + credit reservation), then a dispatcher feeds BullMQ with at most N active jobs per user; one queue per provider with BullMQ's rate limiter; the worker (`dist/worker.js`, same image, provider keys as Docker secrets) runs jobs with the domain's retry semantics, writes results (sharp, object store), refunds final failures once and publishes each transition to a Redis stream per user, which `GET /api/v1/events` serves as SSE with `Last-Event-ID` replay. A reconciler and a nightly sweep close the gaps a crash can leave.
+
+**Tech stack (registry checked 2026-10-12):** BullMQ 6.3.12 (Redis backend; see decision 2) on ioredis 6 · existing stack of phase 1 (Fastify 5.12, Better Auth 1.7.7, drizzle 0.45, sharp 0.35, SeaweedFS 4.48, Testcontainers 12.2). Read the BullMQ docs for every API used (workers, rate limiting, retrying/backoff strategies, `UnrecoverableError`, `DelayedError`, job ids, repeatable/scheduled jobs, graceful shutdown) and record the URLs + date in the code; do the same for the Cloudflare Workers AI and Gemini endpoints before moving their adapters (CLAUDE.md rule).
+
+**Spec:** `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md` §3–§5, §9 (binding), its §12 amendments, and the phase 1 plan's Progress (facts about Better Auth, SeaweedFS, compose).
+
+## Global Constraints
+
+- Branch `feat/backend-phase-2` from `feat/backend-phase-1` (or `main` once phase 1 is merged). Conventional Commits; scopes `providers`, `queue`, `worker`, `credits`, `api`, `db`, `docker`, `docs`, `ci`; every commit ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- **Baselines (2026-10-12): 355 unit tests, 37 integration tests.** After every task: `pnpm check` green, `pnpm test:integration` green, no test count drops. Moving client tests into `packages/providers` must keep their count.
+- **The shipped clients behave exactly as today**: same requests to Cloudflare and Google, same errors, same UI. Task 1 is a pure refactor for them; `pnpm build`, the app's workflow tests and `pnpm rust:check` prove it.
+- **Provider keys exist only in the worker**: the api's config schema has no provider variable and a test asserts it; compose gives the provider secrets to the `worker` service only.
+- **Job data in Redis carries ids only** (`{ jobId }`), never an image, a prompt or a user email. Prompts live in Postgres rows; images in the object store.
+- **Every invariant gets a test that fails when the protection is removed** (phase 1 practice), at least for: atomic enqueue, refund once, cancelled job never persists, per-user cap, cross-user 404, provider keys absent from the api.
+- Credits, costs and budgets are configuration with documented defaults; the owner confirms the numbers (open questions below) — code never hard-codes a price in two places.
+
+## Decisions taken in this plan (beyond the spec)
+
+1. **Platform provider and model are configuration, not user choices**: `IMAGE_PROVIDER` / `IMAGE_MODEL` (default Cloudflare FLUX.2 [klein] 4B), `COPY_PROVIDER` / `COPY_MODEL` (default Gemini 3.1 Flash-Lite). A request may carry per-run options the model supports (aspect ratio, guidance, prompt tweaks) filtered by `buildRequestForModel` — never a provider id or a key.
+2. **BullMQ on Redis** (spec). BullMQ 6 now also ships a Postgres backend (`bullmq/postgres`: `createPostgresBackend`, migrations); it would allow enqueue and credit reservation in one transaction and drop the reconciler, but it is new and Redis already runs for rate limits. Revisit only if Redis becomes a burden; the dispatcher/reconciler design does not depend on it.
+3. **SSE from Redis Streams**: each user has a capped stream `events:<userId>` (`XADD … MAXLEN ~ 1000`); the SSE handler replays from `Last-Event-ID` (a stream id) then blocks on `XREAD`. One blocking Redis connection per open SSE response, at most 3 per user (4th → 429). Simpler and replay-safe compared with pub/sub + a separate log.
+4. **Server-side Mock provider uses sharp** (`apps/server/src/providers/sharp-mock-provider.ts`), with the client Mock's scenarios (`success`, `slow`, `flaky`, `rate_limited`, `timeout`, `error`, `no_image`); enabled only when `ENABLE_MOCK_PROVIDER=true` (dev, CI, tests) — refused in production config.
+5. **Source preparation moves to the domain where it is pure** (`computeGeometry`, `inputPreparationFor` already are); the pixel work is sharp on the server and canvas on the client, behind the same `inputPreparationFor(model)` contract.
+6. **Generated images go through the same storage path as uploads** (`u/<user>/l/<listing>/generation/<asset>.<ext>` + thumbnail), re-encoded by sharp (no metadata), so the image routes of phase 1 serve them unchanged.
+7. **Cloudflare budget guard**: a Redis counter of estimated neurons per UTC day (`estimatedNeurons(model, size)` from the catalogue's pricing); above `CLOUDFLARE_DAILY_NEURON_BUDGET` the `gen:cloudflare` queue is paused and new image enqueues answer 503 `PROVIDER_BUDGET_EXHAUSTED` without reserving credits. New `GenerationErrorCode` in the domain (+ client i18n string, unused by the client until phase 3).
+
+## Open questions for the owner (defaults used until answered)
+
+- Free plan size: `FREE_MONTHLY_CREDITS=60` (≈ 10 listings of 5 photos + text). Costs: 1 credit per image job, 1 per copy job (`CREDIT_COSTS` in `packages/domain`).
+- Per-user cap `MAX_ACTIVE_JOBS_PER_USER=4`; provider limits `CLOUDFLARE_MAX_PER_MINUTE=60`, `GEMINI_MAX_PER_MINUTE=15` (free-tier RPM of Flash-Lite — check the current Gemini rate-limit page).
+- `CLOUDFLARE_DAILY_NEURON_BUDGET=9000` (keeps ~10 % of the 10,000 free daily neurons as margin) — or a paid Workers plan.
+
+## File map
+
+| File                                                                                                   | Responsibility                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/providers/` (new)                                                                            | Cloudflare + Gemini image and copy adapters, mappers, errors, model catalogues, `HttpClient` interface, allowlist; tests moved from `src/infrastructure/providers` |
+| `src/infrastructure/providers/*`                                                                       | Thin client wiring: Tauri/browser `HttpClient`, credential sources (`CloudflareAuth`, `GeminiAuthManager`), the canvas Mock                                        |
+| `packages/domain/src/services/{credits,image-geometry}.ts`                                             | Credit costs; `computeGeometry` moved from the client image pipeline                                                                                               |
+| `apps/server/src/db/schema.ts` + `drizzle/0001_*.sql`                                                  | `generation`, `generation_job`, `credit_ledger`, `credit_balance`                                                                                                  |
+| `apps/server/src/credits/{ledger,routes,grants}.ts`                                                    | Reserve / refund / grant with idempotency keys, balance, monthly grant                                                                                             |
+| `apps/server/src/queue/{connection,queues,dispatcher,reconciler,events}.ts`                            | BullMQ queues and limiter config, per-user dispatch, crash recovery, Redis stream events                                                                           |
+| `apps/server/src/generations/{plan,enqueue,routes}.ts`                                                 | Build jobs from the listing + domain catalogue, the enqueue transaction, generation/copy/cancel/retry routes                                                       |
+| `apps/server/src/worker/{worker,run-image-job,run-copy-job,prepare-source,budget}.ts`, `src/worker.ts` | Worker entrypoint and job execution                                                                                                                                |
+| `apps/server/src/providers/{registry,sharp-mock-provider}.ts`                                          | Platform providers built from worker config                                                                                                                        |
+| `apps/server/src/events/routes.ts`                                                                     | `GET /api/v1/events` (SSE)                                                                                                                                         |
+| `apps/server/src/maintenance/{sweep,drift}.ts`                                                         | Nightly orphan sweep and balance drift check                                                                                                                       |
+| `packages/contracts/src/{generation,credits,events}.ts`                                                | Request/response/event schemas                                                                                                                                     |
+| `compose.yaml`, `compose.dev.yaml`, `scripts/dev-secrets.mjs`, `scripts/server-smoke.mjs`              | `worker` service with provider secrets, mock in dev, smoke extended to generation + SSE                                                                            |
+| Docs                                                                                                   | spec amendments, SECURITY/PRIVACY (sub-processors become real), DEVELOPMENT, ARCHITECTURE, skills, CHANGELOG                                                       |
+
+---
+
+### Task 1: `packages/providers` (pure refactor for the clients)
+
+- [ ] **Step 1: Verify the provider docs** (Cloudflare Workers AI REST + model pages for FLUX.2 [klein] 4B/9B and the Llama vision models; Gemini Interactions API, models and rate limits). Record any change in the catalogues + DEVELOPMENT.md with the date. Note: `gemini-2.5-flash-image` was announced to shut down on 2026-10-02 — remove it if the docs confirm.
+- [ ] **Step 2:** Create `@aiv/providers` (source-only, Node-tested like the domain, lint boundary of shared packages). Define `HttpClient { fetch(url, init): Promise<Response> }` and move the host allowlist (`ALLOWED_HOSTS`, `allowHost`) next to it. Move `cloudflare/{CloudflareMapper,CloudflareErrors,CloudflareModels,CloudflareProvider,CloudflareListingCopy}` and `gemini/{GeminiMapper,GeminiErrors,GeminiModels,GeminiProvider,GeminiListingCopy}`; replace `@/infrastructure/http/http-client` with the injected client and `@/lib/logger` with an injected `{ warn, error }` logger. Credentials come through small interfaces (`CloudflareEndpoint { url(model), headers() }`, `GeminiAuth { getRequestHeaders(), getStatus() }`) that the client's `CloudflareAuth` / `GeminiAuthManager` already satisfy.
+- [ ] **Step 3:** The client keeps `src/infrastructure/http/http-client.ts` as the `HttpClient` implementation (Tauri plugin or browser fetch, allowlist enforced) and wires the adapters in `app/services.ts`. Tests move with the code; `__setFetchOverride` becomes an injected fake `HttpClient` in the package tests.
+- [ ] **Step 4:** `computeGeometry` moves to `@aiv/domain/services/image-geometry` (pure); the canvas part stays in the client.
+- [ ] **Step 5:** `pnpm check` (same total test count), `pnpm build`, `pnpm rust:check`; the client's workflow tests still pass with the Mock. **Commit** `refactor(providers): share the provider adapters with the server`.
+
+### Task 2: Schema for generations, jobs and credits
+
+- [ ] **Step 1:** `generation` (id, listing_id, user_id, kind `images|copy`, source_image_id, parent_generation_id, settings jsonb, status, created/updated_at), `generation_job` (id, generation_id, user_id, listing_id, kind, provider, model, shot_id, shot_label jsonb, prompt text, seed int, options jsonb, status `queued|dispatched|active|succeeded|failed|cancelled`, attempt, credits int, result_image_id, error jsonb, dispatched_at, started_at, finished_at; indexes `(user_id, status, created_at)`, `(status, dispatched_at)`), `credit_ledger` (id, user_id, delta int, reason `grant|reserve|refund|adjust`, job_id, generation_id, idempotency_key **unique**, created_at), `credit_balance` (user_id pk, balance int **check ≥ 0**, plan text, updated_at). All cascade from `user`.
+- [ ] **Step 2:** `db:generate` → `drizzle/0001_*.sql`; integration tests: constraints (negative balance refused, duplicate idempotency key refused), cascades. **Commit** `feat(db): generations, jobs and the credit ledger`.
+
+### Task 3: Credit ledger and the monthly grant
+
+- [ ] **Step 1:** `CREDIT_COSTS` in `@aiv/domain/services/credits` (`image: 1`, `copy: 1`) and `jobCost(kind)`; one source of truth for the UI later.
+- [ ] **Step 2:** `credits/ledger.ts` — `reserve(tx, userId, amount, key)`: `SELECT … FOR UPDATE` on `credit_balance` (creating the row at 0 if absent), 402 `INSUFFICIENT_CREDITS` when short, ledger row + balance update; `refund(tx, jobId)` with key `refund:<jobId>` (a duplicate key is a no-op, not an error); `grant(userId, amount, key)`. No function updates a balance without its ledger row.
+- [ ] **Step 3:** Monthly free grant: a BullMQ job scheduler (`upsertJobScheduler`, daily) grants `FREE_MONTHLY_CREDITS` with key `grant:<userId>:<YYYY-MM>` to every verified user without one this month; new users get theirs at email verification (Better Auth `afterEmailVerification` hook).
+- [ ] **Step 4:** `GET /api/v1/credits` → `{ balance, plan, ledger: last 50 entries }` (contract in `@aiv/contracts/credits`).
+- [ ] **Step 5:** Tests: concurrent reservations never go negative (20 parallel reserves on a balance of 10 → exactly 10 succeed), refund twice = once, grant twice in a month = once, verification grants once. **Commit** `feat(credits): ledger, reservations, refunds and the free monthly grant`.
+
+### Task 4: Queues, dispatcher and reconciler
+
+- [ ] **Step 1:** `queue/connection.ts`: BullMQ connections from `REDIS_URL` (read the docs: workers need `maxRetriesPerRequest: null`); `queue/queues.ts`: one `Queue` per enabled provider kind (`gen:cloudflare`, `gen:gemini`, `gen:mock`, `copy:gemini`, `copy:cloudflare`, `copy:mock`), job options: `jobId` = our job id, `attempts` from config, `removeOnComplete/removeOnFail` with a bounded history, backoff `type: "domain"`.
+- [ ] **Step 2:** `dispatcher.offer(userId)`: under a Redis lock per user, counts the user's `dispatched|active` jobs, moves the oldest `queued` ones up to `MAX_ACTIVE_JOBS_PER_USER` to `dispatched` (conditional update) and adds them to their queue (idempotent by `jobId`). Called after an enqueue, after each job ends, and by the reconciler.
+- [ ] **Step 3:** `reconciler` (job scheduler, every minute): `dispatched` rows whose BullMQ job is missing (crash between commit and add) are re-added; `active` rows whose BullMQ job is gone and whose `started_at` is older than the lock duration go back to `dispatched`; users with `queued` jobs and free slots are offered.
+- [ ] **Step 4:** Tests (Testcontainers): fairness — user A enqueues 20 jobs, user B 2, B's jobs are dispatched before A's 5th; the cap holds under concurrent offers; reconciler re-adds a job whose add was skipped (simulate by inserting `dispatched` without adding). **Commit** `feat(queue): per-user dispatch and crash reconciliation on BullMQ`.
+
+### Task 5: Enqueue API, cancel and retry
+
+- [ ] **Step 1:** `generations/plan.ts`: from the listing (category, mannequin flag, brand for copy only) and the user's settings, build the shots with `buildListingShots` / `buildShots` (the client's exact prompts), one job per shot, a random seed per job, options filtered by `buildRequestForModel` for the platform model.
+- [ ] **Step 2:** `POST /api/v1/listings/:id/generations` (`{ sourceImageId?, shotIds?, options? }`) and `POST /api/v1/listings/:id/copy` (`{ language }`): one transaction — listing locked and owned, source image owned, generation + jobs inserted `queued`, `reserve(cost, "reserve:<generationId>")`; then `dispatcher.offer`. 202 + the generation with its jobs. Budget guard (decision 7) before the transaction. Email-verified users only (guard already).
+- [ ] **Step 3:** `POST /api/v1/jobs/:id/cancel`: `queued|dispatched` → `cancelled` + BullMQ removal + refund; `active` → Redis key `cancel:<jobId>` + `cancelled` once the worker stops; terminal → 409. `POST /api/v1/jobs/:id/retry` (failed only): new job row, new seed, new reservation.
+- [ ] **Step 4:** `GET /api/v1/listings/:id` returns the generations and jobs now (pin their schemas in `@aiv/contracts` and drop the `unknown` records).
+- [ ] **Step 5:** Tests: 402 writes nothing (no generation, no job, no ledger row — checked by counts); the reservation and the jobs commit or roll back together (inject a failure after the insert); cross-user 404 on every new route; cancel in each state refunds once. **Commit** `feat(api): enqueue generations and copy with credit reservation`.
+
+### Task 6: Worker
+
+- [ ] **Step 1:** Worker config (separate zod schema): provider secrets `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN_FILE`, `GEMINI_API_KEY_FILE`, `ENABLE_MOCK_PROVIDER`, limits, `WORKER_CONCURRENCY`; the api config schema gains a test that it has **no** provider variable. `providers/registry.ts` builds the platform providers with a Node `HttpClient` that enforces the provider allowlist.
+- [ ] **Step 2:** `run-image-job.ts`: load the job (conditional `dispatched → active`, else skip), read the source from the store, prepare it (`prepare-source.ts`: sharp crop/resize per `inputPreparationFor(model)`), call the provider with an `AbortSignal` combining the attempt timeout and the cancel key (checked every second), seed from `seedForAttempt`. Success → `processUpload`-style re-encode + thumbnail → store → one transaction: `image_asset` (kind `generation`), job `succeeded` (`WHERE status = 'active'`), generation status from `deriveGenerationStatus`. Errors → `toGenerationError`; retryable → rethrow for BullMQ with the domain backoff (`backoffStrategy` using `computeBackoffMs` and `retryAfterMs`); non-retryable or last attempt → `UnrecoverableError` path: job `failed` + `refund`. Cancelled → nothing persisted, refund.
+- [ ] **Step 3:** `run-copy-job.ts`: same skeleton with the copy provider; the result is written to `listing.copy` (and the listing renamed after the title, as the client does).
+- [ ] **Step 4:** `budget.ts` (decision 7) increments the neuron counter on success and pauses the queue past the budget; `src/worker.ts` starts workers per enabled queue, closes them on SIGTERM (finishes active jobs within the grace period).
+- [ ] **Step 5:** `apps/server/src/providers/sharp-mock-provider.ts` with the client Mock's scenarios.
+- [ ] **Step 6:** Tests (Mock provider, Testcontainers): success writes a generation image served by `/api/v1/images/:id`; `rate_limited` then success retries with a new seed; `error` fails at once and refunds; `timeout` exhausts attempts and refunds once; cancel while active persists nothing; a double delivery of the same job stores one result; worker shutdown leaves no job `active`. **Commit** `feat(worker): run image and copy jobs with retries, refunds and cancellation`.
+
+### Task 7: Live progress (SSE)
+
+- [ ] **Step 1:** `queue/events.ts`: `publish(userId, event)` → `XADD events:<userId> MAXLEN ~ 1000 * data <json>`; events: `job` (status, attempt, resultImageId, error code/message), `generation` (status), `credits` (balance). Contracts in `@aiv/contracts/events`.
+- [ ] **Step 2:** `GET /api/v1/events`: guard at `onRequest`, `text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, heartbeat comment every 15 s, replay from `Last-Event-ID`, then `XREAD BLOCK` on a dedicated connection closed with the response; at most 3 streams per user. Check that Caddy does not buffer the response (`flush_interval -1` on that route if needed).
+- [ ] **Step 3:** Tests: events arrive in order; reconnecting with `Last-Event-ID` replays exactly the missed ones; another user never receives them; the 4th stream answers 429. **Commit** `feat(api): live job and credit events over SSE`.
+
+### Task 8: Maintenance jobs
+
+- [ ] **Step 1:** Nightly orphan sweep: object keys under `u/` with no matching row (account or listing deleted while the store was down, crash between put and insert) older than 24 h are deleted; counts logged.
+- [ ] **Step 2:** Nightly drift check: `credit_balance.balance` vs `SUM(credit_ledger.delta)` per user; a mismatch is logged as an error (never auto-corrected).
+- [ ] **Step 3:** Tests for both. **Commit** `feat(worker): nightly orphan sweep and credit drift check`.
+
+### Task 9: Compose, CI and the smoke test
+
+- [ ] **Step 1:** `worker` service (same image, `node dist/worker.js`, read-only, `cap_drop: [ALL]`, `stop_grace_period: 60s`, networks internal + an egress network for the providers, provider secrets **only here**), `dev-secrets.mjs` writes placeholder provider secrets, `compose.dev.yaml` sets `ENABLE_MOCK_PROVIDER=true`, `IMAGE_PROVIDER=mock`, `COPY_PROVIDER=mock`. Caddy: no buffering on `/api/v1/events`.
+- [ ] **Step 2:** `server-smoke.mjs` gains: credits granted at verification, enqueue a 2-shot generation with the Mock, SSE until both jobs succeed, download a generated image, copy job fills the title. `docker compose config` check in CI that no provider secret is mounted in `api`.
+- [ ] **Step 3:** **Commit** `feat(docker): worker service with the provider keys`.
+
+### Task 10: Documentation
+
+- [ ] Spec §12 amendments (decisions of this plan, answers to the open questions), SECURITY (provider keys in the worker, Redis job data = ids, SSE limits, budget guard), PRIVACY (Cloudflare/Google become real sub-processors for photos sent by the worker; retention of generations), ARCHITECTURE target section, DEVELOPMENT (worker, providers config, mock), skills `backend` (queue/worker patterns), `testing`, `project-context`, `security-review`, CHANGELOG. **Commit** `docs: document the phase 2 worker and credits`.
+
+### Task 11: Final verification
+
+- [ ] `pnpm check`, `pnpm test:integration`, `pnpm rust:check`, `pnpm build`, stack up + `pnpm smoke:server`; logs of a run free of emails, tokens, cookies, prompts and image bytes; `docker compose config` shows provider secrets on `worker` only; the shipped web app still generates locally with the Mock exactly as before (workflow tests + a look in the browser). Update Progress; mark phase 2 done in the skills; ask the owner before pushing.
+
+## Progress
+
+Update this section after each task: task number, commit hash, deviations.
+
+_Nothing done yet._
