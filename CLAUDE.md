@@ -38,7 +38,7 @@ The product is moving from a local-first, bring-your-own-key app to **user accou
 
 ## Layout
 
-`packages/domain` (pure models/services, shared — from phase 0) · client: `src/domain` (until extracted) → `src/infrastructure` (storage, providers, auth, image, http, publish) → `src/app` (services container, zustand stores, TanStack Query, router) → `src/features` (React UI) · `src-tauri/src` (keychain, OAuth loopback, Vinted window) · `src-tauri/plugins/vinted-webview` (phones) · `cloudflare-worker/` (template users deploy) · server (phase 1+): `apps/server` (api + worker entrypoints), `compose.yaml` · decisions: `docs/adr/`, designs and plans: `docs/superpowers/`.
+`packages/domain` (`@aiv/domain`: pure models, services, ids, retry — shared with the planned server, Node-tested, no DOM) · client: `src/infrastructure` (storage, providers, auth, image, http, publish) → `src/app` (services container, zustand stores, TanStack Query, router) → `src/features` (React UI) · `src-tauri/src` (keychain, OAuth loopback, Vinted window) · `src-tauri/plugins/vinted-webview` (phones) · `cloudflare-worker/` (template users deploy) · server (phase 1+): `apps/server` (api + worker entrypoints), `compose.yaml` · decisions: `docs/adr/`, designs and plans: `docs/superpowers/`.
 
 ## Workflow
 

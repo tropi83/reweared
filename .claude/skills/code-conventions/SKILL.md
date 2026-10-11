@@ -7,14 +7,14 @@ description: Use when writing or reviewing TypeScript/React/Rust code in this re
 
 ## Layering (strict)
 
-`domain` → nothing. `infrastructure` → `domain`, `lib`. `app` → `infrastructure`, `domain`. `features` → `app`, `components`, `i18n`. Never import `features` from `app`/`infrastructure`. No React in `domain`/`infrastructure` (React hooks in `app`: `useImageUrl` and the TanStack Query hooks in `app/query`).
+`@aiv/domain` (`packages/domain`) → nothing but itself. `infrastructure` → `@aiv/domain`, `src/lib`. `app` → `infrastructure`, `@aiv/domain`. `features` → `app`, `components`, `i18n`. Never import `features` from `app`/`infrastructure`. No React in `domain`/`infrastructure` (React hooks in `app`: `useImageUrl` and the TanStack Query hooks in `app/query`).
 
-The domain is shared with the planned server (ADR 0001): from phase 0 it lives in the workspace package `packages/domain` (`@aiv/domain`), which must stay free of I/O, DOM globals, React, Tauri and storage libraries — an ESLint boundary enforces it. Server code (`apps/server`, phase 1+) follows the same TypeScript and lint rules; see the `backend` skill for its own layering.
+The domain is shared with the planned server (ADR 0001): it lives in the workspace package `packages/domain` (`@aiv/domain`) and must stay free of I/O, DOM globals, React, Tauri and storage libraries — the ESLint block for `packages/domain/src/**` (`no-restricted-imports`, `no-restricted-globals`) and its DOM-less `tsconfig` enforce it. Import it by subpath: `@aiv/domain/models`, `@aiv/domain/services/<file>`, `@aiv/domain/lib/<file>` (no root barrel); inside the package use relative imports. The `@/` alias is the app only it. Server code (`apps/server`, phase 1+) follows the same TypeScript and lint rules; see the `backend` skill for its own layering.
 
 ## TypeScript
 
 - `strict` + `noUncheckedIndexedAccess`: handle `undefined` from index access explicitly.
-- `interface` for object shapes, `type` for unions. Export domain types from `src/domain/models/index.ts`.
+- `interface` for object shapes, `type` for unions. Export domain types from `packages/domain/src/models/index.ts`.
 - No `any`. Cast only at boundaries (JSON from Google, Tauri `invoke`) and validate.
 - Optional fields: conditional spreads `...(x ? { x } : {})` rather than assigning `undefined`.
 - Errors: throw `AppError(code, userMessage, { detail, retryable, retryAfterMs })`. `detail` is for diagnostics — never a credential, never an image, never a full prompt.

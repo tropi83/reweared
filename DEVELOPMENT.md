@@ -19,14 +19,14 @@ pnpm android:dev      # run on a phone or emulator with hot reload
 pnpm android:apk      # debug APK — release and signing: BUILDING.md
 pnpm ios:doctor       # iOS pre-flight (macOS only)
 pnpm ios:dev          # run on a simulator or an iPhone with hot reload
-pnpm test             # vitest (unit + integration + workflow)
+pnpm test             # vitest: projects app (jsdom) + domain (Node)
 pnpm check            # typecheck + lint + format:check + test
 pnpm rust:check       # cargo fmt --check + clippy + cargo test
 ```
 
 ## Backend (planned)
 
-The project is moving to accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)). Design: [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md); plans per phase in `docs/superpowers/plans/` (phase 0: [`2026-10-11-backend-phase-0.md`](docs/superpowers/plans/2026-10-11-backend-phase-0.md)). No server code exists yet. From phase 0 the repo is a pnpm workspace and the domain lives in `packages/domain` (`@aiv/domain`); from phase 1 `docker compose -f compose.yaml -f compose.dev.yaml up` will start Postgres, Redis, MinIO, Mailpit, the api and the worker, and this section will document it (Docker required, secrets as files under `secrets/`, never committed). Conventions for that code: the `backend` skill.
+The project is moving to accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)). Design: [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md); plans per phase in `docs/superpowers/plans/` (phase 0: [`2026-10-11-backend-phase-0.md`](docs/superpowers/plans/2026-10-11-backend-phase-0.md)). No server code exists yet. The repo is a pnpm workspace: the domain lives in `packages/domain` (`@aiv/domain`, phase 0); from phase 1 `docker compose -f compose.yaml -f compose.dev.yaml up` will start Postgres, Redis, MinIO, Mailpit, the api and the worker, and this section will document it (Docker required, secrets as files under `secrets/`, never committed). Conventions for that code: the `backend` skill.
 
 ## Environment
 
@@ -87,7 +87,7 @@ Verified 2026-09-12 against https://developers.cloudflare.com/workers-ai/ (model
 
 Flow: `PostButton` → `publish-store` → `PublishBridge` (`TauriVintedBridge` → `vinted_*` commands in `src-tauri/src/vinted.rs`) → a second `WebviewWindow` on vinted.com into which Rust evaluates the pre-fill script. vinted.com gets no Tauri IPC (no capability targets the `vinted` window). Security rationale: SECURITY.md → "Vinted window".
 
-- **Script**: `src/infrastructure/publish/vinted/{prefill,selectors,entry}.ts`, bundled into `src-tauri/scripts/vinted-prefill.js` by `pnpm build:prefill` (Vite library build, IIFE) and compiled into the binary with `include_str!`. The generated file is committed; `pnpm prefill:verify` (part of `pnpm check` and CI) rebuilds it and fails when the committed copy is stale. That directory may only `import type` from `@/domain/services/publish` — nothing from the app exists inside vinted.com.
+- **Script**: `src/infrastructure/publish/vinted/{prefill,selectors,entry}.ts`, bundled into `src-tauri/scripts/vinted-prefill.js` by `pnpm build:prefill` (Vite library build, IIFE) and compiled into the binary with `include_str!`. The generated file is committed; `pnpm prefill:verify` (part of `pnpm check` and CI) rebuilds it and fails when the committed copy is stale. That directory may only `import type` from `@aiv/domain/services/publish` — nothing from the app exists inside vinted.com.
 - **Selectors**: every DOM anchor lives in `selectors.ts` as ordered candidate lists (first match wins). Checked against the live mobile web form on 2026-09-13 (`title--input`, `description--input`, `add-photos-input`, `image-wrapper-N` — the media grid sits outside the `<form>`, so thumbnails are counted on the whole document). When Vinted changes its form, update that file (specific anchors first, generic fallbacks last), bump its "verified on" date, run `pnpm build:prefill` and commit both files.
 - **The window**: one `Window` with two child webviews (Tauri `unstable` feature): `vinted-bar` on top (44 px, `public/vinted-bar.{html,css,js}`, an app page with no capability; Rust pushes the localized guidance from `src/app/publish-bar.ts` through `vinted_status` → `eval`) and `vinted` below (vinted.com). `layout()` re-fits both on resize / scale change.
 - **When it runs**: by itself, as soon as the window is on `/items/new` — after a page load (`vinted:page`) or a client-side navigation (Vinted's own “Sell” entry; caught by the 500 ms location poll of `vinted_poll`) — and again when the document was replaced (reload). The panel's _Fill again_ button re-runs it by hand. The script waits up to 10 s for the form to render (`status` stays `null` meanwhile) before reporting `pageOk: false`.
@@ -115,19 +115,19 @@ Flow: `PostButton` → `publish-store` → `PublishBridge` (`TauriVintedBridge` 
 
 Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, stubbed Google and Cloudflare endpoints) — 51 files, 312 tests on 2026-10-11. The `testing` skill (`.claude/skills/testing/SKILL.md`) documents the harnesses.
 
-- `src/domain/services/generation-queue.test.ts` — concurrency, independent failures, retry/backoff, timeout, cancellation, manual retry.
-- `src/domain/services/recipes.test.ts` — interpolation; `src/domain/models/models.test.ts` — errors, status derivation, request builder (inline models), seeds.
+- `packages/domain/src/services/generation-queue.test.ts` — concurrency, independent failures, retry/backoff, timeout, cancellation, manual retry.
+- `packages/domain/src/services/recipes.test.ts` — interpolation; `packages/domain/src/models/models.test.ts` — errors, status derivation, request builder (inline models), seeds.
 - `src/infrastructure/providers/gemini/GeminiProvider.test.ts` — request mapping, response parsing, error normalization, model listing fallback, host allowlist.
 - `src/infrastructure/auth/auth.test.ts` — SecretStore tiers, API-key provider, PKCE, OAuth loopback flow, concurrent refresh, `invalid_grant`.
 - `src/infrastructure/storage/IndexedDbStorage.test.ts` — round trips, deletion, orphans, unsafe ids, migrations; `rename-migration.test.ts` — schema v3, IndexedDB v1→v2 upgrade, desktop layout migration.
 - `src/app/query/query.test.tsx` — model lists and auth statuses through TanStack Query (cache, degraded errors, invalidation). Components that use query hooks render with `renderWithQuery` from `src/test/render.tsx`.
 - `src/infrastructure/image/image-processing.test.ts` — MIME sniffing, validation, resizing math.
 - `src/app/workflow.test.tsx` — import → generate 4 → branch → reload; partial failure + retry; deletion without orphans.
-- `src/app/app-units.test.ts`, `src/lib/lib.test.ts` — i18n, router, stores, ids, log redaction, backoff, timeouts.
+- `src/app/app-units.test.ts`, `src/lib/lib.test.ts` — i18n, router, stores, log redaction; `packages/domain/src/lib/{ids,retry}.test.ts` — ids, backoff, timeouts.
 - `src-tauri/src/oauth.rs` — callback parsing.
-- `src/domain/services/publish.test.ts` — postability, photo order, Vinted URL stages, report guard; `src/infrastructure/publish/vinted/prefill.test.ts` — form filling on a React-style fixture (fallback selectors, no submit, photos attached once); `src/infrastructure/publish/publish-bridge.test.ts` — command/event mapping, error codes.
+- `packages/domain/src/services/publish.test.ts` — postability, photo order, Vinted URL stages, report guard; `src/infrastructure/publish/vinted/prefill.test.ts` — form filling on a React-style fixture (fallback selectors, no submit, photos attached once); `src/infrastructure/publish/publish-bridge.test.ts` — command/event mapping, error codes.
 - `src/app/publish-store.test.ts` — publish state machine (page events, polled location, auto-fill on arrival and after a reload, poll timeout, partial report, stale session, listing binding) and payload builder; `src/features/publish/PostButton.test.tsx`, `src/features/settings/PublishSection.test.tsx` — reasons, terms dialog, logout.
-- `src/domain/services/{catalog,mannequin,listing-copy,usage-tracker}.test.ts` — catalogue consistency and safety-filter softening, mannequin prompt rewriting, copy prompt and defensive parser, usage counters and learned limits.
+- `packages/domain/src/services/{catalog,mannequin,listing-copy,usage-tracker}.test.ts` — catalogue consistency and safety-filter softening, mannequin prompt rewriting, copy prompt and defensive parser, usage counters and learned limits.
 - `src/infrastructure/providers/{cloudflare/CloudflareListingCopy,gemini/GeminiListingCopy,gemini/GeminiModels}.test.ts` — copy providers (request shape, model choice and fallback) and the Gemini image catalogue.
 - `src/infrastructure/providers/cloudflare/CloudflareProvider.test.ts` — mapper (multipart/JSON bodies), error envelope mapping, auth (direct API / Worker), input preparation for diffusion models, private models (5018), FLUX.2 [klein] requests.
 - `src/app/{listing-flow,listings-store,listing-actions}.test.ts` — `generateListing` (photos + copy in parallel) and `listingReadiness`, switching listings (running jobs cancelled), deletion.

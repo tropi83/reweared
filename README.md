@@ -144,8 +144,8 @@ Exact versions resolved in `pnpm-lock.yaml` / `Cargo.lock` at the time of writin
 ## Project structure
 
 ```
+packages/domain/  @aiv/domain: pure models + services (catalogue, shot plans, job queue, provider contract, listing copy, publish) — no I/O, shared with the planned server
 src/
-  domain/          pure models + services (catalogue, shot plans, job queue, provider contract, listing copy, publish) — no I/O
   infrastructure/  storage (IndexedDB / Tauri fs), providers (cloudflare, gemini, mock), auth, image pipeline, http, publish (Vinted)
   app/             composition root, zustand stores, TanStack Query, hash router, bootstrap, theme
   features/        React UI by feature (listings, workspace, generation, gallery, catalog, mannequin, recipes, settings, publish)
@@ -165,23 +165,23 @@ docs/superpowers/  dated designs (specs/) and implementation plans (plans/)
 
 ## Scripts
 
-| Command                                 | Purpose                                                                            |
-| --------------------------------------- | ---------------------------------------------------------------------------------- |
-| `pnpm dev`                              | Vite dev server (web) on port 1420                                                 |
-| `pnpm build`                            | Typecheck + production web bundle in `dist/`                                       |
-| `pnpm tauri dev`                        | Desktop app with hot reload                                                        |
-| `pnpm tauri build`                      | Desktop installers                                                                 |
-| `pnpm test`                             | Vitest, all suites                                                                 |
-| `pnpm test:watch`                       | Vitest in watch mode                                                               |
-| `pnpm test:coverage`                    | Coverage report in `coverage/`                                                     |
-| `pnpm typecheck`                        | `tsc` strict                                                                       |
-| `pnpm lint`                             | ESLint (`react-hooks` rules on)                                                    |
-| `pnpm format`                           | Prettier write (`format:check` in CI)                                              |
-| `pnpm check`                            | typecheck + lint + format:check + test — the pre-commit gate                       |
-| `pnpm rust:check`                       | `cargo fmt --check` + `clippy -D warnings` + `cargo test`                          |
-| `pnpm android:doctor`                   | Android toolchain pre-flight (JDK, SDK, NDK, Rust targets, Windows Developer Mode) |
-| `pnpm android:dev` / `pnpm android:apk` | Pre-flight, then run on a phone with hot reload / build a debug APK                |
-| `pnpm ios:doctor` / `pnpm ios:dev`      | iOS pre-flight (macOS only), then run on a simulator or an iPhone                  |
+| Command                                 | Purpose                                                                                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `pnpm dev`                              | Vite dev server (web) on port 1420                                                        |
+| `pnpm build`                            | Typecheck + production web bundle in `dist/`                                              |
+| `pnpm tauri dev`                        | Desktop app with hot reload                                                               |
+| `pnpm tauri build`                      | Desktop installers                                                                        |
+| `pnpm test`                             | Vitest, all suites                                                                        |
+| `pnpm test:watch`                       | Vitest in watch mode                                                                      |
+| `pnpm test:coverage`                    | Coverage report in `coverage/`                                                            |
+| `pnpm typecheck`                        | `tsc` strict — the app and the DOM-less `packages/domain`                                 |
+| `pnpm lint`                             | ESLint (`react-hooks` rules on, domain boundary) on `src`, `packages`, `tools`, `scripts` |
+| `pnpm format`                           | Prettier write (`format:check` in CI)                                                     |
+| `pnpm check`                            | typecheck + lint + format:check + test — the pre-commit gate                              |
+| `pnpm rust:check`                       | `cargo fmt --check` + `clippy -D warnings` + `cargo test`                                 |
+| `pnpm android:doctor`                   | Android toolchain pre-flight (JDK, SDK, NDK, Rust targets, Windows Developer Mode)        |
+| `pnpm android:dev` / `pnpm android:apk` | Pre-flight, then run on a phone with hot reload / build a debug APK                       |
+| `pnpm ios:doctor` / `pnpm ios:dev`      | iOS pre-flight (macOS only), then run on a simulator or an iPhone                         |
 
 ## Tests & quality gates
 

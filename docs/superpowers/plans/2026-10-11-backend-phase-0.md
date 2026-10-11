@@ -96,14 +96,14 @@
 
 **Files:** Create `pnpm-workspace.yaml`, `packages/domain/package.json`, `packages/domain/tsconfig.json`. Modify `package.json`.
 
-- [ ] **Step 1:** `pnpm-workspace.yaml`:
+- [x] **Step 1:** `pnpm-workspace.yaml`:
 
   ```yaml
   packages:
     - "packages/*"
   ```
 
-- [ ] **Step 2:** `packages/domain/package.json`:
+- [x] **Step 2:** `packages/domain/package.json`:
 
   ```json
   {
@@ -121,7 +121,7 @@
   }
   ```
 
-- [ ] **Step 3:** `packages/domain/tsconfig.json` — same strictness as the root, **no DOM**:
+- [x] **Step 3:** `packages/domain/tsconfig.json` — same strictness as the root, **no DOM**:
 
   ```json
   {
@@ -147,16 +147,16 @@
 
   `@types/node` is already in the root `node_modules`; add it to the package's `devDependencies` (`"@types/node": "<same range as root>"`) so the dependency is explicit for knip.
 
-- [ ] **Step 4:** Root `package.json`: `"@aiv/domain": "workspace:*"` in `dependencies`; `"typecheck": "tsc -p tsconfig.json && tsc -p packages/domain/tsconfig.json"`. `pnpm install` (lockfile updated, `node_modules/@aiv/domain` is a symlink). Create `packages/domain/src/.gitkeep` so `tsc -p` has an input dir — removed in task 4.
-- [ ] **Step 5:** `pnpm check` green (311). **Commit** `build: add a pnpm workspace with an empty @aiv/domain package`.
+- [x] **Step 4:** Root `package.json`: `"@aiv/domain": "workspace:*"` in `dependencies`; `"typecheck": "tsc -p tsconfig.json && tsc -p packages/domain/tsconfig.json"`. `pnpm install` (lockfile updated, `node_modules/@aiv/domain` is a symlink). Create `packages/domain/src/.gitkeep` so `tsc -p` has an input dir — removed in task 4.
+- [x] **Step 5:** `pnpm check` green (311). **Commit** `build: add a pnpm workspace with an empty @aiv/domain package`.
 
 ### Task 4: Extract the domain (one atomic commit)
 
 **Files:** `git mv` `src/domain/models` → `packages/domain/src/models`, `src/domain/services` → `packages/domain/src/services`, `src/lib/ids.ts` and `src/lib/retry.ts` → `packages/domain/src/lib/`. Modify every importer. Split `src/lib/lib.test.ts`.
 
-- [ ] **Step 1: Move** with `git mv` (history preserved), remove `src/domain/` and `packages/domain/src/.gitkeep`.
-- [ ] **Step 2: Imports inside the package become relative.** `@/domain/models` → `../models` (from `services/`) or `./…` (inside `models/`); `@/domain/services/x` → `./x` / `../services/x`; `@/lib/retry` → `../lib/retry`; `@/lib/ids` → `../lib/ids`. Check: `grep -rn 'from "@/' packages/domain` → **no output**.
-- [ ] **Step 3: Codemod the app** (Git Bash, GNU sed):
+- [x] **Step 1: Move** with `git mv` (history preserved), remove `src/domain/` and `packages/domain/src/.gitkeep`.
+- [x] **Step 2: Imports inside the package become relative.** `@/domain/models` → `../models` (from `services/`) or `./…` (inside `models/`); `@/domain/services/x` → `./x` / `../services/x`; `@/lib/retry` → `../lib/retry`; `@/lib/ids` → `../lib/ids`. Check: `grep -rn 'from "@/' packages/domain` → **no output**.
+- [x] **Step 3: Codemod the app** (Git Bash, GNU sed):
 
   ```bash
   grep -rlE '"@/domain/|"@/lib/(ids|retry)"' src scripts tools --include=*.ts --include=*.tsx --include=*.mjs \
@@ -165,8 +165,8 @@
 
   Also `vi.mock("@/domain/…")` strings, if any (`grep -rn "vi.mock(\"@/domain" src` before running). Check: `grep -rnE '@/domain|@/lib/(ids|retry)' src scripts tools` → **no output**.
 
-- [ ] **Step 4: Split `src/lib/lib.test.ts`:** `describe("ids", …)` → `packages/domain/src/lib/ids.test.ts`, `describe("retry helpers", …)` → `packages/domain/src/lib/retry.test.ts`; `lib.test.ts` keeps the logger tests.
-- [ ] **Step 5: Vitest projects** in `vite.config.ts` (replace `test.include` / `environment` / `setupFiles`):
+- [x] **Step 4: Split `src/lib/lib.test.ts`:** `describe("ids", …)` → `packages/domain/src/lib/ids.test.ts`, `describe("retry helpers", …)` → `packages/domain/src/lib/retry.test.ts`; `lib.test.ts` keeps the logger tests.
+- [x] **Step 5: Vitest projects** in `vite.config.ts` (replace `test.include` / `environment` / `setupFiles`):
 
   ```ts
   test: {
@@ -189,14 +189,14 @@
 
   Verify the API against the Vitest 4 docs (`test.projects`, `extends: true`) before relying on it — do not guess option names. If a domain test turns out to need a DOM polyfill, fix the test (use Node APIs), not the environment.
 
-- [ ] **Step 6:** `pnpm typecheck` (both tsconfigs) — a DOM type used in `packages/domain` is a real leak: fix it in the domain (e.g. `typeof window` guard → remove) rather than adding `"DOM"` to the package `lib`. `pnpm test` → **311 passed**, with `domain` and `app` projects both listed. `pnpm build` and `pnpm build:prefill` + `pnpm prefill:verify` (the Vinted script imports types from `@aiv/domain/services/publish` now — the generated bundle must be byte-identical, types are erased).
-- [ ] **Step 7: Commit** `refactor(domain): extract the pure domain into the @aiv/domain workspace package` — body: why (the server of ADR 0001 imports it), no behaviour change, 311 tests.
+- [x] **Step 6:** `pnpm typecheck` (both tsconfigs) — a DOM type used in `packages/domain` is a real leak: fix it in the domain (e.g. `typeof window` guard → remove) rather than adding `"DOM"` to the package `lib`. `pnpm test` → **311 passed**, with `domain` and `app` projects both listed. `pnpm build` and `pnpm build:prefill` + `pnpm prefill:verify` (the Vinted script imports types from `@aiv/domain/services/publish` now — the generated bundle must be byte-identical, types are erased).
+- [x] **Step 7: Commit** `refactor(domain): extract the pure domain into the @aiv/domain workspace package` — body: why (the server of ADR 0001 imports it), no behaviour change, 311 tests.
 
 ### Task 5: Guard the boundary (lint, knip)
 
 **Files:** Modify `eslint.config.js`, `knip.json`, `package.json` (`lint` script).
 
-- [ ] **Step 1:** `lint` script → `eslint src packages tools scripts`. In `eslint.config.js`, the TS block's `files` becomes `["src/**/*.{ts,tsx}", "packages/*/src/**/*.ts"]` (react-hooks rules are harmless on non-React files) and add a block for the domain:
+- [x] **Step 1:** `lint` script → `eslint src packages tools scripts`. In `eslint.config.js`, the TS block's `files` becomes `["src/**/*.{ts,tsx}", "packages/*/src/**/*.ts"]` (react-hooks rules are harmless on non-React files) and add a block for the domain:
 
   ```js
   {
@@ -211,8 +211,8 @@
   },
   ```
 
-- [ ] **Step 2:** Prove the guard: temporarily add `import { useState } from "react";` to a domain file → `pnpm lint` fails with the message; revert.
-- [ ] **Step 3:** `knip.json` → workspaces:
+- [x] **Step 2:** Prove the guard: temporarily add `import { useState } from "react";` to a domain file → `pnpm lint` fails with the message; revert.
+- [x] **Step 3:** `knip.json` → workspaces:
 
   ```json
   {
@@ -231,16 +231,16 @@
 
   Check the knip 5 workspace docs for whether `exports` subpath patterns count as entries; an export only used by the app must not be reported as unused. `pnpm knip` clean.
 
-- [ ] **Step 4:** `pnpm check` green. **Commit** `build(lint): keep @aiv/domain free of app, DOM and Tauri imports`.
+- [x] **Step 4:** `pnpm check` green. **Commit** `build(lint): keep @aiv/domain free of app, DOM and Tauri imports`.
 
 ### Task 6: Docs for the new paths
 
 **Files:** `ARCHITECTURE.md`, `DEVELOPMENT.md`, `.claude/skills/code-conventions/SKILL.md`, `.claude/skills/testing/SKILL.md`, `.claude/skills/project-context/SKILL.md`, `CLAUDE.md` (_Layout_ only).
 
-- [ ] **Step 1:** `grep -rn 'src/domain\|src/lib/ids\|src/lib/retry\|@/domain' --include=*.md . | grep -v node_modules | grep -v docs/superpowers` — update every hit (dated specs/plans under `docs/superpowers/` are history: leave them).
-- [ ] **Step 2:** ARCHITECTURE.md _Layers_: tree starts with `packages/domain/src/{models,services,lib}`; dependency direction `features → app → infrastructure → @aiv/domain`; one line on why it is a package (shared with the future server, Node-tested, no DOM lib). Principles 1–2 get "(until phase 3 — ADR 0001)".
-- [ ] **Step 3:** testing skill: the two Vitest projects, where domain tests live, "domain tests run in Node: no DOM polyfills". code-conventions: import style `@aiv/domain/models`, the lint boundary.
-- [ ] **Step 4:** prettier, `pnpm check` green. **Commit** `docs: document the @aiv/domain package and its boundary`.
+- [x] **Step 1:** `grep -rn 'src/domain\|src/lib/ids\|src/lib/retry\|@/domain' --include=*.md . | grep -v node_modules | grep -v docs/superpowers` — update every hit (dated specs/plans under `docs/superpowers/` are history: leave them).
+- [x] **Step 2:** ARCHITECTURE.md _Layers_: tree starts with `packages/domain/src/{models,services,lib}`; dependency direction `features → app → infrastructure → @aiv/domain`; one line on why it is a package (shared with the future server, Node-tested, no DOM lib). Principles 1–2 get "(until phase 3 — ADR 0001)".
+- [x] **Step 3:** testing skill: the two Vitest projects, where domain tests live, "domain tests run in Node: no DOM polyfills". code-conventions: import style `@aiv/domain/models`, the lint boundary.
+- [x] **Step 4:** prettier, `pnpm check` green. **Commit** `docs: document the @aiv/domain package and its boundary`.
 
 ### Task 7: Final verification
 
@@ -257,3 +257,6 @@ Update this section after each task: task number, commit hash, deviations.
 
 - **Task 1 — done** (commit: see `git log --grep "docs(adr)"`). Deviations: full documentation pass instead of banners. New `backend` skill (server invariants, testing with Testcontainers). Stale facts fixed on the way: README (diagram showed Gemini as the image provider, 74 → 311 tests, Vinted on phones, project structure, skills list), ARCHITECTURE (`CURRENT_SCHEMA_VERSION` 1 → 3, IndexedDB stores, providers and features lists), SECURITY (keychain key list, CSP `connect-src` with Cloudflare), PRIVACY (images go to Cloudflare, copy to Gemini/Cloudflare, listing wording, phone Vinted session), BUILDING (Vinted on phones), DEVELOPMENT (test list), skills `testing` (test map) and `code-conventions` (`lst` ids). `.gitignore` ignores `secrets/` and DB dumps. Task 6 still applies for the paths that change in task 4.
 - **Task 2 — done** (commit: `git log --grep "move provider tests"`). The three files were created as planned; the domain no longer imports `@/infrastructure`. Deviation: `buildRequestForModel` keeps its domain tests with **inline `ModelInfo` literals** (sized / unsized models; also covers seed and empty options), and the Gemini-specific assertions moved to `GeminiModels.test.ts` — so the suite went from **48 files / 311 tests to 51 files / 312 tests**. **New baseline for tasks 3–7: 312 tests.** README, DEVELOPMENT and the `testing` skill carry the new counts.
+- **Tasks 3 + 4 — done in one commit** (`git log --grep "extract the pure domain"`). Deviations: (a) task 3 alone could not be green — knip reports `@aiv/domain` as an unused dependency until something imports it, and `tsc -p packages/domain` fails on an empty `src` — so the scaffolding was committed with the extraction instead of adding temporary ignores; (b) `packages/domain/package.json` also lists `typescript` and `vitest` as devDependencies (explicit deps for knip); (c) `extends: true as const` in `vite.config.ts` (the inferred `boolean` does not match `string | true`); (d) the `domain` Vitest project sets `root: "./packages/domain"` and does **not** extend the root config, so it has no `@/` alias and no jsdom setup. Vitest 4.1.11 API checked in its type definitions (`projects`, `extends?: string | true`). Result: 53 files, **312 tests** (domain project alone: 10 files, 65 tests), both typechecks green, `pnpm build` green, Vinted pre-fill bundle unchanged.
+- **Task 5 — done** (`git log --grep "keep @aiv/domain free"`). Guard proven: importing `react`, importing `@/lib/logger` and reading `window` each fail the lint. Deviation: knip treats the subpath `exports` of the package as entries and stopped reporting unused domain exports (a probe export was not reported) — `includeEntryExports: true` on the `packages/domain` workspace restores it (probe reported, real tree clean).
+- **Task 6 — done** (`git log --grep "document the @aiv/domain"`). Paths updated in ARCHITECTURE (layers tree, dependency direction, why a package), README (structure, scripts), DEVELOPMENT, CLAUDE.md (layout), skills `project-context`, `code-conventions` (layering, import style), `testing` (two projects); CHANGELOG entry.

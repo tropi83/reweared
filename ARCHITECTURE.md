@@ -12,10 +12,11 @@
 ## Layers
 
 ```
-src/
-  domain/            pure models + services (no React, no I/O)
+packages/domain/src/ @aiv/domain — pure models + services + lib, shared with the planned server (no React, no I/O, no DOM)
     models/          Listing, ImageAsset, Generation, GenerationJob, Recipe, ModelInfo, AppSettings, catalog, mannequin, errors
     services/        GenerationQueue (job state machine), ImageProvider contract, catalog + shot plans, listing copy, mannequin, publish, recipes, usage tracker
+    lib/             ids (createId, assertSafeId), retry (backoff, sleep, timeouts)
+src/
   infrastructure/    I/O implementations
     storage/         StorageProvider: IndexedDbStorage (web), TauriFsStorage (native), migrations
     providers/       cloudflare/ (Workers AI: direct REST or the user's Worker), gemini/ (Interactions API: copy, image adapter disabled), mock/
@@ -38,7 +39,7 @@ src-tauri/
 cloudflare-worker/   Worker template users deploy in their own Cloudflare account (web build)
 ```
 
-Dependency direction: `features → app → infrastructure → domain`. `domain` imports nothing from the other layers.
+Dependency direction: `features → app → infrastructure → @aiv/domain`. The domain imports nothing from the other layers. It is a pnpm workspace package (`packages/domain`, subpath imports `@aiv/domain/models`, `@aiv/domain/services/<file>`, `@aiv/domain/lib/<file>`) so the server of ADR 0001 can import it: it is typechecked without the DOM lib, its tests run in a Node Vitest project (`domain`), and an ESLint boundary forbids app, React, Tauri, storage imports and browser globals.
 
 ## Domain model
 
@@ -50,7 +51,7 @@ Listing ─┬─ ImageAsset (kind: original | generation)
 
 A `ListingDocument` (`listing.json`) holds all of a listing's records plus `schemaVersion`/`appVersion`. The aggregate was called _project_ until 2026-09-13 (schema v3 renames it; `#/project/:id` hashes still open). `Generation.parentGenerationId` is the generation that produced `sourceImageId`; this is enough to rebuild the branch tree.
 
-## Generation job system (`domain/services/generation-queue.ts`)
+## Generation job system (`packages/domain/src/services/generation-queue.ts`)
 
 - `enqueue(jobs)` → `queued`; the pump starts up to `concurrency` jobs.
 - A running job gets an `AbortController`; each attempt is wrapped in a timeout signal.
@@ -63,9 +64,9 @@ The queue is pure TypeScript with injectable `sleep`/`random`, covered by `gener
 
 ## Listing catalogue and packs
 
-`domain/services/catalog.ts` holds the marketplace taxonomy (10 categories → 56 subcategories) and, per `ProductKind` (40 kinds: garment, footwear, bag, jewelry, phone, trading-card, pet-carrier…), a plan of `ShotSpec`s: four base shots, plus a mirror-selfie shot for wearable kinds (garment, footwear, bag, accessory, jewelry, watch, leather goods) that `buildListingShots` drops for the kids category (`excludeCategories`). Every prompt shares a fidelity preamble (keep shape, colours, pattern, logos, text) and a quality suffix; `{{subject}}` and `{{wearer}}` are interpolated from the subcategory and the category (a woman / a man / a child, face not visible / an athlete…). `domain/models/mannequin.ts` + `domain/services/mannequin.ts` describe the seller's mannequin (build S/M/L, pose, skin tone; one per device in `Settings.mannequin`, toggled per project with `Listing.useMannequin`): `buildShots(selection, { mannequin })` rewrites `{{wearer}}` with it and fills the `{{pose|default}}` slot (or appends the pose as its own sentence when a template with a person has no slot — never two poses), only for the shots that show a person and never for the kids and pets categories (`mannequinApplies`). The brand is never put in an image prompt. Built-in recipes are generated from the catalogue (`listingRecipeId`). `GenerationQueue` is unchanged: a pack is a `Generation` with `listing` set and one job per shot, each job carrying its own `prompt`, `shotId`, `shotLabel` and seed.
+`packages/domain/src/services/catalog.ts` holds the marketplace taxonomy (10 categories → 56 subcategories) and, per `ProductKind` (40 kinds: garment, footwear, bag, jewelry, phone, trading-card, pet-carrier…), a plan of `ShotSpec`s: four base shots, plus a mirror-selfie shot for wearable kinds (garment, footwear, bag, accessory, jewelry, watch, leather goods) that `buildListingShots` drops for the kids category (`excludeCategories`). Every prompt shares a fidelity preamble (keep shape, colours, pattern, logos, text) and a quality suffix; `{{subject}}` and `{{wearer}}` are interpolated from the subcategory and the category (a woman / a man / a child, face not visible / an athlete…). `domain/models/mannequin.ts` + `packages/domain/src/services/mannequin.ts` describe the seller's mannequin (build S/M/L, pose, skin tone; one per device in `Settings.mannequin`, toggled per project with `Listing.useMannequin`): `buildShots(selection, { mannequin })` rewrites `{{wearer}}` with it and fills the `{{pose|default}}` slot (or appends the pose as its own sentence when a template with a person has no slot — never two poses), only for the shots that show a person and never for the kids and pets categories (`mannequinApplies`). The brand is never put in an image prompt. Built-in recipes are generated from the catalogue (`listingRecipeId`). `GenerationQueue` is unchanged: a pack is a `Generation` with `listing` set and one job per shot, each job carrying its own `prompt`, `shotId`, `shotLabel` and seed.
 
-`domain/services/listing-copy.ts` defines `ListingCopyProvider` (photo → `{ title, description, condition, brand, color, keywords }`), the shared prompt, a JSON schema for constrained output and a defensive parser. Implementations: `CloudflareListingCopyProvider` (Llama 4 Scout, `response_format: json_schema`, fallback Llama 3.2 Vision) and `GeminiListingCopyProvider` (Flash text models, Interactions API with an image part). The result is stored on `Project.copy`. `ListingCopyRequest.brand` carries the brand typed by the seller (`Listing.brand`, ≤ 60 chars): the prompt then imposes it verbatim in the title and the description instead of letting the model read (or invent) one.
+`packages/domain/src/services/listing-copy.ts` defines `ListingCopyProvider` (photo → `{ title, description, condition, brand, color, keywords }`), the shared prompt, a JSON schema for constrained output and a defensive parser. Implementations: `CloudflareListingCopyProvider` (Llama 4 Scout, `response_format: json_schema`, fallback Llama 3.2 Vision) and `GeminiListingCopyProvider` (Flash text models, Interactions API with an image part). The result is stored on `Project.copy`. `ListingCopyRequest.brand` carries the brand typed by the seller (`Listing.brand`, ≤ 60 chars): the prompt then imposes it verbatim in the title and the description instead of letting the model read (or invent) one.
 
 `app/stores/listing-setup-store.ts` orchestrates one run: `generateListing()` starts the photo pack and the copy in parallel (`Promise.allSettled`), skips a part whose provider is not usable (`skipped-provider`) and reports both outcomes (`ListingRunReport`, stamped with the project id); `app/listing-readiness.ts` is the pure helper behind the button (`canCreate`, first `blocker`, `skipped` parts) so the label only promises what will run. The UI is `features/workspace/ListingSetupCard.tsx` (+ `AdvancedOptions.tsx` for per-run choices, `useComposerDefaults.ts`) and `features/mannequin/MannequinDialog.tsx`, also mounted in Settings → Mannequin. The image provider/model and the text provider/model are chosen in `features/settings/ModelsSection.tsx` (persisted in `AppSettings.activeProviderId`, `lastModelByProvider`, `copyProviderId`, `copyModelByProvider`); `UsageSection.tsx` shows local counters per provider (`UsageTracker`), with the gauge of the model in use (`UsageGauge.tsx`).
 
@@ -92,7 +93,7 @@ interface ImageProvider {
 
 ### Quotas and usage
 
-Google returns the same "You exceeded your current quota" sentence for throttling, daily exhaustion and models outside the plan; `GeminiErrors.parseQuotaInfo` reads the structured `google.rpc.QuotaFailure` / `RetryInfo` details to classify (`RATE_LIMITED` retryable with Google's delay · `QUOTA_EXCEEDED` · `MODEL_NOT_IN_PLAN` when `quotaValue` is 0). `domain/services/usage-tracker.ts` counts requests locally per provider/model (rolling minute, Pacific day), learns limits from those details (`quotaValue`) unless the user set manual ones, and persists through `StorageProvider.readMeta/writeMeta` (`metadata/usage.json` on desktop). Only requests from this device are counted; the UI states it.
+Google returns the same "You exceeded your current quota" sentence for throttling, daily exhaustion and models outside the plan; `GeminiErrors.parseQuotaInfo` reads the structured `google.rpc.QuotaFailure` / `RetryInfo` details to classify (`RATE_LIMITED` retryable with Google's delay · `QUOTA_EXCEEDED` · `MODEL_NOT_IN_PLAN` when `quotaValue` is 0). `packages/domain/src/services/usage-tracker.ts` counts requests locally per provider/model (rolling minute, Pacific day), learns limits from those details (`quotaValue`) unless the user set manual ones, and persists through `StorageProvider.readMeta/writeMeta` (`metadata/usage.json` on desktop). Only requests from this device are counted; the UI states it.
 
 ### Cloudflare Workers AI (`infrastructure/providers/cloudflare`)
 
@@ -128,7 +129,7 @@ Image bytes are never put in the JSON. Thumbnails (WebP, 512px) drive the galler
 
 ## Publishing on Vinted (desktop and phones)
 
-`domain/services/publish.ts` (pure) decides what can be posted (`canPost`: photos marked “To post” + title/description + desktop), the posting order (original first, then generations by creation time, at most 20) and maps Vinted URLs to stages. `app/publish-payload.ts` re-encodes the marked photos (JPEG ≤ 2048 px, ≤ 4 MiB each) and caps the copy at Vinted's limits. `app/stores/publish-store.ts` drives the session `closed → login | browsing → form → filled`, fed by `vinted:page` events and by a 500 ms poll of the window's location (Vinted is a single-page app: its own “Sell” entry reaches the form without a page-load event). Arriving on the form — or a replaced document — runs `fill()` by itself: it hands the payload to the bridge and polls the script's report every 300 ms (20 s timeout); the panel's button runs it again by hand. A session is bound to its project and to an epoch, so a late result never leaks into another project or session.
+`packages/domain/src/services/publish.ts` (pure) decides what can be posted (`canPost`: photos marked “To post” + title/description + desktop), the posting order (original first, then generations by creation time, at most 20) and maps Vinted URLs to stages. `app/publish-payload.ts` re-encodes the marked photos (JPEG ≤ 2048 px, ≤ 4 MiB each) and caps the copy at Vinted's limits. `app/stores/publish-store.ts` drives the session `closed → login | browsing → form → filled`, fed by `vinted:page` events and by a 500 ms poll of the window's location (Vinted is a single-page app: its own “Sell” entry reaches the form without a page-load event). Arriving on the form — or a replaced document — runs `fill()` by itself: it hands the payload to the bridge and polls the script's report every 300 ms (20 s timeout); the panel's button runs it again by hand. A session is bound to its project and to an epoch, so a late result never leaks into another project or session.
 
 `infrastructure/publish/PublishBridge.ts` abstracts the platform with two modes: **windowed** (desktop, `TauriVintedBridge` calls the `vinted_*` commands step by step) and **delegated** (phones, `MobileVintedBridge` hands the whole payload to the `vinted-webview` plugin's native screen in one `run` call and gets the report back when it closes — the app's WebView is paused underneath, so it cannot drive anything); `UnsupportedBridge` (web) throws `PLATFORM_UNSUPPORTED`. `src-tauri/plugins/vinted-webview` owns the shared policy (`policy.rs`: hosts, paths, payload limits, the injected script) used by both the desktop window and the native screens (Kotlin `VintedActivity`, Swift `VintedViewController`). In Rust (`src-tauri/src/vinted.rs`) the Vinted `WebviewWindow` has its own profile, a navigation allow-list, and receives the pre-fill script (built from `infrastructure/publish/vinted/`) through `eval`; results come back through `eval_with_callback`. The page never gets IPC and the app never clicks Vinted's submit button. The script attaches the photos and mounts paste icons next to the title and the description: the text goes in on the user's tap, never automatically.
 
@@ -164,7 +165,7 @@ clients (web, Tauri desktop/phones) ──HTTPS──► caddy ──► api (Fa
 
 - **Accounts** (Better Auth, Resend for email) own listings, images and generations; Postgres + MinIO are the source of truth.
 - **Queue**: the api enqueues in one Postgres transaction (jobs + credit reservation); a dispatcher feeds BullMQ with at most N active jobs per user; one queue per provider with a rate limiter; a reconciler closes the gap between commit and dispatch; the worker reuses `GenerationQueue`'s retry semantics (`GenerationError`, `computeBackoffMs`, new seed per attempt) and refunds failures once.
-- **Shared code**: `packages/domain` (`@aiv/domain`, extracted in phase 0) holds the models, catalogue, shot plans, listing-copy contract, errors and retry helpers used by both the client and the server.
+- **Shared code**: `packages/domain` (`@aiv/domain`, extracted in phase 0 — done) holds the models, catalogue, shot plans, listing-copy contract, errors and retry helpers used by both the client and the server.
 - **Clients** become thin: `ApiStorageProvider`, SSE-driven job updates, listings and credits through TanStack Query. The Vinted pre-fill stays on the device.
 
-Phases: 0 docs + workspace + domain package · 1 compose stack + api · 2 worker, queue, credits, SSE · 3 client switch · 4 production. This document's sections above are rewritten as each phase ships.
+Phases: 0 docs + workspace + domain package (done) · 1 compose stack + api · 2 worker, queue, credits, SSE · 3 client switch · 4 production. This document's sections above are rewritten as each phase ships.
