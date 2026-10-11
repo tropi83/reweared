@@ -4,6 +4,8 @@ A ~100-line Cloudflare Worker you deploy in **your own** Cloudflare account. The
 
 It is not a backend of AI Image Variations: it lives in your account, under your control, and only talks to Cloudflare's own inference.
 
+> With the move to accounts and a server ([ADR 0001](../docs/adr/0001-backend-accounts-platform-keys.md)), generations will run on the platform's Cloudflare account and this template will no longer be needed by users. It stays supported for the current, local-first release.
+
 ## Deploy (5 minutes, free plan is enough)
 
 ```bash

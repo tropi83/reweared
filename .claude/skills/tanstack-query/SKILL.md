@@ -9,6 +9,11 @@ description: Use when reading or adding provider metadata (model lists, auth sta
 or the app produces. Do not blur the line: a document, a setting, a secret, a generation job or a publish session is
 never a query.
 
+> **Planned change (backend phase 3, ADR 0001):** when the client switches to the API, server data — listings,
+> listing detail, credits, the platform's `/models` — becomes TanStack Query data, invalidated or patched by SSE
+> events; provider auth statuses disappear (no user keys). The rules below hold until that phase's plan rewrites
+> this skill. Do not move listings to Query before then.
+
 | Data                                              | Owner          | Where                                                      |
 | ------------------------------------------------- | -------------- | ---------------------------------------------------------- |
 | Model list per provider (`provider.getModels()`)  | TanStack Query | `src/app/query/models.ts`                                  |

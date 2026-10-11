@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Decision to move to accounts and a server** ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)): user accounts, a server-side generation queue with the platform's provider keys, credits with a free plan, Docker on one VPS. The design and the phase 0 plan are in `docs/superpowers/`; the docs (README, ARCHITECTURE, SECURITY, PRIVACY, DEVELOPMENT, CONTRIBUTING, agent instructions and skills, plus a new `backend` skill) now say which architecture they describe. No change to the app yet.
+
 - **Desktop Vinted window: a status bar above vinted.com**, like the status line of the phone screen — sign in → open the sell form → filling → “Photos 2/3 · Title ⧉ · Description ⧉ — click the ⧉ icons to paste the text” → ✓. The window now holds two webviews (bar + Vinted); the bar is an app page without any Tauri capability, fed by `eval` only.
 
 - **Delete a listing from every screen** — a “⋯” actions menu (rename, duplicate, delete) on the listing header, on the home cards and in the drawer rows (always visible on touch screens, revealed on hover with a mouse). Deleting asks for confirmation, stops a run or a Vinted session bound to that listing, leaves the workspace first, then removes the files — on this device only, never on Vinted.

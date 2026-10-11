@@ -11,7 +11,7 @@ description: Use for any git operation in this repo — branch naming, Conventio
 
 ## Commits — Conventional Commits
 
-`<type>(<scope>): <imperative summary>` — types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `security`. Scopes: `queue`, `gemini`, `auth`, `storage`, `ui`, `tauri`, `i18n`, `docs`, `ci`, `deps`.
+`<type>(<scope>): <imperative summary>` — types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `security`. Scopes: `queue`, `gemini`, `cloudflare`, `auth`, `storage`, `ui`, `tauri`, `publish`, `listing`, `i18n`, `docs`, `adr`, `ci`, `deps`; backend (phase 1+): `domain`, `api`, `worker`, `db`, `credits`, `docker`.
 The body explains **why**. Reference issues with `Refs #12` / `Closes #12`. Atomic commits (one concern), each one green.
 
 ```
@@ -23,7 +23,7 @@ even though the docs show it; let the model pick the output format.
 
 ## Never commit
 
-`.env`, anything matching `client_secret*.json`, API keys/tokens (even in tests or screenshots), `dist/`, `src-tauri/target`, `src-tauri/gen/schemas`, user data from `%APPDATA%`. `.gitignore` covers these — never weaken it.
+`.env`, `secrets/` (Docker secrets of the backend), database dumps, anything matching `client_secret*.json`, API keys/tokens (even in tests or screenshots), `dist/`, `src-tauri/target`, `src-tauri/gen/schemas`, user data from `%APPDATA%`. `.gitignore` covers these — never weaken it.
 
 ## Before committing
 

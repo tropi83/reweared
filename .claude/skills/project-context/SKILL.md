@@ -1,13 +1,27 @@
 ---
 name: project-context
-description: Use at the start of any task on AI Image Variations — product intent, architecture map, where things live, decisions already taken (Gemini Interactions API, keyring, OAuth loopback), and what is explicitly out of scope.
+description: Use at the start of any task on AI Image Variations — product intent, the ongoing move to a backend (ADR 0001), architecture map, where things live, decisions already taken (Cloudflare FLUX default, Gemini Interactions API, keyring, OAuth loopback, Vinted pre-fill, backend stack), and what is explicitly out of scope.
 ---
 
 # Project context — AI Image Variations
 
 ## Product in one paragraph
 
-Local-first AI photo studio for second-hand listings (Vinted-style): import the item's photo → choose category/subcategory (10 → 56, `catalog.ts`) → the app generates the listing photos with predefined, kind-specific prompts (retouched / studio / in use or worn / folded or detail, + mirror selfie for wearables except kids) → compare, pick, export; a vision model writes the title + description (Gemini 3.1 Flash-Lite by default, free tier; Cloudflare Llama as alternative). No free prompt in the main flow (custom recipes remain for power users). BYOK: images = Cloudflare Workers AI only (Gemini image generation disabled via `GEMINI_IMAGE_GENERATION_ENABLED`), copy = Gemini by default. No account, no backend, no cloud.
+Local-first AI photo studio for second-hand listings (Vinted-style): import the item's photo → choose category/subcategory (10 → 56, `catalog.ts`) → the app generates the listing photos with predefined, kind-specific prompts (retouched / studio / in use or worn / folded or detail, + mirror selfie for wearables except kids) → compare, pick, export; a vision model writes the title + description (Gemini 3.1 Flash-Lite by default, free tier; Cloudflare Llama as alternative). No free prompt in the main flow (custom recipes remain for power users). BYOK: images = Cloudflare Workers AI only (Gemini image generation disabled via `GEMINI_IMAGE_GENERATION_ENABLED`), copy = Gemini by default. Listings can be pre-filled on Vinted (desktop window, native screen on phones). **Current release:** no account, no backend, no cloud.
+
+## Where the product is going (ADR 0001, 2026-10-11)
+
+The product moves to **user accounts + a server** that is the source of truth and runs generations with the **platform's** provider keys: [`docs/adr/0001-backend-accounts-platform-keys.md`](../../../docs/adr/0001-backend-accounts-platform-keys.md), design `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`. Stack: TypeScript/Node in a pnpm workspace sharing `packages/domain`, Fastify api + BullMQ worker (same image), Postgres (drizzle), Redis, MinIO, Better Auth, Resend, SSE, credit ledger with a free plan, one VPS with `docker compose` + Caddy. Image provider stays open (Cloudflare by default; the Gemini adapter exists).
+
+| Phase | Content                                                                       | Status (2026-10-11) |
+| ----- | ----------------------------------------------------------------------------- | ------------------- |
+| 0     | ADR, docs, pnpm workspace, `packages/domain` extraction — no behaviour change | in progress         |
+| 1     | compose stack, api: auth, listings, uploads, S3                               | not started         |
+| 2     | worker, queues, dispatcher, reconciler, credits, SSE, server-side providers   | not started         |
+| 3     | web + Tauri clients switch to the API, import of local listings               | not started         |
+| 4     | production VPS, backups, monitoring, server image release                     | not started         |
+
+Until phase 3 ships, everything below that says BYOK / local-first still describes the client and still binds changes to `src/`. Server work follows the `backend` skill.
 
 ## Map
 
@@ -34,28 +48,31 @@ Local-first AI photo studio for second-hand listings (Vinted-style): import the 
 | Vinted publishing (domain, payload, store, UI)              | `src/domain/services/publish.ts`, `src/app/publish-payload.ts`, `src/app/stores/publish-store.ts`, `src/features/publish/*`                                                                                     |
 | Vinted bridge + injected script                             | `src/infrastructure/publish/*` (`vinted/` = script bundled by `pnpm build:prefill`), `src-tauri/src/vinted.rs` (desktop window), `src-tauri/plugins/vinted-webview` (shared policy + Android/iOS native screen) |
 | Builds per platform, mobile pre-flight                      | `BUILDING.md`, `scripts/mobile-doctor.mjs` (`pnpm android:doctor`, `pnpm ios:doctor`)                                                                                                                           |
+| Fetched provider metadata (TanStack Query)                  | `src/app/query/*` — skill `tanstack-query`                                                                                                                                                                      |
+| Architecture decisions, designs, plans                      | `docs/adr/`, `docs/superpowers/specs/`, `docs/superpowers/plans/` (dated; plans have a _Progress_ section)                                                                                                      |
+| Backend (planned)                                           | design `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`, skill `backend`; `packages/domain` from phase 0, `apps/server` + `compose.yaml` from phase 1                                       |
 
 ## Decisions already taken (do not re-litigate without new facts)
 
-- **Default provider = Cloudflare Workers AI**, model **FLUX.2 [klein] 4B** (multipart API, reference image ≤ 512 px, ≈110 neurons per 1K image inside the 10,000 free daily neurons) because Gemini image models have no free tier. SD 1.5 img2img is private on many accounts (5018); SDXL/DreamShaper have no image input (3030) and must not be re-added as img2img. `api.cloudflare.com` has no CORS → direct mode desktop-only; web uses the user's own Worker (`cloudflare-worker/`). Never add a proxy of ours.
+- **Backend pivot (ADR 0001):** platform-owned provider keys (worker only, Docker secrets), accounts with Better Auth (email + password, Google Sign-In), Resend for email, credits reserved at enqueue and refunded on failure, BullMQ + Redis dispatch with Postgres as job state and a per-user cap, SSE, one VPS with docker compose. The decisions marked "**Until phase 3**" below describe the current client and are replaced by the design afterwards.
+- **Default image provider = Cloudflare Workers AI**, model **FLUX.2 [klein] 4B** (multipart API, reference image ≤ 512 px, ≈110 neurons per 1K image inside the 10,000 free daily neurons) because Gemini image models have no free tier. SD 1.5 img2img is private on many accounts (5018); SDXL/DreamShaper have no image input (3030) and must not be re-added as img2img. **Until phase 3 (client BYOK):** `api.cloudflare.com` has no CORS → direct mode desktop-only; web uses the user's own Worker (`cloudflare-worker/`); never add a proxy of ours on the client path. With the backend, the worker calls Cloudflare server-side with the platform account.
 - **One listing card, one button.** `generateListing` runs photos + text with `Promise.allSettled`, skips a part whose provider is unusable and reports both outcomes; the label comes from `listingReadiness` and never promises a part that will not run. One mannequin per device (`Settings.mannequin`), toggled per project (`Listing.useMannequin`), never for kids/pets. The seller's brand (`Listing.brand`) goes to the copy prompt only — never into an image prompt.
-- Diffusion providers: input prepared client-side (`ModelCapabilities.inputImage`: crop to ratio, multiples of 64), one random `seed` per job, provider options via `ModelCapabilities.options` + `job.providerOptions`.
-
+- Diffusion providers: input prepared client-side today, by the worker (sharp) after phase 3 (`ModelCapabilities.inputImage`: crop to ratio, multiples of 64), one random `seed` per job, provider options via `ModelCapabilities.options` + `job.providerOptions`.
 - Gemini image generation = **Interactions API** `POST /v1beta/interactions` with `response_format: { type: "image", aspect_ratio?, image_size? }`. `mime_type` is NOT sent (the live API rejected `image/png` on 2026-09-11 despite the docs).
 - Model capabilities live only in `GeminiModels.ts` (ids, aspect ratios, sizes). Verified 2026-09-11.
-- Secrets: OS keychain via `keyring` crate (desktop). Not Stronghold (needs a JS-supplied password). Mobile keystore = TODO, session-only meanwhile.
-- OAuth: Desktop client + PKCE + loopback `127.0.0.1:<port>/callback` (Rust). The user picks the Cloud project billed via `x-goog-user-project`. Web = API key only.
+- **Until phase 3 —** secrets: OS keychain via `keyring` crate (desktop). Not Stronghold (needs a JS-supplied password). Mobile keystore = TODO, session-only meanwhile. After phase 3 the keychain holds only the session token; provider keys live in the server's worker.
+- **Until phase 3 —** OAuth for Gemini credentials: Desktop client + PKCE + loopback `127.0.0.1:<port>/callback` (Rust). The user picks the Cloud project billed via `x-goog-user-project`. Web = API key only.
 - **The aggregate is a `Listing`** (was `Project` until 2026-09-13): `ListingDocument`, `useListingsStore`, `features/listings`, route `#/listing/:id`. The catalogue side is `Category*` / `catalog.ts`; `Listing.category` is the chosen taxonomy. Identifiers are English — ESLint `no-french-identifiers` enforces it.
 - Storage layout: `listings/<id>/{listing.json, original/, generations/, thumbnails/}` (schema v3; `projects/` layouts and IndexedDB v1 migrate on first launch); `schemaVersion` + migrations; images are files, never inside JSON.
 - Variations are independent jobs; the UI shows progressive results; retry only for retryable codes.
-- Hash router (`#/listing/:id`, `#/settings/:section`, `#/recipes`); zustand stores; no react-router. **TanStack Query** only for fetched provider metadata (model lists, auth statuses — `src/app/query`, skill `tanstack-query`); documents, settings, jobs stay in zustand.
-- **Post on Vinted = pre-fill, never publish** (desktop window; phones use the native screen of the `vinted-webview` plugin in delegated mode — the app's WebView is paused underneath, so the native side drives the flow). A second `WebviewWindow` with an isolated profile and a navigation allow-list; vinted.com never gets Tauri IPC; the script is compiled into the binary and only fills title, description and photos. DOM selectors live in one file (`src/infrastructure/publish/vinted/selectors.ts`). Vinted's terms forbid automated tools → one-time warning (`vintedAutomationAcknowledged`). Photos to post = the “À publier” marks (`ProjectDocument.toPost`, schema v2). Window-creating commands must be `async` (WebView2 deadlock in sync commands on Windows).
+- Hash router (`#/listing/:id`, `#/settings/:section`, `#/recipes`); zustand stores; no react-router. **TanStack Query** only for fetched provider metadata until phase 3, when listings, credits and models become server data (model lists, auth statuses — `src/app/query`, skill `tanstack-query`); documents, settings, jobs stay in zustand.
+- **Post on Vinted = pre-fill, never publish** (desktop window; phones use the native screen of the `vinted-webview` plugin in delegated mode — the app's WebView is paused underneath, so the native side drives the flow). A second `WebviewWindow` with an isolated profile and a navigation allow-list; vinted.com never gets Tauri IPC; the script is compiled into the binary and only fills title, description and photos. DOM selectors live in one file (`src/infrastructure/publish/vinted/selectors.ts`). Vinted's terms forbid automated tools → one-time warning (`vintedAutomationAcknowledged`). Photos to post = the “À publier” marks (`ListingDocument.toPost`, since schema v2). Stays on the device after the backend pivot: the client downloads the marked photos from the API. Window-creating commands must be `async` (WebView2 deadlock in sync commands on Windows).
 - **Mobile builds**: `keyring` is a desktop-only dependency (keyring 4 refuses to compile without `v1`/`cli`, and `secrets.rs` has no mobile keychain yet). Android builds on Windows need Developer Mode (cargo-mobile2 symlinks the `.so` into `jniLibs`, no copy fallback) — never build from an elevated terminal instead. `src-tauri/gen/android` is committed; the bundle identifier (`com.aiimagevariations.app`, Tauri warns about `.app`) is kept until a data migration exists (BUILDING.md §6).
 
-## Out of scope (MVP)
+## Out of scope
 
-Accounts, cloud sync, collaboration, sharing, marketplace, chat UI, payment, backend, ad SDK (only the `Entitlement` model exists).
+Collaboration, sharing, marketplace, chat UI, ad SDK (only the `Entitlement` model exists), payment before the credit ledger exists (Stripe comes after phase 2), automatic publishing on Vinted (pre-fill only). Accounts, a backend and multi-device access are **in scope since ADR 0001** — delivered through the phases above, not ad hoc.
 
 ## Toolchain pins
 
-pnpm 10 · Node 22+ · TypeScript 6 · Vite 8 (rolldown; `minify: "esbuild"` is unsupported) · Vitest 4 · React 19 · Tailwind 4 · Tauri 2.11 · Rust 1.88+ · keyring 4.
+pnpm 10 · Node 22+ · TypeScript 6 · Vite 8 (rolldown; `minify: "esbuild"` is unsupported) · Vitest 4 · React 19 · Tailwind 4 · Tauri 2.11 · Rust 1.88+ · keyring 4. Backend (planned — pin exact versions when phase 1 starts, after checking each project's docs): Node 22 · Fastify · drizzle · BullMQ · Postgres 17 · Redis 7 · MinIO · Better Auth · Resend · sharp · Testcontainers.

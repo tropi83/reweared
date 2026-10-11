@@ -1,20 +1,22 @@
 # Security
 
+> **Planned change ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)):** the app is moving to user accounts and a server that runs generations with the platform's provider keys. This document describes the **current, local-first release**; the server's threat model is summarized in [Planned: server](#planned-server-adr-0001) and will replace the client sections as the phases ship.
+
 ## Threat model
 
-| Asset                         | Threats considered                                                      | Mitigations                                                                                                                                                                       |
-| ----------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gemini API key / OAuth tokens | extraction from disk, logs, crash reports, clipboard, devtools, backups | OS credential store on desktop; memory-only by default on web; redacting logger; never in diagnostics; never sent anywhere but Google                                             |
-| Images / prompts              | exfiltration, upload without consent                                    | only sent when the user launches a generation, directly to the configured provider; no analytics, no ad SDK                                                                       |
-| Local files                   | path traversal, malformed/huge/spoofed files                            | ids validated by `assertSafeId` before any path is built; Tauri fs scope limited to `$APPDATA/**`; magic-byte MIME sniffing; 40 MB cap; decoding delegated to the browser decoder |
-| Webview                       | XSS, injection, over-privileged IPC                                     | strict CSP, no `dangerouslySetInnerHTML`, closed set of Rust commands, capabilities with minimum permissions                                                                      |
-| Network                       | contacting unexpected hosts                                             | allowlist in `http-client.ts` + Tauri `http` scope + CSP `connect-src`                                                                                                            |
+| Asset                                                           | Threats considered                                                      | Mitigations                                                                                                                                                                       |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemini API key / OAuth tokens, Cloudflare token / Worker secret | extraction from disk, logs, crash reports, clipboard, devtools, backups | OS credential store on desktop; memory-only by default on web; redacting logger; never in diagnostics; never sent anywhere but the provider it belongs to                         |
+| Images / prompts                                                | exfiltration, upload without consent                                    | only sent when the user launches a generation, directly to the configured provider; no analytics, no ad SDK                                                                       |
+| Local files                                                     | path traversal, malformed/huge/spoofed files                            | ids validated by `assertSafeId` before any path is built; Tauri fs scope limited to `$APPDATA/**`; magic-byte MIME sniffing; 40 MB cap; decoding delegated to the browser decoder |
+| Webview                                                         | XSS, injection, over-privileged IPC                                     | strict CSP, no `dangerouslySetInnerHTML`, closed set of Rust commands, capabilities with minimum permissions                                                                      |
+| Network                                                         | contacting unexpected hosts                                             | allowlist in `http-client.ts` + Tauri `http` scope + CSP `connect-src`                                                                                                            |
 
 ## Credentials
 
 - **Cloudflare:** the API token (direct mode) and the Worker shared secret live in the SecretStore like the Gemini key (OS keychain on desktop, memory or opt-in localStorage on web). Account ID and Worker URL are configuration, not secrets. Worker URLs must be `https`, without credentials or query strings; `allowHost()` refuses localhost/loopback. The Worker template validates every input against the model schema, caps bodies at 12 MB, only runs allowlisted models and compares the shared secret in constant time.
 
-- **Desktop (Windows/macOS/Linux):** `keyring` crate → Windows Credential Manager / macOS Keychain / Secret Service. Rust commands `secret_get/set/delete` accept only `gemini_api_key` and `google_oauth`.
+- **Desktop (Windows/macOS/Linux):** `keyring` crate → Windows Credential Manager / macOS Keychain / Secret Service. Rust commands `secret_get/set/delete` accept only `gemini_api_key`, `google_oauth`, `cloudflare_api_token` and `cloudflare_worker_secret` (`ALLOWED_KEYS` in `secrets.rs`).
 - **Web:** memory by default. _Remember on this device_ writes to `localStorage` **only after the user acknowledges** the browser disclaimer. The UI never claims browser storage is secure.
 - **Mobile:** secure storage is not integrated yet; credentials are session-only (the Rust command reports unsupported and the frontend degrades). Tracked for Phase 6.
 - The API key is never displayed after saving (only its last 4 characters).
@@ -80,7 +82,7 @@ Phones cannot drive a second window from the app's JavaScript (the app's WebView
 
 ## Content Security Policy (`src-tauri/tauri.conf.json`)
 
-`default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (inline `style` attributes for dynamic sizes); `img-src 'self' blob: data:`; `connect-src` restricted to `ipc:`, `http://ipc.localhost` and the Google hosts; `object-src 'none'`; `frame-ancestors 'none'`; `form-action 'none'`.
+`default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (inline `style` attributes for dynamic sizes); `img-src 'self' blob: data:`; `connect-src` restricted to `ipc:`, `http://ipc.localhost`, the Google hosts (`generativelanguage`, `oauth2`, `www`, `cloudresourcemanager` `.googleapis.com`), `api.cloudflare.com` and `*.workers.dev`; `object-src 'none'`; `frame-ancestors 'none'`; `form-action 'none'`.
 
 ## Files
 
@@ -88,6 +90,20 @@ Phones cannot drive a second window from the app's JavaScript (the app's WebView
 - Temporary payloads (prepared provider images, base64 bodies) live in memory only and are dropped after the burst of jobs.
 - Cancelled jobs never write a result. `Settings → Storage → Remove orphaned files` deletes any image file not referenced by a project document.
 
+## Planned: server (ADR 0001)
+
+Not implemented yet — design §7 in [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). This section becomes the main threat model when phase 3 ships.
+
+| Asset                                       | Threats considered                                                  | Planned mitigations                                                                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform provider keys (Cloudflare, Gemini) | theft from the database, env dumps, images, logs, a compromised api | Docker secrets mounted in the **worker only**; the api never calls a provider; egress allowlist; rotation by replacing the secret file                     |
+| Accounts and sessions                       | credential stuffing, session theft, CSRF                            | argon2id, rate limits, email verification (Resend); httpOnly `Secure` `SameSite=Lax` cookies + Origin check (web); bearer token in the OS keychain (Tauri) |
+| Listings, photos, generations               | cross-user access, leaking location metadata, public buckets        | every query scoped by the session user (404 otherwise); private bucket and short presigned URLs; EXIF/GPS stripped at upload                               |
+| Credits / provider budget                   | double spending, refund replay, free-credit abuse                   | ledger with idempotency keys and `CHECK (balance >= 0)`; reservation in the enqueue transaction; per-user caps; provider budget guard                      |
+| Infrastructure                              | exposed databases, container escape, data loss                      | only Caddy publishes ports; non-root, read-only containers; no Docker socket; nightly off-site backups with restore drills                                 |
+
+Logging moves to pino with the same redaction rules as `src/lib/logger.ts`; prompts, images, full emails and presigned URLs are never logged. The Tauri capabilities, CSP and `ALLOWED_HOSTS` shrink to the API origin in phase 3; the OAuth loopback and provider credential storage leave the client.
+
 ## Reporting
 
-Open an issue with the redacted diagnostics export. Never paste an API key or token.
+Open an issue with the redacted diagnostics export. Never paste an API key or token. Vulnerabilities: contact the maintainer privately (see `CONTRIBUTING.md`), not in a public issue.

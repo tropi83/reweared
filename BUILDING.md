@@ -35,13 +35,13 @@ Always go through the project's pinned CLI (`pnpm tauri …`). A globally instal
 
 ## What runs where
 
-|                   | Windows               | macOS                             | Linux (Debian/Ubuntu)                   | Android                 | iOS                    |
-| ----------------- | --------------------- | --------------------------------- | --------------------------------------- | ----------------------- | ---------------------- |
-| Build on          | Windows               | macOS                             | Linux                                   | Windows, macOS or Linux | macOS only             |
-| Package           | `.exe` (NSIS), `.msi` | `.app`, `.dmg`                    | `.deb`, `.rpm`, `.AppImage`             | `.apk`, `.aab`          | `.ipa`                 |
-| Saved credentials | Credential Manager    | Keychain                          | Secret Service (GNOME Keyring, KWallet) | session only (planned)  | session only (planned) |
-| Google sign-in    | yes                   | yes                               | yes                                     | no — API key            | no — API key           |
-| Post on Vinted    | yes                   | yes (isolated profile: macOS 14+) | yes                                     | no (button disabled)    | no (button disabled)   |
+|                   | Windows               | macOS                             | Linux (Debian/Ubuntu)                   | Android                           | iOS                                         |
+| ----------------- | --------------------- | --------------------------------- | --------------------------------------- | --------------------------------- | ------------------------------------------- |
+| Build on          | Windows               | macOS                             | Linux                                   | Windows, macOS or Linux           | macOS only                                  |
+| Package           | `.exe` (NSIS), `.msi` | `.app`, `.dmg`                    | `.deb`, `.rpm`, `.AppImage`             | `.apk`, `.aab`                    | `.ipa`                                      |
+| Saved credentials | Credential Manager    | Keychain                          | Secret Service (GNOME Keyring, KWallet) | session only (planned)            | session only (planned)                      |
+| Google sign-in    | yes                   | yes                               | yes                                     | no — API key                      | no — API key                                |
+| Post on Vinted    | yes                   | yes (isolated profile: macOS 14+) | yes                                     | yes (native screen, WebView 116+) | yes (native screen, iOS 17+; not built yet) |
 
 Desktop bundles are built on their own OS: `.msi` needs WiX (Windows only) and macOS bundles need macOS. The release workflow builds each OS on its own runner (§2.4).
 

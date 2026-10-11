@@ -21,6 +21,10 @@ src-tauri/gen/schemas
 keystore.properties
 client_secret*.json
 service-account*.json
+# Backend (ADR 0001): Docker secrets and database dumps
+secrets/
+*.dump
+*.sql.gz
 
 # Logs
 logs

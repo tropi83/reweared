@@ -22,38 +22,40 @@
 ## Decisions taken in this plan (beyond the spec)
 
 1. **The root stays the web app in phase 0.** The spec's `apps/web/` move touches Vite, Tauri (`frontendDist`, `beforeDevCommand`), CI and every doc for no functional gain now. It is reconsidered at the start of phase 1 when `apps/server/` appears; until then `pnpm-workspace.yaml` lists `packages/*` and the root.
-2. **SECURITY.md and PRIVACY.md are not rewritten yet.** They describe what the shipped app does, and the shipped app stays local-first until phase 3. They get a short "Planned change" banner pointing at the ADR; the full rewrite happens in the phase that changes the behaviour (phase 1 for the server, phase 3 for the clients).
+2. **SECURITY.md and PRIVACY.md keep describing the shipped release.** The shipped app stays local-first until phase 3, so their main sections stay about it — corrected where they were stale — and each gains a _Planned_ section for the server (threat model, sub-processors, rights). They are rewritten as the main description in the phase that changes the behaviour (phase 1 for the server, phase 3 for the clients). _(Revised 2026-10-11 at the owner's request: full documentation pass instead of banners only.)_
 3. **`src/lib/logger.ts` stays in the app for now.** The domain does not log. It moves (redaction patterns shared with pino) in phase 1, when the server needs it.
 4. **Domain tests that exercise infrastructure move to infrastructure.** `listing-copy.test.ts` tests the Cloudflare and Gemini copy providers, `models.test.ts` checks `GEMINI_IMAGE_MODELS`: those parts belong next to the adapters (and `packages/domain` cannot import them).
 
 ## File map
 
-| File                                                                          | Change                                                                                           |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `docs/adr/0001-backend-accounts-platform-keys.md` (new)                       | The pivot decision, context, consequences, superseded rules                                      |
-| `CLAUDE.md`, `.claude/skills/project-context/SKILL.md`                        | Transition rules: current client rules still apply to `src/`; server rules for what comes next   |
-| `SECURITY.md`, `PRIVACY.md`, `README.md`                                      | "Planned change" banner → ADR                                                                    |
-| `src/infrastructure/providers/{cloudflare,gemini}/*ListingCopy.test.ts` (new) | Provider tests moved out of `src/domain/services/listing-copy.test.ts`                           |
-| `src/infrastructure/providers/gemini/GeminiModels.test.ts` (new)              | Catalogue tests moved out of `src/domain/models/models.test.ts`                                  |
-| `pnpm-workspace.yaml` (new)                                                   | `packages: ["packages/*"]`                                                                       |
-| `packages/domain/{package.json,tsconfig.json}` (new)                          | Source-only package, `exports` map, Node-only types                                              |
-| `src/domain/**` → `packages/domain/src/{models,services}/**`                  | `git mv`, relative imports inside the package                                                    |
-| `src/lib/{ids,retry}.ts` → `packages/domain/src/lib/`                         | `git mv`; their tests split out of `src/lib/lib.test.ts`                                         |
-| ~96 files under `src/`                                                        | `@/domain/…` → `@aiv/domain/…`, `@/lib/ids` / `@/lib/retry` → `@aiv/domain/lib/…`                |
-| `vite.config.ts`                                                              | `test.projects`: `app` (jsdom, unchanged) + `domain` (node)                                      |
-| `package.json`                                                                | `@aiv/domain: workspace:*`, `typecheck` runs both tsconfigs                                      |
-| `eslint.config.js`                                                            | `packages/**` covered; `no-restricted-imports` + `no-restricted-globals` boundary for the domain |
-| `knip.json`                                                                   | `workspaces` config                                                                              |
-| `ARCHITECTURE.md`, `DEVELOPMENT.md`, skills `code-conventions`, `testing`     | New paths                                                                                        |
+| File                                                                                                                                                                               | Change                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `docs/adr/0001-backend-accounts-platform-keys.md` (new)                                                                                                                            | The pivot decision, context, consequences, superseded rules                                      |
+| `CLAUDE.md`, `.claude/skills/project-context/SKILL.md`                                                                                                                             | Transition rules: current client rules still apply to `src/`; server rules for what comes next   |
+| Every doc (README, ARCHITECTURE, SECURITY, PRIVACY, DEVELOPMENT, CONTRIBUTING, BUILDING, CHANGELOG, `cloudflare-worker/README.md`, all skills + new `backend` skill, `.gitignore`) | Planned-change notes, _Planned_ sections, stale facts corrected (task 1)                         |
+| `src/infrastructure/providers/{cloudflare,gemini}/*ListingCopy.test.ts` (new)                                                                                                      | Provider tests moved out of `src/domain/services/listing-copy.test.ts`                           |
+| `src/infrastructure/providers/gemini/GeminiModels.test.ts` (new)                                                                                                                   | Catalogue tests moved out of `src/domain/models/models.test.ts`                                  |
+| `pnpm-workspace.yaml` (new)                                                                                                                                                        | `packages: ["packages/*"]`                                                                       |
+| `packages/domain/{package.json,tsconfig.json}` (new)                                                                                                                               | Source-only package, `exports` map, Node-only types                                              |
+| `src/domain/**` → `packages/domain/src/{models,services}/**`                                                                                                                       | `git mv`, relative imports inside the package                                                    |
+| `src/lib/{ids,retry}.ts` → `packages/domain/src/lib/`                                                                                                                              | `git mv`; their tests split out of `src/lib/lib.test.ts`                                         |
+| ~96 files under `src/`                                                                                                                                                             | `@/domain/…` → `@aiv/domain/…`, `@/lib/ids` / `@/lib/retry` → `@aiv/domain/lib/…`                |
+| `vite.config.ts`                                                                                                                                                                   | `test.projects`: `app` (jsdom, unchanged) + `domain` (node)                                      |
+| `package.json`                                                                                                                                                                     | `@aiv/domain: workspace:*`, `typecheck` runs both tsconfigs                                      |
+| `eslint.config.js`                                                                                                                                                                 | `packages/**` covered; `no-restricted-imports` + `no-restricted-globals` boundary for the domain |
+| `knip.json`                                                                                                                                                                        | `workspaces` config                                                                              |
+| `ARCHITECTURE.md`, `DEVELOPMENT.md`, skills `code-conventions`, `testing`                                                                                                          | New paths                                                                                        |
 
 ---
 
 ### Task 1: ADR and transition rules
 
-**Files:** Create `docs/adr/0001-backend-accounts-platform-keys.md`. Modify `CLAUDE.md`, `.claude/skills/project-context/SKILL.md`, `SECURITY.md`, `PRIVACY.md`, `README.md`.
+**Files:** Create `docs/adr/0001-backend-accounts-platform-keys.md`, `.claude/skills/backend/SKILL.md`. Modify `CLAUDE.md`, every skill, `README.md`, `ARCHITECTURE.md`, `SECURITY.md`, `PRIVACY.md`, `DEVELOPMENT.md`, `CONTRIBUTING.md`, `BUILDING.md`, `CHANGELOG.md`, `cloudflare-worker/README.md`, `.gitignore`.
 
-- [ ] **Step 1: Write the ADR** (Michael Nygard format): _Status_ Accepted 2026-10-11 · _Context_ (local-first BYOK app; wish for accounts, platform-paid generation, a server-side queue) · _Decision_ (the spec's §0 table, verbatim) · _Consequences_ (positive: no key setup for users, fair queue, multi-device; negative: hosting cost, GDPR controller role, sub-processors Cloudflare/Google/Resend, abuse surface on free credits, the app needs the network) · _Superseded rules_ — list each one with where it lives: CLAUDE.md "No proprietary backend", "Requests go from the user's device straight to Google", "Images leave the device only on Generate, directly to the configured provider"; project-context "No account, no backend, no cloud", "Never add a proxy of ours", "Out of scope: Accounts, cloud sync, backend"; ARCHITECTURE.md principles 1–2 · _Phasing_ (spec §10).
-- [ ] **Step 2: CLAUDE.md** — add a section right after the intro:
+> Done with a wider scope than written below (see Progress): the owner asked for a full documentation pass. CLAUDE.md was restructured into _Everywhere / Client (until phase 3) / Server (from phase 1)_ non-negotiables rather than one inserted section.
+
+- [x] **Step 1: Write the ADR** (Michael Nygard format): _Status_ Accepted 2026-10-11 · _Context_ (local-first BYOK app; wish for accounts, platform-paid generation, a server-side queue) · _Decision_ (the spec's §0 table, verbatim) · _Consequences_ (positive: no key setup for users, fair queue, multi-device; negative: hosting cost, GDPR controller role, sub-processors Cloudflare/Google/Resend, abuse surface on free credits, the app needs the network) · _Superseded rules_ — list each one with where it lives: CLAUDE.md "No proprietary backend", "Requests go from the user's device straight to Google", "Images leave the device only on Generate, directly to the configured provider"; project-context "No account, no backend, no cloud", "Never add a proxy of ours", "Out of scope: Accounts, cloud sync, backend"; ARCHITECTURE.md principles 1–2 · _Phasing_ (spec §10).
+- [x] **Step 2: CLAUDE.md** — add a section right after the intro:
 
   ```md
   ## Transition to a backend (ADR 0001, 2026-10-11)
@@ -68,8 +70,8 @@
 
   and update the _Layout_ line to start with `packages/domain` (pure models/services/lib, shared) → `src/infrastructure` …
 
-- [ ] **Step 3: project-context skill** — product paragraph: append "Pivot in progress (ADR 0001): accounts, platform keys, server-side queue — see the spec." In _Decisions already taken_, prefix the BYOK / no-proxy bullets with "**Until phase 3:**". In _Out of scope_, remove accounts/backend/cloud sync and add "payment (Stripe comes after credits), collaboration, sharing, marketplace, chat UI, ad SDK". Map row "Domain models / errors" → `packages/domain/src/models/*`.
-- [ ] **Step 4: Banners** — top of `SECURITY.md` and `PRIVACY.md` (below the H1), and in README's _Roadmap / status_:
+- [x] **Step 3: project-context skill** — product paragraph: append "Pivot in progress (ADR 0001): accounts, platform keys, server-side queue — see the spec." In _Decisions already taken_, prefix the BYOK / no-proxy bullets with "**Until phase 3:**". In _Out of scope_, remove accounts/backend/cloud sync and add "payment (Stripe comes after credits), collaboration, sharing, marketplace, chat UI, ad SDK". Map row "Domain models / errors" → `packages/domain/src/models/*`.
+- [x] **Step 4: Banners** — top of `SECURITY.md` and `PRIVACY.md` (below the H1), and in README's _Roadmap / status_:
 
   ```md
   > **Planned change (ADR 0001):** the app is moving to user accounts and a server that runs generations
@@ -77,8 +79,8 @@
   > rewritten when that behaviour ships.
   ```
 
-- [ ] **Step 5:** `pnpm exec prettier --write` on the touched files; `pnpm check` green (311).
-- [ ] **Step 6: Commit** `docs(adr): record the move to a backend with accounts and platform keys`.
+- [x] **Step 5:** `pnpm exec prettier --write` on the touched files; `pnpm check` green (311).
+- [x] **Step 6: Commit** `docs(adr): record the move to a backend with accounts and platform keys`.
 
 ### Task 2: Move infrastructure tests out of the domain
 
@@ -251,4 +253,6 @@
 
 ## Progress
 
-_Nothing done yet. Update this section after each task: task number, commit hash, deviations._
+Update this section after each task: task number, commit hash, deviations.
+
+- **Task 1 — done** (commit: see `git log --grep "docs(adr)"`). Deviations: full documentation pass instead of banners. New `backend` skill (server invariants, testing with Testcontainers). Stale facts fixed on the way: README (diagram showed Gemini as the image provider, 74 → 311 tests, Vinted on phones, project structure, skills list), ARCHITECTURE (`CURRENT_SCHEMA_VERSION` 1 → 3, IndexedDB stores, providers and features lists), SECURITY (keychain key list, CSP `connect-src` with Cloudflare), PRIVACY (images go to Cloudflare, copy to Gemini/Cloudflare, listing wording, phone Vinted session), BUILDING (Vinted on phones), DEVELOPMENT (test list), skills `testing` (test map) and `code-conventions` (`lst` ids). `.gitignore` ignores `secrets/` and DB dumps. Task 6 still applies for the paths that change in task 4.

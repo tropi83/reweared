@@ -12,4 +12,6 @@ description: Use when cutting a version — bump versions consistently in packag
 5. `.github/workflows/release.yml` builds Windows / macOS / Linux bundles with `tauri-apps/tauri-action` and attaches them to a **draft** GitHub release. Review the notes, then publish.
 6. Smoke test an installer: app starts, Settings → About shows the version, a fresh install can import → generate (Mock) → close → reopen with the project still there.
 
+**Server (planned, backend phase 4):** the api/worker image will be built and pushed by a release workflow and deployed with `docker compose pull && docker compose up -d` after a database backup; migrations run in the `migrate` one-shot service. Not defined yet — the phase 4 plan writes this section.
+
 Never ship with the Mock provider enabled (`VITE_ENABLE_MOCK_PROVIDER` unset in release env) and never embed anything but the public Desktop OAuth client documented in DEVELOPMENT.md.

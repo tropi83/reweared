@@ -24,6 +24,10 @@ pnpm check            # typecheck + lint + format:check + test
 pnpm rust:check       # cargo fmt --check + clippy + cargo test
 ```
 
+## Backend (planned)
+
+The project is moving to accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)). Design: [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md); plans per phase in `docs/superpowers/plans/` (phase 0: [`2026-10-11-backend-phase-0.md`](docs/superpowers/plans/2026-10-11-backend-phase-0.md)). No server code exists yet. From phase 0 the repo is a pnpm workspace and the domain lives in `packages/domain` (`@aiv/domain`); from phase 1 `docker compose -f compose.yaml -f compose.dev.yaml up` will start Postgres, Redis, MinIO, Mailpit, the api and the worker, and this section will document it (Docker required, secrets as files under `secrets/`, never committed). Conventions for that code: the `backend` skill.
+
 ## Environment
 
 Copy `.env.example` to `.env` (git-ignored). All variables are **public build configuration**; never put user credentials in them.
@@ -109,7 +113,7 @@ Flow: `PostButton` → `publish-store` → `PublishBridge` (`TauriVintedBridge` 
 
 ## Tests
 
-Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, stubbed Google endpoints). The `testing` skill (`.claude/skills/testing/SKILL.md`) documents the harnesses.
+Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, stubbed Google and Cloudflare endpoints) — 48 files, 311 tests on 2026-10-11. The `testing` skill (`.claude/skills/testing/SKILL.md`) documents the harnesses.
 
 - `src/domain/services/generation-queue.test.ts` — concurrency, independent failures, retry/backoff, timeout, cancellation, manual retry.
 - `src/domain/services/recipes.test.ts` — interpolation; `src/domain/models/models.test.ts` — errors, status derivation, request builder, catalogue.
@@ -123,6 +127,10 @@ Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, st
 - `src-tauri/src/oauth.rs` — callback parsing.
 - `src/domain/services/publish.test.ts` — postability, photo order, Vinted URL stages, report guard; `src/infrastructure/publish/vinted/prefill.test.ts` — form filling on a React-style fixture (fallback selectors, no submit, photos attached once); `src/infrastructure/publish/publish-bridge.test.ts` — command/event mapping, error codes.
 - `src/app/publish-store.test.ts` — publish state machine (page events, polled location, auto-fill on arrival and after a reload, poll timeout, partial report, stale session, listing binding) and payload builder; `src/features/publish/PostButton.test.tsx`, `src/features/settings/PublishSection.test.tsx` — reasons, terms dialog, logout.
+- `src/domain/services/{catalog,mannequin,listing-copy,usage-tracker}.test.ts` — catalogue consistency and safety-filter softening, mannequin prompt rewriting, copy prompt and defensive parser, usage counters and learned limits.
+- `src/infrastructure/providers/cloudflare/CloudflareProvider.test.ts` — mapper (multipart/JSON bodies), error envelope mapping, auth (direct API / Worker), input preparation for diffusion models, private models (5018), FLUX.2 [klein] requests.
+- `src/app/{listing-flow,listings-store,listing-actions}.test.ts` — `generateListing` (photos + copy in parallel) and `listingReadiness`, switching listings (running jobs cancelled), deletion.
+- `src/features/**/*.test.tsx` — components that hold logic (listing card, feed, lightbox, settings sections, post button and panel, mannequin dialog, category icons); `src/i18n/errors.test.ts` — error wording and quota reset times.
 - `src-tauri/src/vinted.rs` — navigation allow-list, closed paths, payload limits, page-event URL stripping, poll parsing.
 
 ```bash
@@ -132,7 +140,7 @@ pnpm check           # typecheck + lint + prettier + tests (pre-commit gate)
 pnpm rust:check      # cargo fmt --check, clippy -D warnings, cargo test
 ```
 
-CI never needs a Google account: everything runs against the Mock provider and `fake-indexeddb`. See `.github/workflows/ci.yml`.
+CI never needs a Google or Cloudflare account: everything runs against the Mock provider and `fake-indexeddb`. See `.github/workflows/ci.yml`.
 
 ## Code style
 
