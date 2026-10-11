@@ -151,16 +151,16 @@
 
 **Files:** `DEVELOPMENT.md` (Backend section becomes "Running the server": prerequisites Docker, `node scripts/dev-secrets.mjs`, compose dev command, Mailpit URL, `pnpm test:integration`, `pnpm smoke:server`, env table), `ARCHITECTURE.md` (target section: what exists after phase 1), `SECURITY.md` / `PRIVACY.md` planned sections (facts from this phase: scrypt, cookie flags, bearer, EXIF stripping, streaming, rate limits, SeaweedFS), `README.md` roadmap, `CHANGELOG.md`, skills `backend` (status, real file paths, commands), `testing` (projects `contracts`, `server`, integration config), `project-context` (phase table, map rows for `apps/server`, `packages/contracts`), `security-review` (server verification commands), `git-workflow` (scopes), `.env.example`.
 
-- [ ] **Step 1:** Update every file above; `grep -rn "phase 1" --include=*.md .` and fix statuses.
-- [ ] **Step 2:** prettier, `pnpm check`. **Commit** `docs: document the phase 1 server stack`.
+- [x] **Step 1:** Update every file above; `grep -rn "phase 1" --include=*.md .` and fix statuses.
+- [x] **Step 2:** prettier, `pnpm check`. **Commit** `docs: document the phase 1 server stack`.
 
 ### Task 11: Final verification
 
-- [ ] `pnpm check` green (app count ≥ 312 + new contracts/server unit tests), `pnpm test:integration` green, `pnpm rust:check` green (nothing changed there).
-- [ ] `docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait` → all healthy; `pnpm smoke:server http://localhost:8080 http://localhost:8025` green; `docker compose logs api` contains no email in full, no token, no cookie value.
-- [ ] Manual: sign up through `curl` with a real inbox in Mailpit, upload a phone photo with GPS, download the full image and check with `exiftool` (or `sharp(...).metadata()`) that no GPS/EXIF remains.
-- [ ] The web app (`pnpm dev`) and the desktop app behave exactly as before (no client change).
-- [ ] Update **Progress** below with commit hashes and deviations; mark phase 1 done in the `project-context` and `backend` skills; ask the owner before pushing or opening a PR.
+- [x] `pnpm check` green (app count ≥ 312 + new contracts/server unit tests), `pnpm test:integration` green, `pnpm rust:check` green (nothing changed there).
+- [x] `docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait` → all healthy; `pnpm smoke:server http://localhost:8080 http://localhost:8025` green; `docker compose logs api` contains no email in full, no token, no cookie value.
+- [x] Manual: sign up through `curl` with a real inbox in Mailpit, upload a phone photo with GPS, download the full image and check with `exiftool` (or `sharp(...).metadata()`) that no GPS/EXIF remains.
+- [x] The web app (`pnpm dev`) and the desktop app behave exactly as before (no client change).
+- [x] Update **Progress** below with commit hashes and deviations; mark phase 1 done in the `project-context` and `backend` skills; ask the owner before pushing or opening a PR.
 
 ## Progress
 
@@ -226,3 +226,5 @@ Update this section after each task: task number, commit hash, deviations.
   - The secrets scan also matches Resend keys (`\bre_…`, test files excluded as before) and fails when anything under `secrets/` is tracked.
   - Checked: all smoke steps pass against the dev stack; the api logs of a full run contain no email address, token or cookie.
   - ESLint's script globals gained `FormData`, `Blob`, `setTimeout`.
+- **Task 10 — done** (`281cdba`). DEVELOPMENT.md → "Server (backend phase 1)" (commands, dev URLs, layout, every variable, production outline); ARCHITECTURE/SECURITY/PRIVACY state what phase 1 implements and that no client uses it; README, CHANGELOG, `.env.example` (compose variables, secrets stay in `./secrets`), CLAUDE.md, skills `backend` (status + patterns in the code), `testing`, `project-context` (phase table, map, pinned versions), `security-review`, `code-conventions`.
+- **Task 11 — done** (2026-10-12). `pnpm check` green (355 unit tests in the `app`, `domain`, `contracts`, `server` projects), `pnpm test:integration` green (5 files, 37 tests), `pnpm rust:check` green (6 tests; `src-tauri` unchanged since `main`), `pnpm build` green, compose dev stack healthy and `pnpm smoke:server` green, api logs of a full run free of emails, tokens and cookies. Not done here: a real phone photo checked with `exiftool` (the GPS/EXIF removal is covered by sharp-generated photos carrying GPS, camera EXIF and an orientation tag, mutation-checked), and a look at the web app in a browser (the client code is unchanged apart from the shared `redact`/`sniffImageMime` moves, covered by its tests and the build). The branch `feat/backend-phase-1` is local: pushing and the PR wait for the owner. **Phase 1 complete.**
