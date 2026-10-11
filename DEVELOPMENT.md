@@ -26,7 +26,7 @@ pnpm rust:check       # cargo fmt --check + clippy + cargo test
 
 ## Server (backend phase 1)
 
-The project is moving to accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md), design [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md), plans in `docs/superpowers/plans/`). Phase 1 is in the repository: accounts, listings, uploads and object storage behind a REST API. **The clients do not use it yet** (phase 3); generation and credits come in phase 2. Conventions: the `backend` skill.
+The project is moving to accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md), design [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md), plans in `docs/superpowers/plans/`; next: [phase 2](docs/superpowers/plans/2026-10-12-backend-phase-2.md)). Phase 1 is in the repository: accounts, listings, uploads and object storage behind a REST API. **The clients do not use it yet** (phase 3); generation and credits come in phase 2. Conventions: the `backend` skill.
 
 Prerequisites: Docker (Desktop on Windows/macOS). Then:
 
