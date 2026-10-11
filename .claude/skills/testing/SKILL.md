@@ -7,14 +7,14 @@ description: Use when adding or fixing tests — where tests live, how the harne
 
 ## Stack
 
-Vitest 4 + jsdom + `@testing-library/react` + `fake-indexeddb`; coverage via `@vitest/coverage-v8`. Rust: `cargo test`. Setup file `src/test/setup.ts` polyfills `Blob.arrayBuffer` / `URL.createObjectURL` / `DataTransfer` and silences canvas. Baseline on 2026-10-11: **48 files, 311 tests** — a refactor must not lower the test count.
+Vitest 4 + jsdom + `@testing-library/react` + `fake-indexeddb`; coverage via `@vitest/coverage-v8`. Rust: `cargo test`. Setup file `src/test/setup.ts` polyfills `Blob.arrayBuffer` / `URL.createObjectURL` / `DataTransfer` and silences canvas. Baseline on 2026-10-11: **51 files, 312 tests** — a refactor must not lower the test count.
 
 ## Where
 
 Colocated `*.test.ts(x)` next to the code:
 
 - **Domain** (`src/domain`, moving to `packages/domain` in phase 0 of the backend — tests there run in a **Node** Vitest project, so no DOM polyfill may be relied on): `generation-queue.test.ts` (queue semantics; the `harness()` helper routes requests back to jobs through `prompt = job.id`), `recipes`, `catalog`, `mannequin`, `listing-copy` (prompt + parser), `publish`, `usage-tracker`, `models/models.test.ts` (errors, status derivation, request builder).
-- **Infrastructure**: `providers/{gemini,cloudflare}/*Provider.test.ts` (use `__setFetchOverride` from `http-client.ts`; never hit the network), `auth/auth.test.ts` + `SecretStore.test.ts` (secret tiers, API key, PKCE, the OAuth flow with a fake `LoopbackListener`, concurrent refresh), `storage/IndexedDbStorage.test.ts` (one DB name per test) + `rename-migration.test.ts`, `image/image-processing.test.ts`, `publish/publish-bridge.test.ts`, `publish/vinted/prefill.test.ts` (React-style form fixture).
+- **Infrastructure**: `providers/{gemini,cloudflare}/*Provider.test.ts`, `*ListingCopy.test.ts`, `GeminiModels.test.ts` (use `__setFetchOverride` from `http-client.ts`; never hit the network), `auth/auth.test.ts` + `SecretStore.test.ts` (secret tiers, API key, PKCE, the OAuth flow with a fake `LoopbackListener`, concurrent refresh), `storage/IndexedDbStorage.test.ts` (one DB name per test) + `rename-migration.test.ts`, `image/image-processing.test.ts`, `publish/publish-bridge.test.ts`, `publish/vinted/prefill.test.ts` (React-style form fixture).
 - **App**: `workflow.test.tsx` and `listing-flow.test.ts` (end-to-end through the stores with the Mock provider; image decoding mocked via `vi.mock("@/infrastructure/image/image-processing")`), `listings-store`, `listing-actions`, `publish-store`, `publish-bar`, `query/query.test.tsx`, `app-units.test.ts` (i18n, router, ui/composer/toast stores).
 - **Features / components**: one test per component that holds logic (`ListingSetupCard`, `GenerationFeed`, `Lightbox`, `PostButton`, settings sections…), `src/i18n/errors.test.ts` (provider-specific error wording, quota reset times, localization).
 - `src/lib/lib.test.ts` (ids, redaction, backoff, timeouts), `scripts/mobile-doctor.test.mjs`, `tools/eslint-rules/no-french-identifiers.test.mjs`.

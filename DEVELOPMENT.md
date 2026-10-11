@@ -113,10 +113,10 @@ Flow: `PostButton` → `publish-store` → `PublishBridge` (`TauriVintedBridge` 
 
 ## Tests
 
-Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, stubbed Google and Cloudflare endpoints) — 48 files, 311 tests on 2026-10-11. The `testing` skill (`.claude/skills/testing/SKILL.md`) documents the harnesses.
+Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, stubbed Google and Cloudflare endpoints) — 51 files, 312 tests on 2026-10-11. The `testing` skill (`.claude/skills/testing/SKILL.md`) documents the harnesses.
 
 - `src/domain/services/generation-queue.test.ts` — concurrency, independent failures, retry/backoff, timeout, cancellation, manual retry.
-- `src/domain/services/recipes.test.ts` — interpolation; `src/domain/models/models.test.ts` — errors, status derivation, request builder, catalogue.
+- `src/domain/services/recipes.test.ts` — interpolation; `src/domain/models/models.test.ts` — errors, status derivation, request builder (inline models), seeds.
 - `src/infrastructure/providers/gemini/GeminiProvider.test.ts` — request mapping, response parsing, error normalization, model listing fallback, host allowlist.
 - `src/infrastructure/auth/auth.test.ts` — SecretStore tiers, API-key provider, PKCE, OAuth loopback flow, concurrent refresh, `invalid_grant`.
 - `src/infrastructure/storage/IndexedDbStorage.test.ts` — round trips, deletion, orphans, unsafe ids, migrations; `rename-migration.test.ts` — schema v3, IndexedDB v1→v2 upgrade, desktop layout migration.
@@ -128,6 +128,7 @@ Colocated `*.test.ts(x)` files, all offline (Mock provider, `fake-indexeddb`, st
 - `src/domain/services/publish.test.ts` — postability, photo order, Vinted URL stages, report guard; `src/infrastructure/publish/vinted/prefill.test.ts` — form filling on a React-style fixture (fallback selectors, no submit, photos attached once); `src/infrastructure/publish/publish-bridge.test.ts` — command/event mapping, error codes.
 - `src/app/publish-store.test.ts` — publish state machine (page events, polled location, auto-fill on arrival and after a reload, poll timeout, partial report, stale session, listing binding) and payload builder; `src/features/publish/PostButton.test.tsx`, `src/features/settings/PublishSection.test.tsx` — reasons, terms dialog, logout.
 - `src/domain/services/{catalog,mannequin,listing-copy,usage-tracker}.test.ts` — catalogue consistency and safety-filter softening, mannequin prompt rewriting, copy prompt and defensive parser, usage counters and learned limits.
+- `src/infrastructure/providers/{cloudflare/CloudflareListingCopy,gemini/GeminiListingCopy,gemini/GeminiModels}.test.ts` — copy providers (request shape, model choice and fallback) and the Gemini image catalogue.
 - `src/infrastructure/providers/cloudflare/CloudflareProvider.test.ts` — mapper (multipart/JSON bodies), error envelope mapping, auth (direct API / Worker), input preparation for diffusion models, private models (5018), FLUX.2 [klein] requests.
 - `src/app/{listing-flow,listings-store,listing-actions}.test.ts` — `generateListing` (photos + copy in parallel) and `listingReadiness`, switching listings (running jobs cancelled), deletion.
 - `src/features/**/*.test.tsx` — components that hold logic (listing card, feed, lightbox, settings sections, post button and panel, mannequin dialog, category icons); `src/i18n/errors.test.ts` — error wording and quota reset times.

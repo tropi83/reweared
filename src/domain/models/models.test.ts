@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AppError, deriveGenerationStatus, isGenerationError, isRetryableCode, summarize, toGenerationError, type ListingDocument } from "./index";
 import { buildRequestForModel, seedForAttempt } from "@/domain/services/image-provider";
-import { GEMINI_IMAGE_MODELS } from "@/infrastructure/providers/gemini/GeminiModels";
-import { DEFAULT_SETTINGS } from "@/domain/models";
+import { DEFAULT_SETTINGS, type ImageSize, type ModelInfo } from "@/domain/models";
 
 describe("errors", () => {
   it("marks only transient codes as retryable by default", () => {
@@ -93,33 +92,38 @@ describe("summarize", () => {
 });
 
 describe("buildRequestForModel", () => {
-  const flash = GEMINI_IMAGE_MODELS.find((m) => m.id === "gemini-3.1-flash-image")!;
-  const legacy = GEMINI_IMAGE_MODELS.find((m) => m.id === "gemini-2.5-flash-image")!;
-  const lite = GEMINI_IMAGE_MODELS.find((m) => m.id === "gemini-3.1-flash-lite-image")!;
+  // Inline models: the domain is tested on its own; real catalogues are tested next to their adapters.
+  const model = (id: string, supportedImageSizes: ImageSize[]): ModelInfo => ({
+    id,
+    displayName: id,
+    tier: "balanced",
+    available: true,
+    capabilities: { imageGeneration: true, imageEditing: true, maxInputImages: 1, supportedAspectRatios: ["1:1", "4:5", "16:9"], supportedImageSizes },
+  });
+  const sized = model("sized", ["512px", "1K"]);
+  const unsized = model("unsized", []);
 
   it("never forwards parameters the model does not support", () => {
-    expect(buildRequestForModel(legacy, { prompt: "p", aspectRatio: "16:9", imageSize: "2K" })).toEqual({ prompt: "p", model: legacy.id, aspectRatio: "16:9" });
-    expect(buildRequestForModel(lite, { prompt: "p", aspectRatio: "1:1", imageSize: "4K" })).toEqual({ prompt: "p", model: lite.id, aspectRatio: "1:1" });
-    expect(buildRequestForModel(flash, { prompt: "p", aspectRatio: "original", imageSize: "512px" })).toEqual({
+    expect(buildRequestForModel(unsized, { prompt: "p", aspectRatio: "16:9", imageSize: "1K" })).toEqual({
       prompt: "p",
-      model: flash.id,
+      model: "unsized",
+      aspectRatio: "16:9",
+    });
+    expect(buildRequestForModel(sized, { prompt: "p", aspectRatio: "21:9", imageSize: "4K" })).toEqual({ prompt: "p", model: "sized" });
+    expect(buildRequestForModel(sized, { prompt: "p", aspectRatio: "original", imageSize: "512px" })).toEqual({
+      prompt: "p",
+      model: "sized",
       imageSize: "512px",
     });
   });
 
-  it("keeps the source image", () => {
+  it("keeps the source image, the seed and non-empty options", () => {
     const blob = new Blob([]);
-    const req = buildRequestForModel(flash, { prompt: "p", aspectRatio: "4:5", sourceImage: { blob, mimeType: "image/jpeg" } });
+    const req = buildRequestForModel(sized, { prompt: "p", aspectRatio: "4:5", sourceImage: { blob, mimeType: "image/jpeg" }, seed: 7, options: {} });
     expect(req.sourceImage?.mimeType).toBe("image/jpeg");
     expect(req.aspectRatio).toBe("4:5");
-  });
-
-  it("gemini catalogue is internally consistent", () => {
-    expect(new Set(GEMINI_IMAGE_MODELS.map((m) => m.id)).size).toBe(GEMINI_IMAGE_MODELS.length);
-    for (const m of GEMINI_IMAGE_MODELS) {
-      expect(m.capabilities.supportedAspectRatios).not.toContain("original");
-      expect(m.capabilities.imageEditing).toBe(true);
-    }
+    expect(req.seed).toBe(7);
+    expect(req.options).toBeUndefined();
   });
 });
 

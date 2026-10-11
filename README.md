@@ -69,7 +69,7 @@ Prerequisites: **Node ≥ 22**, **pnpm ≥ 10**, and for the desktop app **Rust 
 pnpm install
 pnpm dev            # web build at http://localhost:1420
 pnpm tauri dev      # desktop app
-pnpm test           # 311 tests (Vitest) — see below
+pnpm test           # 312 tests (Vitest) — see below
 ```
 
 The **Mock provider** (always available in dev builds, or with `VITE_ENABLE_MOCK_PROVIDER=true`) generates placeholder images without any network call, so the whole workflow can be exercised without a Google account. Switch to it in the composer's _Provider_ select; simulate rate limits, outages or timeouts from Settings → Providers → Mock.
@@ -185,7 +185,7 @@ docs/superpowers/  dated designs (specs/) and implementation plans (plans/)
 
 ## Tests & quality gates
 
-311 tests across 48 Vitest files + Rust unit tests (`oauth.rs`, `vinted.rs`), all offline (Mock provider, `fake-indexeddb`, stubbed Google and Cloudflare endpoints). Domain (queue, catalogue, mannequin, listing copy, publish, usage), providers (Cloudflare, Gemini), auth, storage and migrations, image pipeline, Vinted bridge and pre-fill script, stores and end-to-end workflows, and the components that hold logic. The per-file list lives in [DEVELOPMENT.md](DEVELOPMENT.md#tests) and the `testing` skill.
+312 tests across 51 Vitest files + Rust unit tests (`oauth.rs`, `vinted.rs`), all offline (Mock provider, `fake-indexeddb`, stubbed Google and Cloudflare endpoints). Domain (queue, catalogue, mannequin, listing copy, publish, usage), providers (Cloudflare, Gemini), auth, storage and migrations, image pipeline, Vinted bridge and pre-fill script, stores and end-to-end workflows, and the components that hold logic. The per-file list lives in [DEVELOPMENT.md](DEVELOPMENT.md#tests) and the `testing` skill.
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push/PR: web (typecheck, lint, prettier, tests + coverage, build), Rust (fmt, clippy `-D warnings`, tests) and a secrets scan. Tags `vX.Y.Z` trigger [`release.yml`](.github/workflows/release.yml), which builds Windows/macOS/Linux bundles into a draft GitHub release.
 
