@@ -1,4 +1,4 @@
-import { AppError, type GenerationErrorCode } from "@/domain/models";
+import { AppError, type GenerationErrorCode } from "@aiv/domain/models";
 import type { GeminiErrorBody } from "./GeminiMapper";
 
 /** Parses a Retry-After header (seconds or HTTP date) into milliseconds. */

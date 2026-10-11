@@ -1,7 +1,7 @@
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { ALL_ASPECT_RATIOS, type AspectRatio } from "@/domain/models";
+import { ALL_ASPECT_RATIOS, type AspectRatio } from "@aiv/domain/models";
 import { useT } from "@/i18n";
 import { Field, Section } from "./SettingsPrimitives";
 

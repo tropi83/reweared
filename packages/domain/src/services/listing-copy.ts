@@ -1,4 +1,4 @@
-import { AppError, type AuthStatus, type ListingCondition, type ListingCopy, type CategorySelection, type Locale } from "@/domain/models";
+import { AppError, type AuthStatus, type ListingCondition, type ListingCopy, type CategorySelection, type Locale } from "../models";
 import { findSubcategory } from "./catalog";
 
 export interface ListingCopyRequest {

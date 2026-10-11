@@ -1,4 +1,4 @@
-import type { AuthStatus, CredentialKind } from "@/domain/models";
+import type { AuthStatus, CredentialKind } from "@aiv/domain/models";
 
 export interface AuthResult {
   status: AuthStatus;

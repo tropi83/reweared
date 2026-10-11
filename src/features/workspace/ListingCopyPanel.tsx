@@ -10,7 +10,7 @@ import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Misc";
-import { LISTING_COPY_LIMITS, resolveCopyModel } from "@/domain/services/listing-copy";
+import { LISTING_COPY_LIMITS, resolveCopyModel } from "@aiv/domain/services/listing-copy";
 import { useT, type MessageKey } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 

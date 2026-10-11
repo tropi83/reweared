@@ -9,7 +9,7 @@
     "build:prefill": "vite build --config vite.prefill.config.ts",
     "prefill:verify": "node scripts/verify-prefill.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/domain/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -27,6 +27,7 @@
     "ios:dev": "node scripts/mobile-doctor.mjs ios && tauri ios dev"
   },
   "dependencies": {
+    "@aiv/domain": "workspace:*",
     "@tanstack/react-query": "^5.102.8",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.3",

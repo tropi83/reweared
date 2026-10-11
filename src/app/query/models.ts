@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getServices } from "@/app/services";
-import type { ModelInfo } from "@/domain/models";
+import type { ModelInfo } from "@aiv/domain/models";
 import { queryKeys } from "./keys";
 import { getQueryClient } from "./query-client";
 

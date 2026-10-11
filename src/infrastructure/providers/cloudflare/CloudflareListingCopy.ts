@@ -1,4 +1,4 @@
-import { AppError, type AuthStatus } from "@/domain/models";
+import { AppError, type AuthStatus } from "@aiv/domain/models";
 import {
   blobToDataUri,
   buildListingCopyPrompt,
@@ -9,7 +9,7 @@ import {
   type ListingCopyProvider,
   type ListingCopyRequest,
   type ListingCopyResult,
-} from "@/domain/services/listing-copy";
+} from "@aiv/domain/services/listing-copy";
 import { allowHost, httpFetch } from "@/infrastructure/http/http-client";
 import { createLogger } from "@/lib/logger";
 import type { CloudflareAuth } from "./CloudflareAuth";

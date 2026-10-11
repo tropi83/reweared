@@ -1,5 +1,5 @@
-import { AppError, type ImageMimeType } from "@/domain/models";
-import type { ImageGenerationRequest } from "@/domain/services/image-provider";
+import { AppError, type ImageMimeType } from "@aiv/domain/models";
+import type { ImageGenerationRequest } from "@aiv/domain/services/image-provider";
 import { base64ToBlob, blobToBase64 } from "@/infrastructure/providers/gemini/GeminiMapper";
 import { cloudflareFamilyOf, FLUX_OUTPUT, SD_OPTION_SPECS } from "./CloudflareModels";
 

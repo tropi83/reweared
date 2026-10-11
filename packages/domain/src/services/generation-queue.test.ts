@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AppError, type GenerationJob, type JobStatus } from "@/domain/models";
+import { AppError, type GenerationJob, type JobStatus } from "../models";
 import { GenerationQueue, type QueueDependencies } from "./generation-queue";
 import type { ImageGenerationResult, ImageProvider } from "./image-provider";
 

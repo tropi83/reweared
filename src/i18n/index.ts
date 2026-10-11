@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { Locale } from "@/domain/models";
+import type { Locale } from "@aiv/domain/models";
 import { en } from "./en";
 import { fr } from "./fr";
 

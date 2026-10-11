@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AppError } from "@/domain/models";
+import { AppError } from "@aiv/domain/models";
 import { UnsupportedBridge } from "./UnsupportedBridge";
 import { MobileVintedBridge } from "./MobileVintedBridge";
 import { TauriVintedBridge, type TauriIpc } from "./TauriVintedBridge";

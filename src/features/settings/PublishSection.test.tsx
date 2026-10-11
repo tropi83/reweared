@@ -6,7 +6,7 @@ import { __setServices, createServices, getServices } from "@/app/services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { useToastStore } from "@/app/stores/toast-store";
-import { AppError } from "@/domain/models";
+import { AppError } from "@aiv/domain/models";
 import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import { UnsupportedBridge } from "@/infrastructure/publish/UnsupportedBridge";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";

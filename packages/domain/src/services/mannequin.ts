@@ -8,7 +8,7 @@ import {
   type MannequinBuild,
   type MannequinPose,
   type SkinTone,
-} from "@/domain/models";
+} from "../models";
 
 // English: image models are prompted in English (see catalog.ts).
 const BUILD: Record<MannequinBuild, string> = { S: "a slim build", M: "an average build", L: "a fuller, plus-size build" };

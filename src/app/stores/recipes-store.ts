@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import type { Recipe } from "@/domain/models";
-import { BUILT_IN_RECIPES } from "@/domain/services/recipes";
-import { createId, nowIso } from "@/lib/ids";
+import type { Recipe } from "@aiv/domain/models";
+import { BUILT_IN_RECIPES } from "@aiv/domain/services/recipes";
+import { createId, nowIso } from "@aiv/domain/lib/ids";
 import { getServices } from "../services";
 
 interface RecipesState {

@@ -1,4 +1,4 @@
-import { AppError, MAX_IMPORT_BYTES, THUMBNAIL_DIMENSION, isSupportedInputMimeType, type ImageMimeType, type SupportedInputMimeType } from "@/domain/models";
+import { AppError, MAX_IMPORT_BYTES, THUMBNAIL_DIMENSION, isSupportedInputMimeType, type ImageMimeType, type SupportedInputMimeType } from "@aiv/domain/models";
 
 /**
  * Detects the real image type from magic bytes. The browser-provided `File.type` is only a hint

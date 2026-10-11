@@ -1,6 +1,6 @@
 /** Every category and every subcategory of the catalogue has an icon; nothing falls through unnoticed. */
 import { describe, expect, it } from "vitest";
-import { CATEGORIES } from "@/domain/services/catalog";
+import { CATEGORIES } from "@aiv/domain/services/catalog";
 import { CATEGORY_ICONS, categoryIcon, SUBCATEGORY_ICONS, subcategoryIcon } from "./category-icons";
 
 describe("category icons", () => {

@@ -15,7 +15,7 @@ import { __setServices, createServices, getServices } from "@/app/services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { useUiStore } from "@/app/stores/ui-store";
-import type { Generation } from "@/domain/models";
+import type { Generation } from "@aiv/domain/models";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { GenerationFeed } from "./GenerationFeed";
 

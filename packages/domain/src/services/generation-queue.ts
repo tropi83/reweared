@@ -1,6 +1,6 @@
-import { toGenerationError, type GenerationError, type GenerationJob } from "@/domain/models";
-import { computeBackoffMs, sleep, withTimeout } from "@/lib/retry";
-import { nowIso } from "@/lib/ids";
+import { toGenerationError, type GenerationError, type GenerationJob } from "../models";
+import { computeBackoffMs, sleep, withTimeout } from "../lib/retry";
+import { nowIso } from "../lib/ids";
 import type { ImageGenerationRequest, ImageGenerationResult, ImageProvider } from "./image-provider";
 
 export interface QueueDependencies {

@@ -1,4 +1,4 @@
-import type { FillReport, PublishPayload } from "@/domain/services/publish";
+import type { FillReport, PublishPayload } from "@aiv/domain/services/publish";
 
 export type VintedPath = "/items/new" | "/";
 

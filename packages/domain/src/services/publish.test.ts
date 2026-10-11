@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ListingDocument } from "@/domain/models";
+import type { ListingDocument } from "../models";
 import { canPost, isFillReport, isVintedLoginUrl, isVintedSellFormUrl, orderedPhotoIds, PUBLISH_LIMITS, stageForUrl } from "./publish";
 
 function doc(over: Partial<ListingDocument> = {}): ListingDocument {

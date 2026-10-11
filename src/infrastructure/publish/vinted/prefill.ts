@@ -1,4 +1,4 @@
-import type { FieldFillResult, FillReport, PublishPayload } from "@/domain/services/publish";
+import type { FieldFillResult, FillReport, PublishPayload } from "@aiv/domain/services/publish";
 import type { VintedSelectors } from "./selectors";
 
 export interface Prefill {

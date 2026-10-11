@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveCopyModel } from "@/domain/services/listing-copy";
+import { resolveCopyModel } from "@aiv/domain/services/listing-copy";
 import { __setFetchOverride } from "@/infrastructure/http/http-client";
 import { GeminiListingCopyProvider } from "./GeminiListingCopy";
 

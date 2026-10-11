@@ -1,6 +1,6 @@
-import { AppError, type AuthStatus, type ModelInfo, type ProviderInfo, ALL_ASPECT_RATIOS } from "@/domain/models";
-import type { GenerateOptions, ImageGenerationRequest, ImageGenerationResult, ImageProvider } from "@/domain/services/image-provider";
-import { sleep } from "@/lib/retry";
+import { AppError, type AuthStatus, type ModelInfo, type ProviderInfo, ALL_ASPECT_RATIOS } from "@aiv/domain/models";
+import type { GenerateOptions, ImageGenerationRequest, ImageGenerationResult, ImageProvider } from "@aiv/domain/services/image-provider";
+import { sleep } from "@aiv/domain/lib/retry";
 
 export type MockScenario = "success" | "slow" | "flaky" | "rate_limited" | "timeout" | "error" | "no_image";
 

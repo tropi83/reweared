@@ -23,7 +23,7 @@ vi.mock("@/infrastructure/platform/capabilities", async (importOriginal) => {
 });
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
-import { AppError } from "@/domain/models";
+import { AppError } from "@aiv/domain/models";
 import { createSecretStore, LayeredSecretStore, MemorySecretStore, type SecretStore } from "./SecretStore";
 
 const KEY = "AIzaSyTESTKEY0000000000000000000000000";

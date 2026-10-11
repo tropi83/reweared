@@ -1,5 +1,5 @@
-import type { ImageMimeType } from "@/domain/models";
-import type { ImageGenerationRequest } from "@/domain/services/image-provider";
+import type { ImageMimeType } from "@aiv/domain/models";
+import type { ImageGenerationRequest } from "@aiv/domain/services/image-provider";
 
 /**
  * Request/response shapes of the Gemini Interactions API, limited to what this app uses.

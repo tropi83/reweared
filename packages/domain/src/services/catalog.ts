@@ -1,4 +1,4 @@
-import type { Category, CategoryId, CategorySelection, Subcategory, Localized, Mannequin, ProductKind, ShotSpec } from "@/domain/models";
+import type { Category, CategoryId, CategorySelection, Subcategory, Localized, Mannequin, ProductKind, ShotSpec } from "../models";
 import { describeWearer, mannequinApplies, posePhrase } from "./mannequin";
 
 /**

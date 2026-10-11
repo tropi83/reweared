@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { DEFAULT_SETTINGS, type AppSettings } from "@/domain/models";
+import { DEFAULT_SETTINGS, type AppSettings } from "@aiv/domain/models";
 import { setLocale } from "@/i18n";
 import { getServices } from "../services";
 import { applyTheme } from "../theme";

@@ -1,4 +1,4 @@
-import { CURRENT_SCHEMA_VERSION, DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION, type AppSettings, type ListingDocument } from "@/domain/models";
+import { CURRENT_SCHEMA_VERSION, DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION, type AppSettings, type ListingDocument } from "@aiv/domain/models";
 
 type ListingMigration = (doc: Record<string, unknown>) => Record<string, unknown>;
 

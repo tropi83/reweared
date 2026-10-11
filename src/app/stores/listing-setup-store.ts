@@ -1,10 +1,10 @@
 import { create } from "zustand";
-import { AppError, toGenerationError, type GenerationError, type ListingCopy, type CategorySelection, type ListingDocument } from "@/domain/models";
-import { buildShots, catalogRecipeId } from "@/domain/services/catalog";
-import { normalizeMannequin } from "@/domain/services/mannequin";
+import { AppError, toGenerationError, type GenerationError, type ListingCopy, type CategorySelection, type ListingDocument } from "@aiv/domain/models";
+import { buildShots, catalogRecipeId } from "@aiv/domain/services/catalog";
+import { normalizeMannequin } from "@aiv/domain/services/mannequin";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { MOCK_PROVIDER_ID } from "@/infrastructure/providers/mock/MockImageProvider";
-import { nowIso } from "@/lib/ids";
+import { nowIso } from "@aiv/domain/lib/ids";
 import { createLogger } from "@/lib/logger";
 import { listingReadiness } from "../listing-readiness";
 import { authStatusSnapshot } from "../query/auth-status";

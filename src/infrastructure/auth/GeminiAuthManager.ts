@@ -1,4 +1,4 @@
-import { AppError, type AuthStatus, type CredentialKind } from "@/domain/models";
+import { AppError, type AuthStatus, type CredentialKind } from "@aiv/domain/models";
 import { getPlatform, isTauri } from "@/infrastructure/platform/capabilities";
 import { ApiKeyCredentialProvider } from "./ApiKeyCredentialProvider";
 import type { CredentialProvider } from "./CredentialProvider";

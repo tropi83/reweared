@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRequestForModel } from "@/domain/services/image-provider";
+import { buildRequestForModel } from "@aiv/domain/services/image-provider";
 import { GEMINI_IMAGE_MODELS } from "./GeminiModels";
 
 describe("GEMINI_IMAGE_MODELS", () => {

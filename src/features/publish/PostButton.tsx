@@ -5,7 +5,7 @@ import { postEligibility, usePublishStore } from "@/app/stores/publish-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
-import { orderedPhotoIds } from "@/domain/services/publish";
+import { orderedPhotoIds } from "@aiv/domain/services/publish";
 import { useT, type MessageKey } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 import { cn } from "@/lib/cn";

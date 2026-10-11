@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getServices } from "@/app/services";
-import type { UsageSnapshot } from "@/domain/services/usage-tracker";
+import type { UsageSnapshot } from "@aiv/domain/services/usage-tracker";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/cn";
 

@@ -1,4 +1,4 @@
-import type { ThemePreference } from "@/domain/models";
+import type { ThemePreference } from "@aiv/domain/models";
 
 const media = typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
 let preference: ThemePreference = "system";

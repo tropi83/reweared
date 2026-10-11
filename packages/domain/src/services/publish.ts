@@ -1,4 +1,4 @@
-import type { ListingDocument } from "@/domain/models";
+import type { ListingDocument } from "../models";
 
 /** One photo sent to the injected script (base64 bytes, ≤ PUBLISH_LIMITS.photoBytes decoded). */
 export interface PublishPhoto {

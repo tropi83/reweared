@@ -8,9 +8,9 @@ import {
   type ImageMimeType,
   type ListingDocument,
   type ListingSummary,
-} from "@/domain/models";
+} from "@aiv/domain/models";
 import { createThumbnail, decodeImage, validateImageFile } from "@/infrastructure/image/image-processing";
-import { createId, nowIso } from "@/lib/ids";
+import { createId, nowIso } from "@aiv/domain/lib/ids";
 import { createLogger } from "@/lib/logger";
 import { evictImageUrls, primeImageUrl } from "../image-urls";
 import { getServices } from "../services";

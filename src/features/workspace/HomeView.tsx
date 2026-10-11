@@ -5,7 +5,7 @@ import { navigate } from "@/app/router";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
-import { MAX_IMPORT_BYTES, type ListingSummary } from "@/domain/models";
+import { MAX_IMPORT_BYTES, type ListingSummary } from "@aiv/domain/models";
 import { useT } from "@/i18n";
 import { CategoryBadge } from "../catalog/CategoryBadge";
 import { ListingActionsMenu } from "../listings/ListingActionsMenu";

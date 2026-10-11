@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AppError, deriveGenerationStatus, isGenerationError, isRetryableCode, summarize, toGenerationError, type ListingDocument } from "./index";
-import { buildRequestForModel, seedForAttempt } from "@/domain/services/image-provider";
-import { DEFAULT_SETTINGS, type ImageSize, type ModelInfo } from "@/domain/models";
+import { buildRequestForModel, seedForAttempt } from "../services/image-provider";
+import { DEFAULT_SETTINGS, type ImageSize, type ModelInfo } from "./index";
 
 describe("errors", () => {
   it("marks only transient codes as retryable by default", () => {

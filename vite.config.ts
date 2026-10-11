@@ -28,10 +28,20 @@ export default defineConfig(() => ({
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },
   test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs", "tools/**/*.test.mjs"],
-    css: false,
+    projects: [
+      {
+        extends: true as const,
+        test: {
+          name: "app",
+          environment: "jsdom",
+          globals: true,
+          setupFiles: ["./src/test/setup.ts"],
+          include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs", "tools/**/*.test.mjs"],
+          css: false,
+        },
+      },
+      // The shared domain runs in plain Node, without the app's aliases or DOM polyfills: the server imports it too.
+      { test: { name: "domain", root: "./packages/domain", environment: "node", globals: true, include: ["src/**/*.test.ts"] } },
+    ],
   },
 }));

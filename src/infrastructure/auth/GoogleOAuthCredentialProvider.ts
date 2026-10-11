@@ -1,4 +1,4 @@
-import { AppError, type AuthStatus } from "@/domain/models";
+import { AppError, type AuthStatus } from "@aiv/domain/models";
 import { httpFetch } from "@/infrastructure/http/http-client";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { createLogger } from "@/lib/logger";

@@ -20,7 +20,7 @@ import { __setServices, createServices } from "./services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult, useGenerationStore } from "./stores/generation-store";
 import { useListingsStore } from "./stores/listings-store";
 import { useComposerStore } from "./stores/composer-store";
-import { buildShots } from "@/domain/services/catalog";
+import { buildShots } from "@aiv/domain/services/catalog";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 
 const PNG_HEADER = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13];
@@ -108,7 +108,7 @@ describe("core workflow (mock provider)", () => {
     mock.generate = async (req, opts) => {
       calls++;
       if (calls === 2) {
-        const { AppError } = await import("@/domain/models");
+        const { AppError } = await import("@aiv/domain/models");
         throw new AppError("CONTENT_REJECTED", "nope");
       }
       return original(req, opts);
@@ -199,7 +199,7 @@ describe("listing packs", () => {
   it("generates one job per shot with distinct prompts and labels, and stores the copy on the listing", async () => {
     const listings = useListingsStore.getState();
     const doc = listings.current!;
-    const { buildShots } = await import("@/domain/services/catalog");
+    const { buildShots } = await import("@aiv/domain/services/catalog");
     const category = { categoryId: "women" as const, subcategoryId: "shoes" };
     const shots = buildShots(category);
     const gen = await useGenerationStore.getState().start({
