@@ -11,7 +11,7 @@ Local-first AI photo studio for second-hand listings (Vinted-style): import the 
 
 ## Where the product is going (ADR 0001, 2026-10-11)
 
-The product moves to **user accounts + a server** that is the source of truth and runs generations with the **platform's** provider keys: [`docs/adr/0001-backend-accounts-platform-keys.md`](../../../docs/adr/0001-backend-accounts-platform-keys.md), design `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`. Stack: TypeScript/Node in a pnpm workspace sharing `packages/domain`, Fastify api + BullMQ worker (same image), Postgres (drizzle), Redis, MinIO, Better Auth, Resend, SSE, credit ledger with a free plan, one VPS with `docker compose` + Caddy. Image provider stays open (Cloudflare by default; the Gemini adapter exists).
+The product moves to **user accounts + a server** that is the source of truth and runs generations with the **platform's** provider keys: [`docs/adr/0001-backend-accounts-platform-keys.md`](../../../docs/adr/0001-backend-accounts-platform-keys.md), design `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`. Stack: TypeScript/Node in a pnpm workspace sharing `packages/domain`, Fastify api + BullMQ worker (same image), Postgres (drizzle), Redis, SeaweedFS (S3 API), Better Auth, Resend, SSE, credit ledger with a free plan, one VPS with `docker compose` + Caddy. Image provider stays open (Cloudflare by default; the Gemini adapter exists).
 
 | Phase | Content                                                                       | Status (2026-10-11) |
 | ----- | ----------------------------------------------------------------------------- | ------------------- |
@@ -75,4 +75,4 @@ Collaboration, sharing, marketplace, chat UI, ad SDK (only the `Entitlement` mod
 
 ## Toolchain pins
 
-pnpm 10 · Node 22+ · TypeScript 6 · Vite 8 (rolldown; `minify: "esbuild"` is unsupported) · Vitest 4 · React 19 · Tailwind 4 · Tauri 2.11 · Rust 1.88+ · keyring 4. Backend (planned — pin exact versions when phase 1 starts, after checking each project's docs): Node 22 · Fastify · drizzle · BullMQ · Postgres 17 · Redis 7 · MinIO · Better Auth · Resend · sharp · Testcontainers.
+pnpm 10 · Node 22+ · TypeScript 6 · Vite 8 (rolldown; `minify: "esbuild"` is unsupported) · Vitest 4 · React 19 · Tailwind 4 · Tauri 2.11 · Rust 1.88+ · keyring 4. Backend (planned — pin exact versions when phase 1 starts, after checking each project's docs): Node 22 · Fastify · drizzle · BullMQ · Postgres 17 · Redis 7 · SeaweedFS · Better Auth · Resend · sharp · Testcontainers.

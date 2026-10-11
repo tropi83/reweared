@@ -12,12 +12,13 @@ are rewritten (phase 0).
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Whose provider keys    | **Platform keys** (Cloudflare Workers AI, Gemini). Users never see or enter a key.                                                                                                                                                                                                                                                             |
 | Local-first            | **Dropped.** Postgres + object storage are the source of truth; web and Tauri become clients.                                                                                                                                                                                                                                                  |
-| Backend language       | **TypeScript / Node 22**, pnpm workspace sharing `src/domain` with the frontend.                                                                                                                                                                                                                                                               |
-| Accounts               | **Built-in auth** (Better Auth): email + password (argon2id), email verification, Google Sign-In.                                                                                                                                                                                                                                              |
+| Backend language       | **TypeScript / Node 22**, pnpm workspace sharing `packages/domain` (`@aiv/domain`) with the frontend.                                                                                                                                                                                                                                          |
+| Accounts               | **Built-in auth** (Better Auth): email + password (Better Auth's default scrypt hashing), email verification, Google Sign-In.                                                                                                                                                                                                                  |
 | Consumption control    | **Credits + free plan**: ledger, reservation at enqueue, refund on failure. Payment (Stripe) later.                                                                                                                                                                                                                                            |
 | Queue                  | **BullMQ + Redis** for dispatch, **Postgres** for job state and credits.                                                                                                                                                                                                                                                                       |
 | Hosting                | **One VPS, `docker compose`**, Caddy (automatic TLS). Workers scale with `--scale worker=N`.                                                                                                                                                                                                                                                   |
 | Progress to the client | **SSE** (one stream per user, `Last-Event-ID` resume). Commands stay REST.                                                                                                                                                                                                                                                                     |
+| Object storage         | **SeaweedFS** (S3 API, Apache-2.0) by default — replaces MinIO, whose Community Edition stopped shipping images in October 2025 and is unmaintained (amendment 2026-10-11). The server only speaks S3, so a managed S3 can replace it in phase 4.                                                                                              |
 | Transactional email    | **Resend** (verification, password reset), from the api only; Mailpit in `compose.dev.yaml`. Decided 2026-10-11.                                                                                                                                                                                                                               |
 | Image provider         | **Open.** The queue is provider-agnostic (one BullMQ queue per provider, the `ImageProvider` contract). Cloudflare stays the default; the Gemini adapter already exists (`GeminiProvider`, behind `GEMINI_IMAGE_GENERATION_ENABLED`) and can be re-enabled with platform billing; another provider = one more adapter in `packages/providers`. |
 
@@ -34,7 +35,7 @@ are rewritten (phase 0).
             │     api     │──SQL──►│   postgres   │  users, listings, assets, jobs, credit ledger
             │  (Fastify)  │        └──────▲───────┘
             │  SSE, auth  │──S3───►┌──────┴───────┐
-            └──┬───────▲──┘        │    minio     │  originals / generations / thumbnails (private)
+            └──┬───────▲──┘        │  seaweedfs   │  originals / generations / thumbnails (private, S3 API)
      add jobs  │       │ pub/sub   └──────▲───────┘
             ┌──▼───────┴──┐               │
             │    redis    │  BullMQ queues, rate limits, cancel flags, event pub/sub
@@ -45,10 +46,10 @@ are rewritten (phase 0).
             │ (BullMQ)    │──HTTPS──► api.cloudflare.com, generativelanguage.googleapis.com
             └─────────────┘  only container holding provider keys (Docker secrets)
    ── internal net (no published ports) ──────────────────────────
-   one-shot: migrate (drizzle-kit), minio-init (buckets + policies)
+   one-shot: migrate (drizzle migrations), storage-init (bucket)
 ```
 
-- Only `caddy` publishes ports. `postgres`, `redis`, `minio` live on an `internal` network.
+- Only `caddy` publishes ports. `postgres`, `redis`, `seaweedfs` live on an `internal` network.
 - `api` and `worker` are **the same image** with two entrypoints (`node dist/api.js` / `node dist/worker.js`):
   one build, shared code, independent scaling.
 - **Provider keys exist only in the worker** (`/run/secrets/cloudflare_api_token`, `gemini_api_key`). The
@@ -167,18 +168,18 @@ commit are swept by a daily job (same idea as today's "Remove orphaned files").
 
 ## 6. API (REST `/api/v1`, zod contracts in `packages/contracts`)
 
-| Route                                                       | Purpose                                                                        |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `/auth/*`                                                   | Better Auth (sign-up, sign-in, Google, verify email, reset password, sessions) |
-| `GET /me`, `PATCH /me/settings`, `DELETE /me`               | profile, settings (mannequin…), account deletion (GDPR: DB rows + S3 prefix)   |
-| `GET/POST/PATCH/DELETE /listings[/:id]`                     | listings                                                                       |
-| `POST /listings/:id/images` (multipart)                     | upload: 40 MB cap, magic-byte sniffing, sharp re-encode **stripping EXIF/GPS** |
-| `GET /images/:id?variant=thumb\|full`                       | 302 to a presigned S3 URL (5 min)                                              |
-| `POST /listings/:id/generations`, `POST /listings/:id/copy` | enqueue (§4)                                                                   |
-| `POST /jobs/:id/cancel`, `POST /jobs/:id/retry`             | §4                                                                             |
-| `GET /events` (SSE)                                         | job transitions, credit balance; `Last-Event-ID` replays from a Redis stream   |
-| `GET /credits`, `GET /models`                               | balance + ledger page; models/shots the platform offers                        |
-| `GET /listings/:id/export`                                  | ZIP of a listing (data portability)                                            |
+| Route                                                       | Purpose                                                                                  |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `/auth/*`                                                   | Better Auth (sign-up, sign-in, Google, verify email, reset password, sessions)           |
+| `GET /me`, `PATCH /me/settings`, `DELETE /me`               | profile, settings (mannequin…), account deletion (GDPR: DB rows + S3 prefix)             |
+| `GET/POST/PATCH/DELETE /listings[/:id]`                     | listings                                                                                 |
+| `POST /listings/:id/images` (multipart)                     | upload: 40 MB cap, magic-byte sniffing, sharp re-encode **stripping EXIF/GPS**           |
+| `GET /images/:id?variant=thumb\|full`                       | streamed by the api from the private bucket; `ETag`, `Cache-Control: private, immutable` |
+| `POST /listings/:id/generations`, `POST /listings/:id/copy` | enqueue (§4)                                                                             |
+| `POST /jobs/:id/cancel`, `POST /jobs/:id/retry`             | §4                                                                                       |
+| `GET /events` (SSE)                                         | job transitions, credit balance; `Last-Event-ID` replays from a Redis stream             |
+| `GET /credits`, `GET /models`                               | balance + ledger page; models/shots the platform offers                                  |
+| `GET /listings/:id/export`                                  | ZIP of a listing (data portability) — phase 3                                            |
 
 Rate limits (Redis) per IP on auth routes and per user on enqueue/upload.
 
@@ -186,17 +187,17 @@ Rate limits (Redis) per IP on auth routes and per user on enqueue/upload.
 
 - **Provider keys**: Docker secrets mounted in the worker only; never in Postgres, env dumps, logs or images.
   Rotation = replace the file + `docker compose up -d worker`.
-- **Passwords**: argon2id (Better Auth). Email verification required before the first generation (abuse of
+- **Passwords**: Better Auth's default hashing (scrypt, accepted by OWASP; no native module). Email verification required before the first generation (abuse of
   free credits). Optional later: captcha on sign-up.
 - **Sessions**: web = httpOnly, `Secure`, `SameSite=Lax` cookie + Origin check on mutations; Tauri = bearer
   session token in the OS keychain (`secrets.rs` key set becomes `session_token` only).
 - **Authorization**: every repository call scoped by the session user; tests assert cross-user access → 404.
-- **Images**: private bucket, presigned URLs, EXIF/GPS stripped at upload, sent to providers only by a job
+- **Images**: private bucket, bytes streamed through the api (no presigned URL, no public storage host), EXIF/GPS stripped at upload, sent to providers only by a job
   the user started. Providers become **sub-processors** (PRIVACY.md).
 - **Logging**: pino with `redact` paths + the regexes of `src/lib/logger.ts` (moved to `packages/domain`);
   prompts and images never logged.
 - **Headers** (Caddy): HSTS, CSP (`connect-src 'self'`), `frame-ancestors 'none'`, `nosniff`.
-- **Backups**: nightly `pg_dump` + `mc mirror` to an off-site bucket, restore tested.
+- **Backups**: nightly `pg_dump` + an S3 sync of the bucket (`rclone` or `aws s3 sync`) to an off-site bucket, restore tested.
 - **Tauri**: `http` scope, CSP `connect-src` and `ALLOWED_HOSTS` shrink to the API origin; Google/Cloudflare
   hosts, OAuth loopback (`oauth.rs`) and provider settings disappear from the client.
 
@@ -218,7 +219,7 @@ Rate limits (Redis) per IP on auth routes and per user on enqueue/upload.
 ## 9. Tests
 
 - Domain and providers: unchanged Vitest suites, now in `packages/*`.
-- Server: Vitest + **Testcontainers** (postgres, redis, minio) — enqueue/reserve atomicity, insufficient
+- Server: Vitest + **Testcontainers** (postgres, redis, seaweedfs) — enqueue/reserve atomicity, insufficient
   credits, refund idempotency, cancel at each state, per-user cap and fairness (two users, 20 jobs each),
   reconciler after a simulated crash between commit and add, cross-user access, upload sniffing/EXIF strip.
 - Provider = server-side `MockImageProvider` (sharp) with today's scenarios (`rate_limited`, `timeout`,
@@ -231,7 +232,7 @@ Rate limits (Redis) per IP on auth routes and per user on enqueue/upload.
 | Phase | Content                                                                                            | Exit criterion                                |
 | ----- | -------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | 0     | ADR; rewrite CLAUDE.md, SECURITY.md, PRIVACY.md, skills; pnpm workspace; extract `packages/domain` | all existing tests green, no behaviour change |
-| 1     | compose (postgres, redis, minio, caddy), `apps/server` api: auth, listings, uploads, S3            | sign-up → upload → see thumbnail              |
+| 1     | compose (postgres, redis, seaweedfs, caddy), `apps/server` api: auth, listings, uploads, S3        | sign-up → upload → see thumbnail              |
 | 2     | worker, BullMQ queues, dispatcher, reconciler, credits, SSE, server-side providers                 | Testcontainers suite green                    |
 | 3     | web client switch (ApiClient, stores, auth screens, credits UI), Tauri client, local import        | full flow in `pnpm dev` and `pnpm tauri dev`  |
 | 4     | VPS: secrets, backups, monitoring, release workflow building server images                         | restore drill done                            |
@@ -242,3 +243,7 @@ Rate limits (Redis) per IP on auth routes and per user on enqueue/upload.
 - Mobile (Android/iOS): keep the Tauri apps as API clients, or web only at first?
 - Moderation of uploads beyond the providers' own filters.
 - Pricing of credits vs. real neuron/token cost — needs measured data from phase 2.
+
+## 12. Amendments
+
+- **2026-10-11 (phase 1 plan, owner approved SeaweedFS):** (1) SeaweedFS replaces MinIO as the default S3-compatible store — MinIO Community Edition stopped publishing images and binaries in October 2025 and its repository is unmaintained, so its last image gets no security fixes; (2) `GET /images/:id` streams bytes through the api instead of redirecting to presigned URLs (bucket fully private, authorization in one place); (3) passwords use Better Auth's default scrypt instead of argon2id; (4) the export ZIP moves to phase 3; (5) Redis only backs rate limits in phase 1; (6) the root package stays the web app (no `apps/web`); (7) BMP uploads are refused by the server (sharp cannot decode them) and converted by the client; (8) mail: Resend in production, SMTP to Mailpit in dev. Details: `docs/superpowers/plans/2026-10-11-backend-phase-1.md`.

@@ -24,7 +24,7 @@
 
 ## Decisions taken in this plan (beyond the spec)
 
-1. **SeaweedFS replaces MinIO.** MinIO stopped publishing Community Edition images and binaries in October 2025 and its repository was marked unmaintained in 2026; `minio/minio:latest` gets no security fixes. The server only speaks the S3 API (`@aws-sdk/client-s3`, `forcePathStyle: true`), so the store is swappable: **SeaweedFS** (Apache-2.0, single `weed` binary with an S3 gateway) in dev, CI and the default compose; a managed S3 (Hetzner / Scaleway / OVH Object Storage) stays possible in phase 4 by changing the endpoint. Garage (AGPL) and RustFS (young) were the other candidates. Pin the SeaweedFS image tag after checking its releases in task 10. _Owner to confirm._
+1. **SeaweedFS replaces MinIO.** MinIO stopped publishing Community Edition images and binaries in October 2025 and its repository was marked unmaintained in 2026; `minio/minio:latest` gets no security fixes. The server only speaks the S3 API (`@aws-sdk/client-s3`, `forcePathStyle: true`), so the store is swappable: **SeaweedFS** (Apache-2.0, single `weed` binary with an S3 gateway) in dev, CI and the default compose; a managed S3 (Hetzner / Scaleway / OVH Object Storage) stays possible in phase 4 by changing the endpoint. Garage (AGPL) and RustFS (young) were the other candidates. Pin the SeaweedFS image tag after checking its releases in task 8. **Confirmed by the owner on 2026-10-11.**
 2. **Images are streamed by the API, not redirected to presigned URLs.** A presigned URL must be signed for the host the browser uses; with the store on the internal network that means a public storage hostname or a signed path rewrite in Caddy. Streaming `GET /images/:id` through the api keeps the bucket fully private, keeps authorization in one place and is cheap at this scale (thumbnails are ~30 KB). `Cache-Control: private, max-age=31536000, immutable` + `ETag` (assets are immutable). Presigned URLs can come back behind the same route if bandwidth ever matters.
 3. **Password hashing = Better Auth's default (scrypt).** OWASP lists scrypt as acceptable; argon2id would need a native module (`@node-rs/argon2`) and custom `hash`/`verify` hooks for no material gain. The spec's "argon2id" becomes "Better Auth default (scrypt)".
 4. **The root stays the web app** (phase 0 decision 1 confirmed): `apps/server` and `packages/contracts` join the workspace, no `apps/web` move.
@@ -62,9 +62,9 @@
 
 **Files:** `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`, `docs/adr/0001-backend-accounts-platform-keys.md` (decision table: "MinIO" → "S3-compatible store (SeaweedFS by default)"), `.claude/skills/backend/SKILL.md`, `.claude/skills/project-context/SKILL.md`, `.claude/skills/security-review/SKILL.md`, `ARCHITECTURE.md` (target section), `SECURITY.md` / `PRIVACY.md` (planned sections).
 
-- [ ] **Step 1:** Spec §0/§1/§3/§6/§7 and every doc above: MinIO → SeaweedFS (with the reason and the date), `GET /images/:id` streams with `Cache-Control: private, immutable` (no presigned redirect), password hashing = Better Auth default (scrypt), export ZIP in phase 3, Redis in phase 1 = rate limits only. Add a dated "Amendments" list at the end of the spec (2026-10-11: decisions 1–8 of this plan).
-- [ ] **Step 2:** `grep -rni "minio\|argon2\|presigned" --include=*.md . | grep -v node_modules | grep -v docs/superpowers/plans/` → only historical mentions with "replaced by" wording remain.
-- [ ] **Step 3:** prettier, `pnpm check`. **Commit** `docs(adr): store images on SeaweedFS and stream them through the API`.
+- [x] **Step 1:** Spec §0/§1/§3/§6/§7 and every doc above: MinIO → SeaweedFS (with the reason and the date), `GET /images/:id` streams with `Cache-Control: private, immutable` (no presigned redirect), password hashing = Better Auth default (scrypt), export ZIP in phase 3, Redis in phase 1 = rate limits only. Add a dated "Amendments" list at the end of the spec (2026-10-11: decisions 1–8 of this plan).
+- [x] **Step 2:** `grep -rni "minio\|argon2\|presigned" --include=*.md . | grep -v node_modules | grep -v docs/superpowers/plans/` → only historical mentions with "replaced by" wording remain.
+- [x] **Step 3:** prettier, `pnpm check`. **Commit** `docs(adr): store images on SeaweedFS and stream them through the API`.
 
 ### Task 2: Shared helpers in `@aiv/domain`, `packages/contracts`, `apps/server` skeleton
 
@@ -166,4 +166,4 @@
 
 Update this section after each task: task number, commit hash, deviations.
 
-_Nothing done yet._
+- **Task 1 — done** (`git log --grep "stream them through the API"`). Spec §0 (new _Object storage_ row, Better Auth hashing, `packages/domain`), §1 topology, §6 image route and export, §7 passwords, images and backups (`mc mirror` → S3 sync), §9, §10 and a new §12 _Amendments_ listing decisions 1–8; ADR 0001 decision table; skills `backend`, `security-review`, `testing`, `project-context`; ARCHITECTURE target section; SECURITY planned section. Remaining mentions of MinIO / presigned URLs only say they were replaced. Also fixed on the way: the spec still said the workspace shares `src/domain` (now `packages/domain`).

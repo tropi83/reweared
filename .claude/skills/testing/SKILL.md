@@ -32,7 +32,7 @@ Colocated `*.test.ts(x)` next to the code:
 
 ## Server (planned — backend phases 1–2)
 
-Unit tests in Node for `packages/*` and pure server modules; integration tests with **Testcontainers** (postgres, redis, minio) for the invariants listed in the `backend` skill (atomic enqueue, 402, refund once, cancel in each state, fairness, reconciler, cross-user 404, upload sniffing/EXIF strip); server-side `MockImageProvider` with the existing scenarios; a compose smoke test in CI. Docker is required locally for the integration suite; unit suites must still run without it.
+Unit tests in Node for `packages/*` and pure server modules; integration tests with **Testcontainers** (postgres, redis, seaweedfs) for the invariants listed in the `backend` skill (atomic enqueue, 402, refund once, cancel in each state, fairness, reconciler, cross-user 404, upload sniffing/EXIF strip); server-side `MockImageProvider` with the existing scenarios; a compose smoke test in CI. Docker is required locally for the integration suite; unit suites must still run without it.
 
 ## Run
 

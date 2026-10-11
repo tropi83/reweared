@@ -159,11 +159,11 @@ Decided in [ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md) (2026-10-
 clients (web, Tauri desktop/phones) ──HTTPS──► caddy ──► api (Fastify: auth, REST, SSE, uploads)
                                                          │  SQL        │ S3          │ BullMQ add / pub-sub
                                                          ▼             ▼             ▼
-                                                      postgres      minio          redis ◄── worker × N ──► Cloudflare / Gemini
+                                                      postgres    seaweedfs        redis ◄── worker × N ──► Cloudflare / Gemini
                                                                                               (holds the platform's provider keys)
 ```
 
-- **Accounts** (Better Auth, Resend for email) own listings, images and generations; Postgres + MinIO are the source of truth.
+- **Accounts** (Better Auth, Resend for email) own listings, images and generations; Postgres + an S3-compatible store (SeaweedFS) are the source of truth; image bytes are streamed to clients by the api.
 - **Queue**: the api enqueues in one Postgres transaction (jobs + credit reservation); a dispatcher feeds BullMQ with at most N active jobs per user; one queue per provider with a rate limiter; a reconciler closes the gap between commit and dispatch; the worker reuses `GenerationQueue`'s retry semantics (`GenerationError`, `computeBackoffMs`, new seed per attempt) and refunds failures once.
 - **Shared code**: `packages/domain` (`@aiv/domain`, extracted in phase 0 — done) holds the models, catalogue, shot plans, listing-copy contract, errors and retry helpers used by both the client and the server.
 - **Clients** become thin: `ApiStorageProvider`, SSE-driven job updates, listings and credits through TanStack Query. The Vinted pre-fill stays on the device.
