@@ -1,0 +1,30 @@
+{
+  "name": "@aiv/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Image Variations server: REST API (accounts, listings, images) and, from phase 2, the generation worker.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "tsx watch src/api.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aiv/contracts": "workspace:*",
+    "@aiv/domain": "workspace:*",
+    "fastify": "5.12.5",
+    "fastify-type-provider-zod": "7.0.0",
+    "pino": "10.4.0",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^4.0.0"
+  }
+}

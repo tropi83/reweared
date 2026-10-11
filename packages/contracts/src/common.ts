@@ -6,6 +6,19 @@ export const safeId = z.string().regex(SAFE_ID_PATTERN, "invalid id");
 
 export const isoDateTime = z.iso.datetime({ offset: true });
 
+/** Codes the API answers with besides `GenerationErrorCode`. */
+export const HTTP_ERROR_CODES = [
+  "UNAUTHENTICATED",
+  "EMAIL_NOT_VERIFIED",
+  "NOT_FOUND",
+  "VALIDATION_FAILED",
+  "PAYLOAD_TOO_LARGE",
+  "UNSUPPORTED_MEDIA_TYPE",
+  "RATE_LIMITED",
+  "UNKNOWN_ERROR",
+] as const;
+export type HttpErrorCode = (typeof HTTP_ERROR_CODES)[number];
+
 /** Every error body: a stable code for the client and a user-safe message (never a stack trace or a secret). */
 export const errorBody = z.object({
   code: z.string().min(1),

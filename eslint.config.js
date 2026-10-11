@@ -7,11 +7,11 @@ import noFrenchIdentifiers from "./tools/eslint-rules/no-french-identifiers.js";
 const local = { rules: { "no-french-identifiers": noFrenchIdentifiers } };
 
 export default tseslint.config(
-  { ignores: ["dist", "src-tauri", "src-tauri/scripts/**", "node_modules"] },
+  { ignores: ["dist", "**/dist", "src-tauri", "src-tauri/scripts/**", "node_modules"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{ts,tsx}", "packages/*/src/**/*.ts"],
+    files: ["src/**/*.{ts,tsx}", "packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "apps/*/test/**/*.ts"],
     plugins: { "react-hooks": reactHooks, local },
     rules: {
       ...reactHooks.configs.recommended.rules,
@@ -21,8 +21,8 @@ export default tseslint.config(
     },
   },
   {
-    // Shared packages (@aiv/domain, @aiv/contracts) run on the server too (ADR 0001): no app, UI, Tauri or storage code, no browser globals.
-    files: ["packages/*/src/**/*.ts"],
+    // Shared packages (@aiv/domain, @aiv/contracts) and the server run in Node (ADR 0001): no app, UI, Tauri or storage code, no browser globals.
+    files: ["packages/*/src/**/*.ts", "apps/server/src/**/*.ts", "apps/server/test/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -30,7 +30,7 @@ export default tseslint.config(
           patterns: [
             {
               group: ["@/*", "react", "react-*", "@tauri-apps/*", "zustand", "idb", "@tanstack/*", "fflate", "lucide-react"],
-              message: "Shared packages run on the server: no app, UI, Tauri or storage imports.",
+              message: "Shared packages and the server run in Node: no app, UI, Tauri or client storage imports.",
             },
           ],
         },
@@ -39,7 +39,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["tools/**/*.{js,mjs}", "scripts/**/*.{js,mjs}"],
+    files: ["tools/**/*.{js,mjs}", "scripts/**/*.{js,mjs}", "apps/*/*.mjs"],
     // Node scripts: the handful of globals they use, without pulling the `globals` package in.
     languageOptions: { globals: { process: "readonly", console: "readonly", URL: "readonly", Buffer: "readonly", fetch: "readonly" } },
     plugins: { local },
