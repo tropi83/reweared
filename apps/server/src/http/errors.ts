@@ -41,6 +41,15 @@ const FASTIFY_CODES: Record<string, { status: number; code: HttpErrorCode; messa
   FST_ERR_CTP_INVALID_MEDIA_TYPE: { status: 415, code: "UNSUPPORTED_MEDIA_TYPE", message: "Unsupported content type." },
   FST_ERR_CTP_EMPTY_JSON_BODY: { status: 400, code: "VALIDATION_FAILED", message: "The request body is empty." },
   FST_ERR_CTP_INVALID_JSON_BODY: { status: 400, code: "VALIDATION_FAILED", message: "The request body is not valid JSON." },
+  // @fastify/multipart (uploads)
+  FST_REQ_FILE_TOO_LARGE: { status: 413, code: "PAYLOAD_TOO_LARGE", message: "The file is too large." },
+  FST_INVALID_MULTIPART_CONTENT_TYPE: { status: 415, code: "UNSUPPORTED_MEDIA_TYPE", message: "Send the image as multipart/form-data." },
+  FST_FILES_LIMIT: { status: 400, code: "VALIDATION_FAILED", message: "Send one image at a time." },
+  FST_PARTS_LIMIT: { status: 400, code: "VALIDATION_FAILED", message: "Too many form fields." },
+  FST_FIELDS_LIMIT: { status: 400, code: "VALIDATION_FAILED", message: "Too many form fields." },
+  FST_NO_FORM_DATA: { status: 400, code: "VALIDATION_FAILED", message: "No image was sent." },
+  FST_PROTO_VIOLATION: { status: 400, code: "VALIDATION_FAILED", message: "Invalid form field name." },
+  FST_MP_PREMATURE_CLOSE: { status: 400, code: "VALIDATION_FAILED", message: "The upload was interrupted." },
 };
 
 /**
