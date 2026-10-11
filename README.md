@@ -213,7 +213,7 @@ On Linux the OS credential store is the Secret Service (GNOME Keyring or KWallet
 
 MVP delivered (see [CHANGELOG.md](CHANGELOG.md)).
 
-**Next: accounts and a server** ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)) — phase 0 (docs, pnpm workspace, shared `packages/domain`) is in progress; then the Docker stack and API (1), the job queue, credits and live progress (2), the web and desktop/phone clients on the API with an import of local listings (3), production (4).
+**Next: accounts and a server** ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)) — phase 0 (docs, pnpm workspace, shared `packages/domain`) is done; next the Docker stack and API (1), the job queue, credits and live progress (2), the web and desktop/phone clients on the API with an import of local listings (3), production (4).
 
 Also planned: share sheet on phones, before/after slider, optional ad-supported free tier (behind an `AdProvider` abstraction that never sees images or prompts). Mobile secure storage and web OAuth are superseded by the account sign-in of phase 3.
 

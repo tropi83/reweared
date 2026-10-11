@@ -244,12 +244,12 @@
 
 ### Task 7: Final verification
 
-- [ ] `pnpm check` → green, **311 tests**, projects `app` + `domain`.
-- [ ] `pnpm rust:check` → green (nothing changed there; proves the frontend build Tauri embeds is fine).
-- [ ] `pnpm build` then `pnpm dev`: open a listing, run a generation with the **Mock** provider, open Settings → Diagnostics. Same behaviour as `main`.
-- [ ] `pnpm tauri dev` starts and shows the listings.
-- [ ] Fresh clone check: `git clean -xdn` shows nothing unexpected; `pnpm install --frozen-lockfile` works (CI uses it — the workspace must be in the lockfile).
-- [ ] CI unchanged and green on the PR (it calls the root scripts, which now cover the workspace). Open the PR `refactor: phase 0 of the backend — ADR and @aiv/domain package` with "Security impact: none (no runtime change)" and "Docs updated: ADR 0001, CLAUDE.md, skills, ARCHITECTURE, DEVELOPMENT".
+- [x] `pnpm check` → green, **311 tests**, projects `app` + `domain`.
+- [x] `pnpm rust:check` → green (nothing changed there; proves the frontend build Tauri embeds is fine).
+- [x] `pnpm build` then `pnpm dev`: open a listing, run a generation with the **Mock** provider, open Settings → Diagnostics. Same behaviour as `main`.
+- [x] `pnpm tauri dev` starts and shows the listings.
+- [x] Fresh clone check: `git clean -xdn` shows nothing unexpected; `pnpm install --frozen-lockfile` works (CI uses it — the workspace must be in the lockfile).
+- [x] CI unchanged and green on the PR (it calls the root scripts, which now cover the workspace). Open the PR `refactor: phase 0 of the backend — ADR and @aiv/domain package` with "Security impact: none (no runtime change)" and "Docs updated: ADR 0001, CLAUDE.md, skills, ARCHITECTURE, DEVELOPMENT".
 
 ## Progress
 
@@ -260,3 +260,4 @@ Update this section after each task: task number, commit hash, deviations.
 - **Tasks 3 + 4 — done in one commit** (`git log --grep "extract the pure domain"`). Deviations: (a) task 3 alone could not be green — knip reports `@aiv/domain` as an unused dependency until something imports it, and `tsc -p packages/domain` fails on an empty `src` — so the scaffolding was committed with the extraction instead of adding temporary ignores; (b) `packages/domain/package.json` also lists `typescript` and `vitest` as devDependencies (explicit deps for knip); (c) `extends: true as const` in `vite.config.ts` (the inferred `boolean` does not match `string | true`); (d) the `domain` Vitest project sets `root: "./packages/domain"` and does **not** extend the root config, so it has no `@/` alias and no jsdom setup. Vitest 4.1.11 API checked in its type definitions (`projects`, `extends?: string | true`). Result: 53 files, **312 tests** (domain project alone: 10 files, 65 tests), both typechecks green, `pnpm build` green, Vinted pre-fill bundle unchanged.
 - **Task 5 — done** (`git log --grep "keep @aiv/domain free"`). Guard proven: importing `react`, importing `@/lib/logger` and reading `window` each fail the lint. Deviation: knip treats the subpath `exports` of the package as entries and stopped reporting unused domain exports (a probe export was not reported) — `includeEntryExports: true` on the `packages/domain` workspace restores it (probe reported, real tree clean).
 - **Task 6 — done** (`git log --grep "document the @aiv/domain"`). Paths updated in ARCHITECTURE (layers tree, dependency direction, why a package), README (structure, scripts), DEVELOPMENT, CLAUDE.md (layout), skills `project-context`, `code-conventions` (layering, import style), `testing` (two projects); CHANGELOG entry.
+- **Task 7 — done** (2026-10-11). `pnpm check` green (53 files, 312 tests; projects `app` + `domain`), `pnpm rust:check` green (fmt, clippy, 6 Rust tests), `pnpm build` green, `pnpm install --frozen-lockfile` green, `git clean -xdn` shows only `.idea/` and `dist/` (an empty `src/domain/` left by `git mv` was removed). `pnpm dev`: the page and `src/main.tsx` load, `services.ts` imports resolve to `/packages/domain/src/...`, and all 20 domain modules are served (HTTP 200). Not done here: a click-through generation with the Mock provider in a browser and `pnpm tauri dev` (GUI) — `app/workflow.test.tsx` and `listing-flow.test.ts` cover import → generate (Mock) → branch → reload through the stores. The PR is not opened yet (owner's call). **Phase 0 complete.**

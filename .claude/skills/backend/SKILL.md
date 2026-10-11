@@ -5,7 +5,7 @@ description: Use for anything server-side of the backend pivot (ADR 0001) — ap
 
 # Backend (target architecture — ADR 0001)
 
-**Status (2026-10-11): design accepted, phase 0 in progress, no server code exists yet.** The binding design is
+**Status (2026-10-11): design accepted, phase 0 done (`packages/domain` extracted), no server code exists yet.** The binding design is
 `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`; each phase has its plan in
 `docs/superpowers/plans/`. If this skill and the design disagree, the design wins — then fix this skill.
 
