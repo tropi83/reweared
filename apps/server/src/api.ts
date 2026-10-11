@@ -7,7 +7,9 @@ import { MemoryMailer, ResendMailer, SmtpMailer, type Mailer } from "./auth/mail
 import { ConfigError, loadConfig, type ServerConfig } from "./config";
 import { connectDatabase } from "./db/client";
 import { describeError, loggerOptions } from "./log";
+import { deleteUserObjects } from "./me/account-cleanup";
 import { connectRedis } from "./redis";
+import { S3ObjectStore } from "./storage/s3-object-store";
 
 function createMailer(config: ServerConfig): Mailer {
   if (config.MAIL_MODE === "resend") return new ResendMailer(config.RESEND_API_KEY ?? "", config.MAIL_FROM);
@@ -20,17 +22,25 @@ async function main(): Promise<void> {
   const log = pino(loggerOptions(config.LOG_LEVEL));
   const database = connectDatabase(config.DATABASE_URL);
   const redis = connectRedis(config.REDIS_URL);
+  const store = new S3ObjectStore({
+    endpoint: config.S3_ENDPOINT,
+    region: config.S3_REGION,
+    bucket: config.S3_BUCKET,
+    accessKeyId: config.S3_ACCESS_KEY_ID,
+    secretAccessKey: config.S3_SECRET_ACCESS_KEY,
+  });
   const google =
     config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET ? { clientId: config.GOOGLE_CLIENT_ID, clientSecret: config.GOOGLE_CLIENT_SECRET } : undefined;
   const auth = createAuth(
     { publicOrigin: config.PUBLIC_ORIGIN, secret: config.BETTER_AUTH_SECRET, google },
-    { db: database.db, redis, mailer: createMailer(config), log },
+    { db: database.db, redis, mailer: createMailer(config), log, afterUserDeleted: deleteUserObjects(store, log) },
   );
   const app = await buildApp({
     logger: log,
     readiness: [
       { name: "database", check: async () => void (await database.db.execute(sql`select 1`)) },
       { name: "redis", check: async () => void (await redis.ping()) },
+      { name: "storage", check: () => store.ping() },
     ],
     accounts: { auth, publicOrigin: config.PUBLIC_ORIGIN, redis },
   });
@@ -39,7 +49,7 @@ async function main(): Promise<void> {
     app.log.info({ signal }, "shutting down");
     app
       .close()
-      .then(() => Promise.allSettled([database.close(), redis.quit()]))
+      .then(() => Promise.allSettled([database.close(), redis.quit(), Promise.resolve(store.close())]))
       .then(
         () => process.exit(0),
         () => process.exit(1),

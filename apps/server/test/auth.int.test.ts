@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { account, listing, session, user } from "../src/db/schema";
+import { objectKey } from "../src/storage/keys";
 import { cookieHeader, cookieJar, lastLink, PASSWORD, signIn, signUp, startHarness, verifiedUser, type Harness } from "./app-harness";
 
 let h: Harness;
@@ -159,6 +160,8 @@ describe("account deletion", () => {
     const jar = await verifiedUser(h, "alice@example.test");
     const [{ id } = { id: "" }] = await h.database.db.select({ id: user.id }).from(user).where(eq(user.email, "alice@example.test"));
     await h.database.db.insert(listing).values({ id: "lst_0123456789abcdef", userId: id, name: "Shirt" });
+    const photo = objectKey(id, "lst_0123456789abcdef", "original", "img_0123456789abcdef", "jpg");
+    await h.store.put(photo, Buffer.from("jpeg"), "image/jpeg");
 
     const ask = await h.app.inject({ method: "POST", url: "/api/auth/delete-user", headers: { origin: h.origin, cookie: cookieHeader(jar) }, payload: {} });
     expect(ask.statusCode).toBe(200);
@@ -169,12 +172,13 @@ describe("account deletion", () => {
     // The link alone (no session) does nothing.
     expect((await h.app.inject({ method: "GET", url: link })).statusCode).not.toBe(200);
     expect(await h.database.db.select().from(user)).toHaveLength(1);
+    expect(await h.store.get(photo)).not.toBeNull();
 
     await h.app.inject({ method: "GET", url: link, headers: { cookie: cookieHeader(jar) } });
     expect(await h.database.db.select().from(user)).toHaveLength(0);
     expect(await h.database.db.select().from(listing)).toHaveLength(0);
     expect(await h.database.db.select().from(session)).toHaveLength(0);
     expect(await h.database.db.select().from(account)).toHaveLength(0);
-    expect(h.deletedUsers).toEqual([id]);
+    expect(await h.store.get(photo)).toBeNull();
   });
 });

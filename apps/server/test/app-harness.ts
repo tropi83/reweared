@@ -5,7 +5,9 @@ import { createAuth, type Auth } from "../src/auth/auth";
 import { requireUser } from "../src/http/auth-guard";
 import { MemoryMailer } from "../src/auth/mailer";
 import type { Database } from "../src/db/client";
+import { deleteUserObjects } from "../src/me/account-cleanup";
 import { connectRedis } from "../src/redis";
+import { S3ObjectStore } from "../src/storage/s3-object-store";
 import { openTestDatabase, truncateAll } from "./db-harness";
 
 export const PASSWORD = "correct horse battery";
@@ -15,8 +17,8 @@ export interface Harness {
   auth: Auth;
   mailer: MemoryMailer;
   database: Database;
+  store: S3ObjectStore;
   origin: string;
-  deletedUsers: string[];
   close(): Promise<void>;
   reset(): Promise<void>;
 }
@@ -26,11 +28,11 @@ export async function startHarness(origin = "http://app.test"): Promise<Harness>
   const database = openTestDatabase();
   const redis = connectRedis(inject("redisUrl"));
   const mailer = new MemoryMailer();
-  const deletedUsers: string[] = [];
+  const store = new S3ObjectStore(inject("s3"));
   const silent = { level: "silent", fatal() {}, error() {}, warn() {}, info() {}, debug() {}, trace() {}, silent() {}, child: () => silent } as never;
   const auth = createAuth(
     { publicOrigin: origin, secret: "test-secret-0123456789-0123456789-abcdef" },
-    { db: database.db, redis, mailer, log: silent, afterUserDeleted: async (id) => void deletedUsers.push(id) },
+    { db: database.db, redis, mailer, log: silent, afterUserDeleted: deleteUserObjects(store, silent) },
   );
   const app = await buildApp({ logger: false, readiness: [], accounts: { auth, publicOrigin: origin, redis } });
   // A state-changing route behind the guard, to exercise its CSRF origin check before real ones exist.
@@ -41,17 +43,17 @@ export async function startHarness(origin = "http://app.test"): Promise<Harness>
     auth,
     mailer,
     database,
+    store,
     origin,
-    deletedUsers,
     async close() {
       await app.close();
       await Promise.allSettled([database.close(), redis.quit()]);
+      store.close();
     },
     async reset() {
       await truncateAll(database);
       await redis.flushdb();
       mailer.sent.length = 0;
-      deletedUsers.length = 0;
     },
   };
 }
