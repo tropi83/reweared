@@ -21,8 +21,8 @@ export default tseslint.config(
     },
   },
   {
-    // @aiv/domain is shared with the server (ADR 0001): no app, UI, Tauri or storage code, no browser globals.
-    files: ["packages/domain/src/**/*.ts"],
+    // Shared packages (@aiv/domain, @aiv/contracts) run on the server too (ADR 0001): no app, UI, Tauri or storage code, no browser globals.
+    files: ["packages/*/src/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -30,7 +30,7 @@ export default tseslint.config(
           patterns: [
             {
               group: ["@/*", "react", "react-*", "@tauri-apps/*", "zustand", "idb", "@tanstack/*", "fflate", "lucide-react"],
-              message: "packages/domain is shared with the server: no app, UI, Tauri or storage imports.",
+              message: "Shared packages run on the server: no app, UI, Tauri or storage imports.",
             },
           ],
         },

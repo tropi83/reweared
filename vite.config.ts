@@ -42,6 +42,7 @@ export default defineConfig(() => ({
       },
       // The shared domain runs in plain Node, without the app's aliases or DOM polyfills: the server imports it too.
       { test: { name: "domain", root: "./packages/domain", environment: "node", globals: true, include: ["src/**/*.test.ts"] } },
+      { test: { name: "contracts", root: "./packages/contracts", environment: "node", globals: true, include: ["src/**/*.test.ts"] } },
     ],
   },
 }));

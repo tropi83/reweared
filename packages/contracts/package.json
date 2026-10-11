@@ -1,0 +1,23 @@
+{
+  "name": "@aiv/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "zod schemas of the AI Image Variations REST API, shared by the server and its clients.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aiv/domain": "workspace:*",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "~6.0.3",
+    "vitest": "^4.0.0"
+  }
+}

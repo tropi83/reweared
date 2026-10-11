@@ -9,7 +9,7 @@
     "build:prefill": "vite build --config vite.prefill.config.ts",
     "prefill:verify": "node scripts/verify-prefill.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json && tsc -p packages/domain/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/domain/tsconfig.json && tsc -p packages/contracts/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

@@ -10,6 +10,11 @@
       "entry": ["src/**/*.test.ts"],
       "project": ["src/**/*.ts"],
       "includeEntryExports": true
+    },
+    "packages/contracts": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "includeEntryExports": true
     }
   },
   "ignoreExportsUsedInFile": true
