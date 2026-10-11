@@ -5,7 +5,15 @@ import { z } from "zod";
  * under /run/secrets) and only fall back to a plain `X` variable for tests and local scripts. Error messages
  * name the variable, never its value.
  */
-const SECRET_KEYS = ["DATABASE_URL", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "BETTER_AUTH_SECRET", "RESEND_API_KEY", "GOOGLE_CLIENT_SECRET"] as const;
+const SECRET_KEYS = [
+  "DATABASE_URL",
+  "REDIS_URL",
+  "S3_ACCESS_KEY_ID",
+  "S3_SECRET_ACCESS_KEY",
+  "BETTER_AUTH_SECRET",
+  "RESEND_API_KEY",
+  "GOOGLE_CLIENT_SECRET",
+] as const;
 
 const configSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("production"),

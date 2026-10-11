@@ -1,0 +1,148 @@
+# AI Image Variations — server stack (ADR 0001). Production baseline; compose.dev.yaml adds dev ports and Mailpit.
+#   node scripts/dev-secrets.mjs                                  # once: random secrets in ./secrets (git-ignored)
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+# Only Caddy publishes ports. Postgres, Redis and SeaweedFS live on the internal network (no route out).
+# Image versions checked on Docker Hub / GitHub releases on 2026-10-12.
+
+x-hardening: &hardening
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+
+x-server-env: &server-env
+  NODE_ENV: production
+  # Better Auth sends telemetry when this is truthy; the api refuses to start if it is.
+  BETTER_AUTH_TELEMETRY: "0"
+  DATABASE_URL_FILE: /run/secrets/database_url
+
+services:
+  postgres:
+    <<: *hardening
+    image: postgres:17.11-alpine3.24
+    environment:
+      POSTGRES_USER: aiv
+      POSTGRES_DB: aiv
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiv -d aiv"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    <<: *hardening
+    image: redis:7.4.11-alpine3.21
+    # AOF persistence; noeviction because BullMQ (phase 2) must never lose keys. The password comes from a secret.
+    command: ["sh", "-c", 'exec redis-server --appendonly yes --maxmemory-policy noeviction --requirepass "$$(cat /run/secrets/redis_password)"']
+    secrets: [redis_password]
+    volumes: [redis-data:/data]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli --no-auth-warning -a "$$(cat /run/secrets/redis_password)" ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  seaweedfs:
+    <<: *hardening
+    # S3-compatible store (MinIO's Community Edition is unmaintained since 2025). Release 4.48, 2026-09-28.
+    image: chrislusf/seaweedfs:4.48
+    # Listen on every network of the container (it binds to the first detected address otherwise).
+    command: ["server", "-ip=seaweedfs", "-ip.bind=0.0.0.0", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/run/secrets/seaweedfs_s3"]
+    secrets: [seaweedfs_s3]
+    volumes: [seaweedfs-data:/data]
+    networks: [internal]
+    healthcheck:
+      # Anonymous requests are refused with 403 once the S3 gateway is up with authentication on.
+      test: ["CMD-SHELL", "wget -q -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -q ' 403'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build: { context: ., dockerfile: deploy/Dockerfile, target: server }
+    image: aiv-server:local
+    command: ["node", "dist/migrate.js"]
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    cap_drop: [ALL]
+    environment: *server-env
+    secrets: [database_url]
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    <<: *hardening
+    image: aiv-server:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    stop_grace_period: 30s
+    environment:
+      <<: *server-env
+      PORT: "3000"
+      # Required (the api refuses to start without them, naming them): set in .env next to this file.
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+      REDIS_URL_FILE: /run/secrets/redis_url
+      S3_ENDPOINT: http://seaweedfs:8333
+      S3_REGION: us-east-1
+      S3_BUCKET: aiv-images
+      S3_ACCESS_KEY_ID_FILE: /run/secrets/s3_access_key_id
+      S3_SECRET_ACCESS_KEY_FILE: /run/secrets/s3_secret_access_key
+      BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
+      MAIL_MODE: ${MAIL_MODE:-resend}
+      MAIL_FROM: ${MAIL_FROM:-}
+      RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+      SMTP_URL: ${SMTP_URL:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    secrets: [database_url, redis_url, s3_access_key_id, s3_secret_access_key, better_auth_secret, resend_api_key]
+    # internal: databases and store; edge: Caddy, and the way out to Resend.
+    networks: [internal, edge]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      seaweedfs: { condition: service_healthy }
+
+  caddy:
+    <<: *hardening
+    build: { context: ., dockerfile: deploy/Dockerfile, target: web }
+    image: aiv-web:local
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    environment:
+      # The public host (automatic HTTPS), e.g. app.example.com; plain HTTP on :80 when unset.
+      CADDY_SITE: ${CADDY_SITE:-:80}
+    ports: ["80:80", "443:443"]
+    volumes: [caddy-data:/data, caddy-config:/config]
+    networks: [edge]
+    depends_on:
+      api: { condition: service_healthy }
+
+networks:
+  edge: {}
+  internal:
+    internal: true
+
+volumes:
+  postgres-data: {}
+  redis-data: {}
+  seaweedfs-data: {}
+  caddy-data: {}
+  caddy-config: {}
+
+secrets:
+  postgres_password: { file: ./secrets/postgres_password }
+  database_url: { file: ./secrets/database_url }
+  redis_password: { file: ./secrets/redis_password }
+  redis_url: { file: ./secrets/redis_url }
+  s3_access_key_id: { file: ./secrets/s3_access_key_id }
+  s3_secret_access_key: { file: ./secrets/s3_secret_access_key }
+  seaweedfs_s3: { file: ./secrets/seaweedfs_s3 }
+  better_auth_secret: { file: ./secrets/better_auth_secret }
+  resend_api_key: { file: ./secrets/resend_api_key }

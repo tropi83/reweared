@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
-import { pino } from "pino";
+import { pino, type Logger } from "pino";
 import { buildApp } from "./app";
 import { createAuth } from "./auth/auth";
 import { MemoryMailer, ResendMailer, SmtpMailer, type Mailer } from "./auth/mailer";
@@ -17,6 +17,20 @@ function createMailer(config: ServerConfig): Mailer {
   return new MemoryMailer();
 }
 
+/** First start of a self-hosted store: create the bucket (idempotent). The store may still be starting, so retry. */
+async function ensureBucketWithRetry(store: S3ObjectStore, log: Logger): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await store.ensureBucket();
+      return;
+    } catch (error) {
+      if (attempt >= 30) throw error;
+      log.warn({ err: error, attempt }, "object store not ready, retrying");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const config = loadConfig(process.env, (path) => readFileSync(path, "utf8"));
   const log = pino(loggerOptions(config.LOG_LEVEL));
@@ -29,6 +43,7 @@ async function main(): Promise<void> {
     accessKeyId: config.S3_ACCESS_KEY_ID,
     secretAccessKey: config.S3_SECRET_ACCESS_KEY,
   });
+  await ensureBucketWithRetry(store, log);
   const google =
     config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET ? { clientId: config.GOOGLE_CLIENT_ID, clientSecret: config.GOOGLE_CLIENT_SECRET } : undefined;
   const auth = createAuth(

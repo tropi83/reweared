@@ -1,0 +1,43 @@
+# Development and CI overrides: the site on http://localhost:8080, emails caught by Mailpit
+# (http://localhost:8025), Postgres/Redis/SeaweedFS reachable from the host for debugging.
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+
+services:
+  postgres:
+    ports: ["127.0.0.1:5432:5432"]
+    networks: [internal, devhost]
+
+  redis:
+    ports: ["127.0.0.1:6379:6379"]
+    networks: [internal, devhost]
+
+  seaweedfs:
+    ports: ["127.0.0.1:8333:8333"]
+    networks: [internal, devhost]
+
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    ports: ["127.0.0.1:8025:8025"]
+    networks: [internal, devhost]
+
+  api:
+    environment:
+      NODE_ENV: development
+      PUBLIC_ORIGIN: http://localhost:8080
+      MAIL_MODE: smtp
+      SMTP_URL: smtp://mailpit:1025
+      MAIL_FROM: AI Image Variations <no-reply@localhost>
+      LOG_LEVEL: debug
+    depends_on:
+      mailpit: { condition: service_started }
+
+  caddy:
+    environment:
+      CADDY_SITE: ":80"
+    ports: !override ["127.0.0.1:8080:80"]
+
+networks:
+  # Published ports need a non-internal network; dev only.
+  devhost: {}
