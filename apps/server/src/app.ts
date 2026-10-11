@@ -7,7 +7,12 @@ import type { Auth } from "./auth/auth";
 import { registerAuthRoutes } from "./auth/routes";
 import { requireUser } from "./http/auth-guard";
 import { registerErrorHandling } from "./http/errors";
+import { registerListingRoutes } from "./listings/routes";
 import { registerMeRoutes } from "./me/routes";
+import { registerRecipeRoutes } from "./recipes/routes";
+import { registerSettingsRoutes } from "./settings/routes";
+import type { Db } from "./db/client";
+import type { ObjectStore } from "./storage/object-store";
 
 /** A dependency the API needs to serve requests (database, Redis, object store). */
 export interface ReadinessCheck {
@@ -20,7 +25,7 @@ export interface AppDeps {
   logger: FastifyBaseLogger | false;
   readiness: ReadinessCheck[];
   /** Accounts and the routes behind them; absent in unit tests of the bare app. */
-  accounts?: { auth: Auth; publicOrigin: string; redis: Redis };
+  accounts?: { auth: Auth; publicOrigin: string; redis: Redis; db: Db; store: ObjectStore };
 }
 
 /** Builds the API without listening, so tests drive it with `app.inject()`. */
@@ -73,9 +78,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   );
 
   if (deps.accounts) {
-    const { auth, publicOrigin } = deps.accounts;
+    const { auth, publicOrigin, db, store } = deps.accounts;
+    const guard = requireUser(auth, [publicOrigin]);
     registerAuthRoutes(app, auth, publicOrigin);
-    registerMeRoutes(app, requireUser(auth, [publicOrigin]));
+    registerMeRoutes(app, guard);
+    registerSettingsRoutes(app, db, guard);
+    registerListingRoutes(app, { db, store, guard, log: app.log });
+    registerRecipeRoutes(app, db, guard);
   }
 
   return app;

@@ -1,4 +1,4 @@
-import type { FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from "fastify";
+import type { FastifyReply, FastifyRequest, onRequestAsyncHookHandler } from "fastify";
 import type { Auth } from "../auth/auth";
 import { authHeaders } from "../auth/routes";
 import { HttpError } from "./errors";
@@ -20,11 +20,12 @@ declare module "fastify" {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
- * Resolves the session (cookie, or `Authorization: Bearer` through Better Auth's bearer plugin) and refuses:
+ * Runs at `onRequest` — before the body is read or validated, so an anonymous client never gets an upload parsed or
+ * a validation error. Resolves the session (cookie, or `Authorization: Bearer` through Better Auth's bearer plugin) and refuses:
  * no session → 401 UNAUTHENTICATED; unverified email → 403 EMAIL_NOT_VERIFIED; a state-changing request
  * authenticated by cookie whose `Origin` is not ours → 403 (CSRF defence on top of `SameSite=Lax`).
  */
-export function requireUser(auth: Auth, trustedOrigins: readonly string[]): preHandlerAsyncHookHandler {
+export function requireUser(auth: Auth, trustedOrigins: readonly string[]): onRequestAsyncHookHandler {
   return async function (req: FastifyRequest, _reply: FastifyReply) {
     const result = await auth.api.getSession({ headers: authHeaders(req) });
     if (!result) throw new HttpError(401, "UNAUTHENTICATED", "Sign in to continue.");

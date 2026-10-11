@@ -42,7 +42,7 @@ async function main(): Promise<void> {
       { name: "redis", check: async () => void (await redis.ping()) },
       { name: "storage", check: () => store.ping() },
     ],
-    accounts: { auth, publicOrigin: config.PUBLIC_ORIGIN, redis },
+    accounts: { auth, publicOrigin: config.PUBLIC_ORIGIN, redis, db: database.db, store },
   });
 
   const shutdown = (signal: string) => {

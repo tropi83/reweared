@@ -24,3 +24,6 @@ export const errorBody = z.object({
   code: z.string().min(1),
   message: z.string(),
 });
+
+/** Path parameter of every `/:id` route: only ids produced by `createId()` reach a query or an object key. */
+export const idParams = z.strictObject({ id: safeId });
