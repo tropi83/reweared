@@ -28,7 +28,7 @@ The product is moving from a local-first, bring-your-own-key app to **user accou
 - Credentials live in `SecretStore` only (OS keychain on desktop). Web storage of a key is opt-in and behind the disclaimer.
 - **Minimum Tauri permissions**: every entry in `src-tauri/capabilities/*.json` needs a justification in `SECURITY.md`. New outbound hosts must be added to `ALLOWED_HOSTS` (http-client.ts), the Tauri `http` scope and the CSP `connect-src` together.
 
-### Server (`apps/server`, `packages/*`) — target architecture, from phase 1
+### Server (`apps/server`, `packages/*`) — phase 1 implemented, later phases per the design
 
 - **Provider keys exist only in the worker** (Docker secrets). The api never calls a provider; nothing secret in Postgres, env dumps, images or logs.
 - **Every data access is scoped by the session user**; cross-user access is tested and answers 404.
@@ -38,13 +38,13 @@ The product is moving from a local-first, bring-your-own-key app to **user accou
 
 ## Layout
 
-`packages/domain` (`@aiv/domain`: pure models, services, ids, retry — shared with the planned server, Node-tested, no DOM) · client: `src/infrastructure` (storage, providers, auth, image, http, publish) → `src/app` (services container, zustand stores, TanStack Query, router) → `src/features` (React UI) · `src-tauri/src` (keychain, OAuth loopback, Vinted window) · `src-tauri/plugins/vinted-webview` (phones) · `cloudflare-worker/` (template users deploy) · server (phase 1+): `apps/server` (api + worker entrypoints), `compose.yaml` · decisions: `docs/adr/`, designs and plans: `docs/superpowers/`.
+`packages/domain` (`@aiv/domain`: pure models, services, ids, retry — shared with the planned server, Node-tested, no DOM) · client: `src/infrastructure` (storage, providers, auth, image, http, publish) → `src/app` (services container, zustand stores, TanStack Query, router) → `src/features` (React UI) · `src-tauri/src` (keychain, OAuth loopback, Vinted window) · `src-tauri/plugins/vinted-webview` (phones) · `cloudflare-worker/` (template users deploy) · server: `apps/server` (Fastify api + migrate entrypoints; worker from phase 2), `packages/contracts` (API schemas), `deploy/` + `compose.yaml` / `compose.dev.yaml` · decisions: `docs/adr/`, designs and plans: `docs/superpowers/`.
 
 ## Workflow
 
 1. Read the relevant skill in `.claude/skills/` (`project-context`, `code-conventions`, `security-review`, `testing`, `git-workflow`, `release`, `tanstack-query` for fetched data, `backend` for anything under the server / Docker / queue / credits).
 2. Implement with tests (Vitest, colocated `*.test.ts(x)`; Rust `#[cfg(test)]`; server integration tests with Testcontainers). Use `MockImageProvider` and `fake-indexeddb`.
-3. Before claiming done: `pnpm check` (typecheck + lint + prettier + knip + tests + prefill freshness) and `pnpm rust:check` when Rust changed. Run the app (`pnpm dev` / `pnpm tauri dev`) for UI changes.
+3. Before claiming done: `pnpm check` (typecheck + lint + prettier + knip + tests + prefill freshness) and `pnpm rust:check` when Rust changed; for server changes also `pnpm test:integration` (Docker) and, for the stack, `pnpm stack:up && pnpm smoke:server`. Run the app (`pnpm dev` / `pnpm tauri dev`) for UI changes.
 4. Update the docs in the same change when behaviour, architecture, permissions, env vars or user-facing flows change (README, ARCHITECTURE, SECURITY, PRIVACY, DEVELOPMENT, BUILDING, skills, CHANGELOG `[Unreleased]`).
 5. Commit with Conventional Commits; never commit `.env`, `secrets/`, keys, tokens, screenshots containing credentials.
 

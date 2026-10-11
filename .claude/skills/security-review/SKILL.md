@@ -53,4 +53,4 @@ grep -rn "AIza[0-9A-Za-z_-]\{20,\}\|ya29\.\|1//0" src src-tauri --include=*.ts -
 
 Manual: Settings → Diagnostics → Copy → confirm no key/token in the output.
 
-Server (from phase 1): the Testcontainers suite (cross-user 404, ledger idempotency, upload sniffing/EXIF strip) and `docker compose config` reviewed for published ports, secrets and users.
+Server: `pnpm test:integration` (cross-user 404 on every route, origin check, rate limits, deletion by emailed link, EXIF stripping), `pnpm smoke:server` against `pnpm stack:up`, then `docker compose logs api` searched for emails, tokens and cookies (there must be none), and `docker compose -f compose.yaml config` reviewed: only Caddy publishes ports, no secret value inlined, `BETTER_AUTH_TELEMETRY: "0"`.

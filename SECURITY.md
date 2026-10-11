@@ -94,6 +94,16 @@ Phones cannot drive a second window from the app's JavaScript (the app's WebView
 
 Not implemented yet — design §7 in [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). This section becomes the main threat model when phase 3 ships.
 
+**Implemented in phase 1** (in the repository and tested; not yet used by the shipped clients):
+
+- Accounts: Better Auth 1.7, password hashing by its default scrypt, sign-in refused until the email is verified, rate limits stored in Redis (sign-in 5/min, sign-up 5/h, reset and verification 3/h, per client IP resolved by Fastify behind Caddy; a client-supplied IP header is always overwritten). Telemetry is off in the config and the api refuses to start when `BETTER_AUTH_TELEMETRY` is truthy (it enables telemetry on its own). Stored Google tokens are encrypted; `/get-access-token` and `/refresh-token` are disabled.
+- Sessions: httpOnly, `SameSite=Lax` cookies (`Secure` and `__Secure-` on https) or bearer tokens; the session guard runs before the request body is read; a cookie-authenticated mutation from another `Origin` is refused.
+- Account deletion only from a link emailed to the account and opened in the signed-in session (Better Auth would otherwise accept any session younger than a day); the user's rows cascade and their objects are deleted.
+- Data: every query filters on the session user; another user's listing, image or recipe is a 404 on every route (tested route by route).
+- Uploads: session checked before the body is read, magic-byte sniffing, 40 MB cap (45 MB at Caddy), 50 MP decode limit, sharp re-encode without EXIF/GPS/XMP/IPTC/ICC, object keys built from checked ids only. Images are streamed from a private bucket (no public or presigned storage URL) with `nosniff`.
+- Logs: pino JSON, requests as method + path + IP (query strings dropped — verification links carry tokens), shared redaction of keys, tokens, cookies and passwords, masked email addresses.
+- Containers: only Caddy publishes ports; Postgres, Redis (password) and SeaweedFS on an internal network without a route out; secrets as Docker secret files (`./secrets`, git-ignored); read-only root filesystems, `no-new-privileges`, dropped capabilities for the api; the api runs as a non-root user. Caddy sets HSTS, CSP, `nosniff`, `no-referrer`.
+
 | Asset                                       | Threats considered                                                  | Planned mitigations                                                                                                                                                            |
 | ------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Platform provider keys (Cloudflare, Gemini) | theft from the database, env dumps, images, logs, a compromised api | Docker secrets mounted in the **worker only**; the api never calls a provider; egress allowlist; rotation by replacing the secret file                                         |

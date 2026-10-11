@@ -153,7 +153,7 @@ A tiny hash router (`app/router.ts`): `#/`, `#/listing/:id` (legacy `#/project/:
 
 ## Target architecture (planned)
 
-Decided in [ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md) (2026-10-11); binding design: [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). Nothing below is implemented yet.
+Decided in [ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md) (2026-10-11); binding design: [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). **Phase 1 is implemented** (accounts, listings, uploads, object storage, compose stack — see DEVELOPMENT.md → Server); the queue, the worker, credits and SSE (phase 2) and the client switch (phase 3) are not. The clients still run local-first.
 
 ```
 clients (web, Tauri desktop/phones) ──HTTPS──► caddy ──► api (Fastify: auth, REST, SSE, uploads)
@@ -163,6 +163,7 @@ clients (web, Tauri desktop/phones) ──HTTPS──► caddy ──► api (Fa
                                                                                               (holds the platform's provider keys)
 ```
 
+- **API (phase 1, `apps/server`)**: Fastify 5 with zod contracts (`@aiv/contracts`); `/api/auth/*` is Better Auth (email + password with mandatory verification, sessions as cookies or bearer tokens, optional Google, deletion confirmed by email); `/api/v1/listings`, `/api/v1/images`, `/api/v1/me/settings`, `/api/v1/recipes` are scoped by the session user (another user's ids answer 404). Uploads are re-encoded by sharp (upright, no EXIF/GPS) with a WebP thumbnail; bytes live in the S3 store under `u/<user>/l/<listing>/…` and are streamed by the api. drizzle owns the schema and forward-only migrations.
 - **Accounts** (Better Auth, Resend for email) own listings, images and generations; Postgres + an S3-compatible store (SeaweedFS) are the source of truth; image bytes are streamed to clients by the api.
 - **Queue**: the api enqueues in one Postgres transaction (jobs + credit reservation); a dispatcher feeds BullMQ with at most N active jobs per user; one queue per provider with a rate limiter; a reconciler closes the gap between commit and dispatch; the worker reuses `GenerationQueue`'s retry semantics (`GenerationError`, `computeBackoffMs`, new seed per attempt) and refunds failures once.
 - **Shared code**: `packages/domain` (`@aiv/domain`, extracted in phase 0 — done) holds the models, catalogue, shot plans, listing-copy contract, errors and retry helpers used by both the client and the server.

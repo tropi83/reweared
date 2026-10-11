@@ -5,7 +5,7 @@ description: Use for anything server-side of the backend pivot (ADR 0001) — ap
 
 # Backend (target architecture — ADR 0001)
 
-**Status (2026-10-11): design accepted, phase 0 done (`packages/domain` extracted), no server code exists yet.** The binding design is
+**Status (2026-10-12): phases 0 and 1 done** — `apps/server` serves accounts, listings, images, settings and recipes; the compose stack runs (`pnpm stack:up`); the worker, queues, credits and SSE (phase 2) do not exist yet, and no client uses the API (phase 3). How to run, layout and configuration: DEVELOPMENT.md → Server. The binding design is
 `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`; each phase has its plan in
 `docs/superpowers/plans/`. If this skill and the design disagree, the design wins — then fix this skill.
 
@@ -63,6 +63,13 @@ description: Use for anything server-side of the backend pivot (ADR 0001) — ap
   `rate_limited`, `timeout`, `error`, `no_image`). **No test may need a Google, Cloudflare or Resend account.**
 - Smoke: `docker compose -f compose.yaml -f compose.ci.yaml up --wait`, then sign-up → upload → generate (mock) →
   SSE → download.
+
+## Patterns already in the code (follow them)
+
+- Routes: `app.withTypeProvider<ZodTypeProvider>()`, schemas from `@aiv/contracts`, `onRequest: guard` (never `preHandler`: the guard must run before the body is read), `sessionUser(req).id` as the first argument of every query.
+- Errors: throw `HttpError(status, code, message)` or `AppError`; `http/errors.ts` maps everything else (Fastify, multipart, zod) to `{ code, message }`.
+- Better Auth: options checked in the installed types (`@better-auth/core` `types/init-options.d.mts`) and, when behaviour matters, in its code — several defaults were unsafe for us (deletion by fresh session, env-enabled telemetry). Regenerate `src/db/auth-schema.ts` with `auth:schema` when plugins change.
+- Tests: unit tests next to the code (`src/**/*.test.ts`, project `server`); integration tests in `test/*.int.test.ts` through `startHarness()` (real Better Auth, Postgres, Redis, SeaweedFS, in-memory mailbox). Prove a security test can fail by breaking the protection once.
 
 ## Before claiming done
 

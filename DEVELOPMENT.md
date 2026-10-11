@@ -24,9 +24,46 @@ pnpm check            # typecheck + lint + format:check + test
 pnpm rust:check       # cargo fmt --check + clippy + cargo test
 ```
 
-## Backend (planned)
+## Server (backend phase 1)
 
-The project is moving to accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)). Design: [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md); plans per phase in `docs/superpowers/plans/` (phase 0, done: [`2026-10-11-backend-phase-0.md`](docs/superpowers/plans/2026-10-11-backend-phase-0.md); phase 1: [`2026-10-11-backend-phase-1.md`](docs/superpowers/plans/2026-10-11-backend-phase-1.md)). No server code exists yet. The repo is a pnpm workspace: the domain lives in `packages/domain` (`@aiv/domain`, phase 0); from phase 1 `docker compose -f compose.yaml -f compose.dev.yaml up` will start Postgres, Redis, MinIO, Mailpit, the api and the worker, and this section will document it (Docker required, secrets as files under `secrets/`, never committed). Conventions for that code: the `backend` skill.
+The project is moving to accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md), design [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md), plans in `docs/superpowers/plans/`). Phase 1 is in the repository: accounts, listings, uploads and object storage behind a REST API. **The clients do not use it yet** (phase 3); generation and credits come in phase 2. Conventions: the `backend` skill.
+
+Prerequisites: Docker (Desktop on Windows/macOS). Then:
+
+```bash
+pnpm stack:up            # creates ./secrets once (random, git-ignored), builds and starts the stack, waits until healthy
+pnpm smoke:server        # end-to-end check: sign-up → email → upload → thumbnail → account deletion
+pnpm stack:down
+pnpm test:integration    # server tests against Postgres, Redis and SeaweedFS started by Testcontainers
+pnpm --filter @aiv/server build        # esbuild bundle in apps/server/dist (api.js, migrate.js)
+pnpm --filter @aiv/server db:generate  # SQL migration from src/db/schema.ts into apps/server/drizzle (commit it, never edit it)
+pnpm --filter @aiv/server auth:schema  # regenerate Better Auth's tables (src/db/auth-schema.ts) after changing its plugins
+```
+
+| URL (dev stack)                    | What                                                        |
+| ---------------------------------- | ----------------------------------------------------------- |
+| http://localhost:8080              | Caddy: the web bundle and `/api/*`                          |
+| http://localhost:8080/api/v1/ready | readiness of database, Redis and object store               |
+| http://localhost:8025              | Mailpit: verification, reset and deletion emails            |
+| 127.0.0.1:5432 / 6379 / 8333       | Postgres / Redis / SeaweedFS S3, credentials in `./secrets` |
+
+Layout: `apps/server/src` — `api.ts` and `migrate.ts` (entrypoints), `app.ts` (`buildApp`), `config.ts` (environment, `*_FILE` secrets), `auth/` (Better Auth, mailers, emails), `http/` (errors, session guard), `db/` (drizzle schema, client), `storage/` (S3 store, object keys), `listings/`, `images/`, `settings/`, `recipes/`, `me/`. Shared code: `packages/domain` (`@aiv/domain`) and `packages/contracts` (`@aiv/contracts`, zod schemas of the API). Images and stack: `deploy/Dockerfile` (targets `server`, `web`), `deploy/Caddyfile`, `compose.yaml` (+ `compose.dev.yaml`).
+
+Server configuration (environment of the `api` service; secrets as `X_FILE` pointing to Docker secrets):
+
+| Variable                                                                                      | Notes                                                                           |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `PUBLIC_ORIGIN`                                                                               | required; the URL users open (`https://…` in production: secure cookies)        |
+| `MAIL_FROM`, `MAIL_MODE`                                                                      | required sender; `resend` (production), `smtp` (dev, Mailpit), `memory` (tests) |
+| `DATABASE_URL_FILE`, `REDIS_URL_FILE`                                                         | connection strings with passwords, from `./secrets`                             |
+| `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID_FILE`, `S3_SECRET_ACCESS_KEY_FILE` | object store (SeaweedFS by default); the bucket is created at startup           |
+| `BETTER_AUTH_SECRET_FILE`                                                                     | ≥ 32 characters; also encrypts stored Google tokens                             |
+| `RESEND_API_KEY_FILE`                                                                         | production mail                                                                 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET_FILE`                                               | optional Google sign-in (both or neither)                                       |
+| `MAX_UPLOAD_BYTES`, `LOG_LEVEL`, `PORT`                                                       | defaults 40 MiB, `info`, 3000                                                   |
+| `BETTER_AUTH_TELEMETRY`                                                                       | must stay unset or `0`: the api refuses to start otherwise                      |
+
+Production on one VPS (details in phase 4): put `PUBLIC_ORIGIN`, `MAIL_FROM` and `CADDY_SITE` (the public host, for automatic HTTPS) in a `.env` next to `compose.yaml`, write real secrets into `./secrets` (a real Resend key in `resend_api_key`), then `docker compose up -d --build --wait`.
 
 ## Environment
 

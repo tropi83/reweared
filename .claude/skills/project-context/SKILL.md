@@ -13,13 +13,13 @@ Local-first AI photo studio for second-hand listings (Vinted-style): import the 
 
 The product moves to **user accounts + a server** that is the source of truth and runs generations with the **platform's** provider keys: [`docs/adr/0001-backend-accounts-platform-keys.md`](../../../docs/adr/0001-backend-accounts-platform-keys.md), design `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`. Stack: TypeScript/Node in a pnpm workspace sharing `packages/domain`, Fastify api + BullMQ worker (same image), Postgres (drizzle), Redis, SeaweedFS (S3 API), Better Auth, Resend, SSE, credit ledger with a free plan, one VPS with `docker compose` + Caddy. Image provider stays open (Cloudflare by default; the Gemini adapter exists).
 
-| Phase | Content                                                                       | Status (2026-10-11) |
-| ----- | ----------------------------------------------------------------------------- | ------------------- |
-| 0     | ADR, docs, pnpm workspace, `packages/domain` extraction — no behaviour change | done (2026-10-11)   |
-| 1     | compose stack, api: auth, listings, uploads, S3                               | not started         |
-| 2     | worker, queues, dispatcher, reconciler, credits, SSE, server-side providers   | not started         |
-| 3     | web + Tauri clients switch to the API, import of local listings               | not started         |
-| 4     | production VPS, backups, monitoring, server image release                     | not started         |
+| Phase | Content                                                                       | Status (2026-10-11)                        |
+| ----- | ----------------------------------------------------------------------------- | ------------------------------------------ |
+| 0     | ADR, docs, pnpm workspace, `packages/domain` extraction — no behaviour change | done (2026-10-11)                          |
+| 1     | compose stack, api: auth, listings, uploads, S3                               | done (2026-10-12), not used by clients yet |
+| 2     | worker, queues, dispatcher, reconciler, credits, SSE, server-side providers   | not started                                |
+| 3     | web + Tauri clients switch to the API, import of local listings               | not started                                |
+| 4     | production VPS, backups, monitoring, server image release                     | not started                                |
 
 Until phase 3 ships, everything below that says BYOK / local-first still describes the client and still binds changes to `src/`. Server work follows the `backend` skill.
 
@@ -50,7 +50,8 @@ Until phase 3 ships, everything below that says BYOK / local-first still describ
 | Builds per platform, mobile pre-flight                      | `BUILDING.md`, `scripts/mobile-doctor.mjs` (`pnpm android:doctor`, `pnpm ios:doctor`)                                                                                                                           |
 | Fetched provider metadata (TanStack Query)                  | `src/app/query/*` — skill `tanstack-query`                                                                                                                                                                      |
 | Architecture decisions, designs, plans                      | `docs/adr/`, `docs/superpowers/specs/`, `docs/superpowers/plans/` (dated; plans have a _Progress_ section)                                                                                                      |
-| Backend (planned)                                           | design `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`, skill `backend`; `packages/domain` from phase 0, `apps/server` + `compose.yaml` from phase 1                                       |
+| Server (phase 1)                                            | `apps/server` (Fastify api, Better Auth, drizzle, S3 store), `packages/contracts` (API zod schemas), `deploy/` + `compose*.yaml`; how to run: DEVELOPMENT.md → Server                                           |
+| Backend design                                              | design `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`, skill `backend`; `packages/domain` from phase 0, `apps/server` + `compose.yaml` from phase 1                                       |
 
 ## Decisions already taken (do not re-litigate without new facts)
 
@@ -75,4 +76,4 @@ Collaboration, sharing, marketplace, chat UI, ad SDK (only the `Entitlement` mod
 
 ## Toolchain pins
 
-pnpm 10 · Node 22+ · TypeScript 6 · Vite 8 (rolldown; `minify: "esbuild"` is unsupported) · Vitest 4 · React 19 · Tailwind 4 · Tauri 2.11 · Rust 1.88+ · keyring 4. Backend (planned — pin exact versions when phase 1 starts, after checking each project's docs): Node 22 · Fastify · drizzle · BullMQ · Postgres 17 · Redis 7 · SeaweedFS · Better Auth · Resend · sharp · Testcontainers.
+pnpm 10 · Node 22+ · TypeScript 6 · Vite 8 (rolldown; `minify: "esbuild"` is unsupported) · Vitest 4 · React 19 · Tailwind 4 · Tauri 2.11 · Rust 1.88+ · keyring 4. Server (pinned 2026-10-11/12): Node 22 · Fastify 5.12 · zod 4.6 · Better Auth 1.7.7 · drizzle-orm 0.45 / drizzle-kit 0.31 · pg 8.23 · ioredis 6 · @aws-sdk/client-s3 3 · sharp 0.35 · pino 10 · Resend 6 · Testcontainers 12.2; images Postgres 17.11, Redis 7.4.11, SeaweedFS 4.48, Caddy 2.11.7, node 22.23.3-alpine. BullMQ arrives in phase 2.
