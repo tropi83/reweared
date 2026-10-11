@@ -143,9 +143,9 @@
 
 **Files:** `scripts/server-smoke.mjs`, `.github/workflows/ci.yml`, root `package.json` (`smoke:server`).
 
-- [ ] **Step 1: `server-smoke.mjs <baseUrl> <mailpitUrl>`**: sign up a random `smoke+<id>@example.test`, read the verification link from Mailpit's HTTP API, follow it, sign in (cookie jar), `POST /listings`, upload a PNG generated in memory (zlib-built 64×64, no dependency), `GET` its thumbnail (200, `image/webp`), `GET /me`, `DELETE /me`. Exits non-zero with the failing step; prints nothing secret.
-- [ ] **Step 2: CI**: job `server-integration` (ubuntu, Docker available): `pnpm install --frozen-lockfile`, `pnpm test:integration`; job `compose-smoke`: `node scripts/dev-secrets.mjs`, `docker compose -f compose.yaml -f compose.ci.yaml up -d --build --wait`, `pnpm smoke:server http://localhost:8080 http://localhost:8025`, always `docker compose logs --no-color > compose.log` (artifact, redacted by construction) and `down -v`. The `web` job is unchanged. The `secrets-scan` job also greps `re_[A-Za-z0-9_]{20,}` (Resend keys).
-- [ ] **Step 3:** Push the branch only when the owner asks; until then, run both jobs' commands locally. **Commit** `ci: server integration tests and a compose smoke test`.
+- [x] **Step 1: `server-smoke.mjs <baseUrl> <mailpitUrl>`**: sign up a random `smoke+<id>@example.test`, read the verification link from Mailpit's HTTP API, follow it, sign in (cookie jar), `POST /listings`, upload a PNG generated in memory (zlib-built 64×64, no dependency), `GET` its thumbnail (200, `image/webp`), `GET /me`, `DELETE /me`. Exits non-zero with the failing step; prints nothing secret.
+- [x] **Step 2: CI**: job `server-integration` (ubuntu, Docker available): `pnpm install --frozen-lockfile`, `pnpm test:integration`; job `compose-smoke`: `node scripts/dev-secrets.mjs`, `docker compose -f compose.yaml -f compose.ci.yaml up -d --build --wait`, `pnpm smoke:server http://localhost:8080 http://localhost:8025`, always `docker compose logs --no-color > compose.log` (artifact, redacted by construction) and `down -v`. The `web` job is unchanged. The `secrets-scan` job also greps `re_[A-Za-z0-9_]{20,}` (Resend keys).
+- [x] **Step 3:** Push the branch only when the owner asks; until then, run both jobs' commands locally. **Commit** `ci: server integration tests and a compose smoke test`.
 
 ### Task 10: Documentation
 
@@ -220,3 +220,9 @@ Update this section after each task: task number, commit hash, deviations.
   - Caddy's CSP still allows the Google and Cloudflare hosts the current local-first web bundle calls (same list as the Tauri CSP); phase 3 shrinks `connect-src` to `'self'`. Request bodies: 45 MB on the upload route, 2 MB elsewhere.
   - Hardening: read-only root filesystem + `cap_drop: [ALL]` for api, migrate and Caddy (Caddy keeps `NET_BIND_SERVICE`); `no-new-privileges` everywhere; Postgres/Redis/SeaweedFS keep their entrypoint capabilities (they drop privileges themselves). Dev ports bind to 127.0.0.1 through a separate `devhost` network (an `internal` network cannot publish ports).
   - Checked: every service healthy, `/api/v1/ready` → ready, the web bundle served with the security headers, no secret value in `docker compose config`, only 80/443 published by the base file, api runs as uid 1000.
+- **Task 9 — done** (`2224d09`). Deviations and findings:
+  - The smoke script needs no package: Node's `fetch`/`FormData`, a cookie jar from `getSetCookie()`, a 64×64 PNG built with `zlib` (`deflateSync`, `crc32`), emails read through Mailpit's HTTP API (`/api/v1/search`, `/api/v1/message/:id`). It also covers the account deletion by emailed link (not in the plan's list).
+  - The CI smoke job uses `compose.dev.yaml` (there is no `compose.ci.yaml`, see task 8). The runner is not pushed yet — the branch stays local until the owner asks; both jobs' commands were run locally.
+  - The secrets scan also matches Resend keys (`\bre_…`, test files excluded as before) and fails when anything under `secrets/` is tracked.
+  - Checked: all smoke steps pass against the dev stack; the api logs of a full run contain no email address, token or cookie.
+  - ESLint's script globals gained `FormData`, `Blob`, `setTimeout`.
