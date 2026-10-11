@@ -8,8 +8,8 @@ import {
   type ListingCopyRequest,
   type ListingCopyResult,
 } from "@aiv/domain/services/listing-copy";
-import { httpFetch } from "@/infrastructure/http/http-client";
-import { createLogger } from "@/lib/logger";
+import { httpFetch } from "../http";
+import { createLogger } from "../log";
 import { mapGeminiHttpError } from "./GeminiErrors";
 import { blobToBase64, extractText, type GeminiErrorBody, type InteractionResponse } from "./GeminiMapper";
 import type { GeminiAuthSource } from "./GeminiProvider";

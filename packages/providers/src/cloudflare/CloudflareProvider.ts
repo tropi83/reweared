@@ -1,9 +1,9 @@
 import { AppError, type AuthStatus, type ModelInfo, type ProviderInfo } from "@aiv/domain/models";
 import type { GenerateOptions, ImageGenerationRequest, ImageGenerationResult, ImageProvider } from "@aiv/domain/services/image-provider";
-import { allowHost, httpFetch } from "@/infrastructure/http/http-client";
-import { createLogger } from "@/lib/logger";
+import { allowHost, httpFetch } from "../http";
+import { createLogger } from "../log";
 import type { GeminiUsageSink } from "../gemini/GeminiProvider";
-import type { CloudflareAuth } from "./CloudflareAuth";
+import type { CloudflareCredentials } from "./credentials";
 import { cloudflareMessageFor, mapCloudflareEnvelopeError, mapCloudflareHttpError } from "./CloudflareErrors";
 import { decodeImageResponse, toCloudflareRequest, type CloudflareErrorBody } from "./CloudflareMapper";
 import { CLOUDFLARE_IMAGE_MODELS, findCloudflareModel } from "./CloudflareModels";
@@ -30,7 +30,7 @@ export class CloudflareProvider implements ImageProvider {
   private modelCache: { at: number; key: string; models: ModelInfo[] } | null = null;
 
   constructor(
-    private readonly auth: CloudflareAuth,
+    private readonly auth: CloudflareCredentials,
     private readonly usage?: GeminiUsageSink,
   ) {}
 

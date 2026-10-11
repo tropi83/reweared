@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { resolveCopyModel } from "@aiv/domain/services/listing-copy";
-import { __setFetchOverride } from "@/infrastructure/http/http-client";
+import { __setFetchOverride } from "../http";
 import { GeminiListingCopyProvider } from "./GeminiListingCopy";
 
 const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);

@@ -116,7 +116,7 @@ Requires the app to be built with an OAuth Desktop client ID (see [DEVELOPMENT.m
 | Professional | `gemini-3-pro-image`          | 1K · 2K · 4K         | complex edits             |
 | Legacy       | `gemini-2.5-flash-image`      | —                    | no `image_size` parameter |
 
-Aspect ratios: 1:1, 3:2, 2:3, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9 (or _Original_). Capabilities are centralized in [`GeminiModels.ts`](src/infrastructure/providers/gemini/GeminiModels.ts); the UI never offers, and the adapter never sends, an unsupported parameter. Verified against the official docs on 2026-09-11.
+Aspect ratios: 1:1, 3:2, 2:3, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9 (or _Original_). Capabilities are centralized in [`GeminiModels.ts`](packages/providers/src/gemini/GeminiModels.ts); the UI never offers, and the adapter never sends, an unsupported parameter. Verified against the official docs on 2026-09-11.
 
 ## Tech stack
 

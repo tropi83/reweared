@@ -1,27 +1,16 @@
 import { AppError, type AuthStatus } from "@aiv/domain/models";
 import type { LayeredSecretStore } from "@/infrastructure/auth/SecretStore";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
+import { CLOUDFLARE_API_BASE, type CloudflareConfig, type CloudflareCredentials } from "@aiv/providers/cloudflare/credentials";
+
+export type { CloudflareConfig, CloudflareMode } from "@aiv/providers/cloudflare/credentials";
 
 /**
- * Two ways to reach Workers AI, both entirely in the user's own Cloudflare account:
- *
- * - "direct": the Cloudflare REST API with an account ID + API token ("Workers AI" template,
- *   Read + Edit). api.cloudflare.com sends no CORS headers (verified 2026-09-11: OPTIONS → 405),
- *   so this mode only works from the desktop app (requests go through the Tauri http plugin).
- * - "worker": a tiny Worker the user deploys in their account (template in cloudflare-worker/),
- *   which calls the model through the `env.AI` binding and answers with CORS headers. No token
- *   ever leaves Cloudflare; an optional shared secret protects the endpoint. Works everywhere.
+ * The app's source of Cloudflare credentials (OS keychain / browser storage) for the shared adapters.
+ * "direct" (account ID + API token) only works from the desktop app: api.cloudflare.com sends no CORS headers
+ * (verified 2026-09-11: OPTIONS → 405). "worker" is the user's own Worker (cloudflare-worker/), usable everywhere.
  */
-export type CloudflareMode = "direct" | "worker";
-
-export interface CloudflareConfig {
-  mode: CloudflareMode;
-  accountId?: string;
-  workerUrl?: string;
-}
-
 export const CLOUDFLARE_CONFIG_META_KEY = "cloudflare-config";
-export const CLOUDFLARE_API_BASE = "https://api.cloudflare.com/client/v4";
 
 export interface MetaStore {
   read<T>(key: string): Promise<T | null>;
@@ -43,7 +32,7 @@ export function normalizeWorkerUrl(raw: string): string {
   return url.origin + url.pathname.replace(/\/+$/, "");
 }
 
-export class CloudflareAuth {
+export class CloudflareAuth implements CloudflareCredentials {
   private config: CloudflareConfig | null = null;
   private loading: Promise<void> | null = null;
   private rejected = false;

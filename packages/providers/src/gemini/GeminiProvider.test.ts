@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "@aiv/domain/models";
-import { __setFetchOverride } from "@/infrastructure/http/http-client";
+import { __setFetchOverride } from "../http";
 import { GeminiProvider } from "./GeminiProvider";
 import { mapGeminiHttpError, parseQuotaInfo, parseRetryAfter } from "./GeminiErrors";
 import { blobToBase64, extractImage, toInteractionBody } from "./GeminiMapper";
@@ -149,7 +149,7 @@ describe("GeminiProvider", () => {
   });
 
   it("refuses non-allowlisted hosts", async () => {
-    const { httpFetch } = await import("@/infrastructure/http/http-client");
+    const { httpFetch } = await import("../http");
     await expect(httpFetch("https://evil.example.com/x")).rejects.toThrow(/allowlisted/);
   });
 });

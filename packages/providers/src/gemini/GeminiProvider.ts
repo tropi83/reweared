@@ -1,7 +1,7 @@
 import { AppError, type AuthStatus, type ModelInfo, type ProviderInfo } from "@aiv/domain/models";
 import type { GenerateOptions, ImageGenerationRequest, ImageGenerationResult, ImageProvider } from "@aiv/domain/services/image-provider";
-import { httpFetch } from "@/infrastructure/http/http-client";
-import { createLogger } from "@/lib/logger";
+import { httpFetch } from "../http";
+import { createLogger } from "../log";
 import { mapGeminiHttpError, mapInteractionOutcome, parseQuotaInfo } from "./GeminiErrors";
 import { extractImage, extractText, toInteractionBody, type GeminiErrorBody, type InteractionResponse } from "./GeminiMapper";
 import { GEMINI_IMAGE_MODELS } from "./GeminiModels";

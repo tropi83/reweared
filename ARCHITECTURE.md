@@ -83,7 +83,7 @@ interface ImageProvider {
 
 `ModelInfo.capabilities` (aspect ratios, image sizes, editing) is the single source of truth; `buildRequestForModel` strips unsupported parameters so nothing unsupported is ever sent. The UI only offers what the selected model supports.
 
-### Gemini (`infrastructure/providers/gemini`)
+### Gemini (`packages/providers/src/gemini`)
 
 - Endpoint: `POST https://generativelanguage.googleapis.com/v1beta/interactions` with `{ model, input: [text, image], response_format: { type: "image", mime_type, aspect_ratio?, image_size? }, store: false }` (docs verified 2026-09-11).
 - Result: first `type: "image"` content in a `model_output` step. No image → `NO_IMAGE_RETURNED` / `CONTENT_REJECTED`.
@@ -95,7 +95,7 @@ interface ImageProvider {
 
 Google returns the same "You exceeded your current quota" sentence for throttling, daily exhaustion and models outside the plan; `GeminiErrors.parseQuotaInfo` reads the structured `google.rpc.QuotaFailure` / `RetryInfo` details to classify (`RATE_LIMITED` retryable with Google's delay · `QUOTA_EXCEEDED` · `MODEL_NOT_IN_PLAN` when `quotaValue` is 0). `packages/domain/src/services/usage-tracker.ts` counts requests locally per provider/model (rolling minute, Pacific day), learns limits from those details (`quotaValue`) unless the user set manual ones, and persists through `StorageProvider.readMeta/writeMeta` (`metadata/usage.json` on desktop). Only requests from this device are counted; the UI states it.
 
-### Cloudflare Workers AI (`infrastructure/providers/cloudflare`)
+### Cloudflare Workers AI (`packages/providers/src/cloudflare`, credentials in the app: `infrastructure/providers/cloudflare/CloudflareAuth.ts`)
 
 - `CloudflareAuth` resolves the endpoint: direct REST (`/accounts/{id}/ai/run/{model}`, bearer token; desktop only because the API has no CORS) or the user's Worker (`{workerUrl}/run/{model}`, optional bearer secret). Config in `metadata/cloudflare-config.json`, secrets in the SecretStore.
 - `CloudflareMapper` builds the JSON body (`prompt`, `image_b64`, `width/height`, `num_steps`, `strength`, `guidance`, `negative_prompt`, `seed`) with options normalized into the documented ranges; the response is raw PNG bytes, a JSON body on 200 is treated as an envelope error.

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { __setFetchOverride } from "@/infrastructure/http/http-client";
 import { LayeredSecretStore, MemorySecretStore, WebLocalSecretStore } from "@/infrastructure/auth/SecretStore";
 import { CloudflareAuth } from "./CloudflareAuth";
-import { CloudflareListingCopyProvider } from "./CloudflareListingCopy";
+import { CloudflareListingCopyProvider } from "@aiv/providers/cloudflare/CloudflareListingCopy";
 
 const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const image = { blob: new Blob([JPEG], { type: "image/jpeg" }), mimeType: "image/jpeg" as const };

@@ -1,7 +1,7 @@
 import type { ImageAsset, ListingDocument } from "@aiv/domain/models";
 import { orderedPhotoIds, PUBLISH_LIMITS, type PublishPayload, type PublishPhoto } from "@aiv/domain/services/publish";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
-import { blobToBase64 } from "@/infrastructure/providers/gemini/GeminiMapper";
+import { blobToBase64 } from "@aiv/providers/gemini/GeminiMapper";
 
 /** Vinted re-encodes uploads anyway; 2048 px JPEG keeps each photo well under the 4 MiB transfer cap. */
 const PHOTO_MAX_DIMENSION = 2048;

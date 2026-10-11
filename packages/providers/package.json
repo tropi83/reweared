@@ -1,0 +1,22 @@
+{
+  "name": "@aiv/providers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Image and listing-copy provider adapters (Cloudflare Workers AI, Google Gemini) shared by the clients and the server worker. No credential storage, no DOM.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aiv/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "~6.0.3",
+    "vitest": "^4.0.0"
+  }
+}
