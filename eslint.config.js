@@ -41,7 +41,18 @@ export default tseslint.config(
   {
     files: ["tools/**/*.{js,mjs}", "scripts/**/*.{js,mjs}", "apps/*/*.mjs"],
     // Node scripts: the handful of globals they use, without pulling the `globals` package in.
-    languageOptions: { globals: { process: "readonly", console: "readonly", URL: "readonly", Buffer: "readonly", fetch: "readonly" } },
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        URL: "readonly",
+        Buffer: "readonly",
+        fetch: "readonly",
+        FormData: "readonly",
+        Blob: "readonly",
+        setTimeout: "readonly",
+      },
+    },
     plugins: { local },
     rules: { "local/no-french-identifiers": "error" },
   },

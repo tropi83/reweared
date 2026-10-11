@@ -76,19 +76,56 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npx tsc --noEmit
 
+  server-integration:
+    name: Server · integration tests (Testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Postgres, Redis and SeaweedFS in containers; no provider account, no real email.
+      - run: pnpm test:integration
+
+  compose-smoke:
+    name: Server · compose stack smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/dev-secrets.mjs
+      - run: docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait --wait-timeout 300
+      - run: node scripts/server-smoke.mjs http://localhost:8080 http://localhost:8025
+      - name: Compose logs
+        if: always()
+        run: docker compose -f compose.yaml -f compose.dev.yaml logs --no-color > compose.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compose-logs
+          path: compose.log
+          retention-days: 7
+      - if: always()
+        run: docker compose -f compose.yaml -f compose.dev.yaml down -v
+
   secrets-scan:
     name: Secrets · no credentials in the tree
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Grep for real-looking Google credentials
+      - name: Grep for real-looking Google and Resend credentials
         run: |
-          if grep -rnE "AIza[0-9A-Za-z_-]{35}|ya29\.[0-9A-Za-z_-]{20,}|1//0[0-9A-Za-z_-]{20,}" \
+          if grep -rnE "AIza[0-9A-Za-z_-]{35}|ya29\.[0-9A-Za-z_-]{20,}|1//0[0-9A-Za-z_-]{20,}|\bre_[0-9A-Za-z_]{20,}" \
                --include='*.ts' --include='*.tsx' --include='*.rs' --include='*.json' --include='*.md' \
                --exclude-dir=node_modules --exclude-dir=target . | grep -v '\.test\.'; then
             echo "::error::Possible credential committed"
             exit 1
           fi
           echo "clean"
-      - name: Ensure .env is not tracked
-        run: test ! -f .env
+      - name: Ensure .env and Docker secrets are not tracked
+        run: test ! -f .env && test -z "$(git ls-files secrets)"

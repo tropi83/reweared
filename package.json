@@ -27,7 +27,8 @@
     "ios:dev": "node scripts/mobile-doctor.mjs ios && tauri ios dev",
     "test:integration": "vitest run --config apps/server/vitest.integration.config.ts",
     "stack:up": "node scripts/dev-secrets.mjs && docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait",
-    "stack:down": "docker compose -f compose.yaml -f compose.dev.yaml down"
+    "stack:down": "docker compose -f compose.yaml -f compose.dev.yaml down",
+    "smoke:server": "node scripts/server-smoke.mjs"
   },
   "dependencies": {
     "@aiv/domain": "workspace:*",
