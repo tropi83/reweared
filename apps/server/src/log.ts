@@ -18,6 +18,17 @@ export function pathOnly(url: string | undefined): string {
   return cut === -1 ? url : url.slice(0, cut);
 }
 
+/** One redacted line for an error and its causes (drizzle wraps the driver error that names the real problem). */
+export function describeError(error: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; current !== undefined && current !== null && depth < 4; depth++) {
+    parts.push(current instanceof Error ? `${current.name}: ${current.message.split("\n")[0]}` : String(current));
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return redact(parts.join(" <- caused by "));
+}
+
 interface LoggedRequest {
   method?: string;
   url?: string;

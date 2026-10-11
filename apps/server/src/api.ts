@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs";
-import { redact } from "@aiv/domain/lib/redact";
 import { buildApp } from "./app";
 import { ConfigError, loadConfig } from "./config";
-import { loggerOptions } from "./log";
+import { describeError, loggerOptions } from "./log";
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env, (path) => readFileSync(path, "utf8"));
@@ -23,6 +22,6 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   // Config errors name the variables, never their values; anything else goes through the shared redaction.
-  console.error(error instanceof ConfigError ? error.message : redact(error instanceof Error ? `${error.name}: ${error.message}` : String(error)));
+  console.error(error instanceof ConfigError ? error.message : describeError(error));
   process.exit(1);
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Writable } from "node:stream";
 import { pino } from "pino";
-import { loggerOptions, pathOnly } from "./log";
+import { describeError, loggerOptions, pathOnly } from "./log";
 
 function capture() {
   const lines: string[] = [];
@@ -37,5 +37,17 @@ describe("server logging", () => {
     expect(lines.join("")).not.toContain("re_FAKE");
     expect(lines.join("")).not.toContain("abc.def");
     expect(JSON.parse(lines[1]!).err).toEqual({ type: "Error", message: "auth failed with [REDACTED]" });
+  });
+});
+
+describe("describeError", () => {
+  it("follows the cause chain on one redacted line", () => {
+    const driver = new Error('password authentication failed for user "aiv" (password=hunter22)');
+    const wrapped = new Error('Failed query: CREATE SCHEMA IF NOT EXISTS "drizzle"\nparams: ', { cause: driver });
+    // The redacted value runs to the next separator, ")" included: a password may contain ")" and must not leak its tail.
+    expect(describeError(wrapped)).toBe(
+      'Error: Failed query: CREATE SCHEMA IF NOT EXISTS "drizzle" <- caused by Error: password authentication failed for user "aiv" (password=[REDACTED]',
+    );
+    expect(describeError("plain")).toBe("plain");
   });
 });
