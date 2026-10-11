@@ -82,16 +82,16 @@
 
 **Files:** `apps/server/src/db/{schema.ts,auth-schema.ts,client.ts}`, `apps/server/drizzle.config.ts`, `apps/server/drizzle/*.sql` (generated, committed), `apps/server/src/migrate.ts`, `apps/server/test/containers.ts`, `apps/server/test/db.int.test.ts`.
 
-- [ ] **Step 1: Auth tables.** Generate the Better Auth drizzle schema with the CLI documented for **better-auth 1.7** (check the docs: `@better-auth/cli generate` or its successor) into `auth-schema.ts`; commit the output untouched apart from formatting.
-- [ ] **Step 2: Our tables** (`schema.ts`, all with `on delete cascade` from `user`):
+- [x] **Step 1: Auth tables.** Generate the Better Auth drizzle schema with the CLI documented for **better-auth 1.7** (check the docs: `@better-auth/cli generate` or its successor) into `auth-schema.ts`; commit the output untouched apart from formatting.
+- [x] **Step 2: Our tables** (`schema.ts`, all with `on delete cascade` from `user`):
   - `listing` — `id text pk`, `user_id text not null → user.id`, `name text not null`, `original_image_id text`, `cover_image_id text`, `category jsonb`, `brand text`, `use_mannequin boolean not null default false`, `copy jsonb`, `to_post jsonb not null default '[]'`, `created_at`, `updated_at timestamptz not null`; index `(user_id, updated_at desc)`.
   - `image_asset` — `id text pk`, `listing_id → listing.id`, `user_id → user.id` (denormalized for scoping and the S3 prefix), `kind text check in ('original','generation')`, `mime_type`, `width int`, `height int`, `byte_size int`, `file_name text`, `object_key text not null`, `thumb_key text not null`, `sha256 text not null`, `generation_id text`, `job_id text`, `created_at`; index `(listing_id)`.
   - `user_settings` — `user_id pk → user.id`, `settings jsonb not null`, `updated_at`.
   - `recipe` — `id text pk`, `user_id → user.id`, `data jsonb not null`, `updated_at`; index `(user_id)`.
   - `generation`, `generation_job`, `credit_*`: **not in phase 1**.
-- [ ] **Step 3:** `drizzle-kit generate` → `apps/server/drizzle/0000_*.sql`; `migrate.ts` runs `migrate(db, { migrationsFolder })` then exits 0 (non-zero and a redacted error on failure). Migrations are forward-only; never edit a committed migration.
-- [ ] **Step 4: Harness.** `test/containers.ts` starts, once per integration run (Vitest `globalSetup`): `PostgreSqlContainer("postgres:17-alpine")`, `RedisContainer("redis:7-alpine")`, and a `GenericContainer` for SeaweedFS (`weed server -s3` with an S3 config granting one test key, wait on the S3 port), runs the migrations, creates the bucket, and exposes URLs through `provide`/`inject`. Each test file truncates our tables + auth tables in `beforeEach` and uses a fresh bucket prefix.
-- [ ] **Step 5:** `db.int.test.ts`: migrations apply on an empty DB; deleting a user cascades to listings, images, settings, recipes. `pnpm test:integration` green. **Commit** `feat(db): add the listing, image, settings and recipe schema`.
+- [x] **Step 3:** `drizzle-kit generate` → `apps/server/drizzle/0000_*.sql`; `migrate.ts` runs `migrate(db, { migrationsFolder })` then exits 0 (non-zero and a redacted error on failure). Migrations are forward-only; never edit a committed migration.
+- [x] **Step 4: Harness.** `test/containers.ts` starts, once per integration run (Vitest `globalSetup`): `PostgreSqlContainer("postgres:17-alpine")`, `RedisContainer("redis:7-alpine")`, and a `GenericContainer` for SeaweedFS (`weed server -s3` with an S3 config granting one test key, wait on the S3 port), runs the migrations, creates the bucket, and exposes URLs through `provide`/`inject`. Each test file truncates our tables + auth tables in `beforeEach` and uses a fresh bucket prefix.
+- [x] **Step 5:** `db.int.test.ts`: migrations apply on an empty DB; deleting a user cascades to listings, images, settings, recipes. `pnpm test:integration` green. **Commit** `feat(db): add the listing, image, settings and recipe schema`.
 
 ### Task 4: Accounts (Better Auth), mailers, auth guard, rate limits
 
@@ -176,3 +176,12 @@ Update this section after each task: task number, commit hash, deviations.
   - ESLint ignored only the root `dist`; it now ignores `**/dist` (the server bundle was being linted).
   - pnpm saved `vitest` and `@types/node` as exact versions in `apps/server`; they now use the root's ranges (a second Vitest 4.0.0 would have been installed).
   - Postponed: `apps/server/vitest.integration.config.ts` + `pnpm test:integration` to task 3 (first Docker-backed test), `dev:server` to task 8 (needs the compose services), `src/migrate.ts` in `build.mjs` to task 3.
+- **Task 3 — done** (`c5d8a7b`); 336 unit tests, 4 integration tests (Docker 29.8, Testcontainers 12.2). Deviations and findings:
+  - **Better Auth's CLI is now the `auth` package** (`auth@1.7.7`, same repository and version as `better-auth`), not `@better-auth/cli` (stuck at 1.4.21). `pnpm --filter @aiv/server auth:schema` runs `auth generate --adapter drizzle --dialect postgresql` against `scripts/auth-schema.config.ts`; regenerating gave an identical file. The "Drizzle schema mismatch" error it prints is the startup validation of that generation-only config and is expected.
+  - **The drizzle adapter is a separate package**, `@better-auth/drizzle-adapter@1.7.7` (docs checked 2026-10-11).
+  - **Telemetry** (`@better-auth/telemetry` is a dependency of `better-auth`): read in its code — it sends when `BETTER_AUTH_TELEMETRY` is truthy **or** `telemetry.enabled` is true, and also from the CLI's `generate`/`migrate`. Off by default, but the env var alone would turn it on. The generation config sets `telemetry: { enabled: false }` and forces `process.env.BETTER_AUTH_TELEMETRY = "0"`. **Task 4 must** do the same in `auth.ts`, set `BETTER_AUTH_TELEMETRY=0` in compose, and refuse to start when the variable is truthy (config check + test).
+  - **OAuth tokens**: Better Auth's `account` table stores Google `access_token` / `refresh_token` / `id_token`. **Task 4 must** enable its OAuth-token encryption option (check the 1.7 docs for the name) or not keep them, and test that no plaintext token is stored.
+  - Peer conflict upstream: `@better-auth/core@1.7.7` wants `@better-auth/utils` 0.4.2 exactly while `better-call@1.4.0` depends on ^0.5.0; `@aiv/server` declares 0.4.2 so the peer is satisfied (`better-call` keeps its own 0.5.0).
+  - The SeaweedFS container moves to task 5 with the storage that uses it (and the core `testcontainers` package with it — knip refused it unused).
+  - `migrate.ts` reads only `DATABASE_URL(_FILE)`, not the API config. Entry points report errors with `describeError()` (cause chain, redacted): drizzle's "Failed query" hid the driver's "password authentication failed". The redacted value runs to the next separator, `)` included, so a password containing `)` cannot leak its tail.
+  - `apps/server/drizzle/meta` (drizzle-kit journal and snapshots) is in `.prettierignore`: generated, rewritten on every `db:generate`.
