@@ -4,7 +4,7 @@
 //! so the webview cannot use these commands as a general-purpose keychain API.
 //! Values are never logged.
 
-const ALLOWED_KEYS: &[&str] = &["gemini_api_key", "google_oauth", "cloudflare_api_token", "cloudflare_worker_secret"];
+const ALLOWED_KEYS: &[&str] = &["gemini_api_key", "google_oauth", "cloudflare_api_token", "cloudflare_worker_secret", "session_token"];
 
 fn check_key(key: &str) -> Result<(), String> {
     if ALLOWED_KEYS.contains(&key) {
