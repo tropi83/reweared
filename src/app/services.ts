@@ -23,6 +23,7 @@ import { API_ORIGIN } from "./api-mode";
 import type { ListingRepository } from "./ports/listing-repository";
 import { LocalListingRepository } from "./ports/local-listing-repository";
 import { RemoteListingRepository } from "./ports/remote-listing-repository";
+import { RemoteRunEngine } from "./ports/remote-run-engine";
 
 // The shared adapters log through the app's redacting logger (Settings → Diagnostics).
 setProviderLoggerFactory(createLogger);
@@ -35,6 +36,8 @@ export interface AppServices {
   storage: StorageProvider;
   /** Listings and their photos: on this device, or on the API in API mode. */
   listings: ListingRepository;
+  /** Photo packs and listing copy run by the platform (API mode); null when they run on this device. */
+  runs: RemoteRunEngine | null;
   /** Credentials: session memory plus the platform's persistent tier when there is one (`canPersist`). */
   secrets: LayeredSecretStore;
   auth: GeminiAuthManager;
@@ -143,6 +146,7 @@ export function createServices(bindings: {
     publish,
     api,
     listings,
+    runs: api ? new RemoteRunEngine(api.client) : null,
     appVersion: APP_VERSION,
   };
   return services;

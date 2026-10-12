@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { AppError, deriveGenerationStatus, type AspectRatio, type Generation, type GenerationJob, type ImageSize } from "@aiv/domain/models";
+import { AppError, deriveGenerationStatus, toGenerationError, type AspectRatio, type Generation, type GenerationJob, type ImageSize } from "@aiv/domain/models";
 import type { CategorySelection, ShotSpec } from "@aiv/domain/models";
 import {
   buildRequestForModel,
@@ -12,6 +12,8 @@ import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { createId, nowIso } from "@aiv/domain/lib/ids";
 import { softenForSafetyFilter } from "@aiv/domain/services/catalog";
 import { createLogger } from "@/lib/logger";
+import { errorMessage } from "@/i18n/errors";
+import { toast } from "./toast-store";
 import { ensureModels, modelsSnapshot } from "../query/models";
 import { getServices } from "../services";
 import { useListingsStore } from "./listings-store";
@@ -140,11 +142,50 @@ export function applyJobUpdate(job: GenerationJob): void {
   );
 }
 
+const SHOT_ID = /^[a-z0-9-]{1,40}$/;
+
+/** API mode: a server request started from a button; its failure becomes a toast. */
+function remote(action: Promise<unknown>, what: string): void {
+  void action
+    .then(() => useListingsStore.getState().reload())
+    .catch((err: unknown) => {
+      const error = toGenerationError(err);
+      log.warn(what, error.code);
+      toast.error(errorMessage(error));
+    });
+}
+
+/** API mode: the open listing's jobs that are still queued or running, in `generationId` or all. */
+function activeJobIds(generationId?: string): string[] {
+  const doc = useListingsStore.getState().current;
+  if (!doc) return [];
+  return Object.values(doc.jobs)
+    .filter((j) => (j.status === "queued" || j.status === "generating") && (!generationId || j.generationId === generationId))
+    .map((j) => j.id);
+}
+
+/** API mode: the server runs catalogue shots only (a pack, or some of its shots); free prompts stay local for now. */
+async function startRemote(params: StartGenerationParams, listingId: string): Promise<Generation> {
+  const shotIds = (params.shots ?? []).map((s) => s.id).filter((id) => SHOT_ID.test(id));
+  if (shotIds.length === 0) throw new AppError("INVALID_REQUEST", "Only the listing's photo pack can be generated on the platform.", { retryable: false });
+  await useListingsStore.getState().flush();
+  const run = await getServices().runs!.startPhotos(listingId, {
+    sourceImageId: params.sourceImageId,
+    shotIds: shotIds.slice(0, 10),
+    aspectRatio: params.aspectRatio,
+  });
+  await useListingsStore.getState().reload();
+  const generation = useListingsStore.getState().current?.generations[run.generationId];
+  if (!generation) throw new AppError("UNKNOWN_ERROR", "The run started but the listing could not be read again.");
+  return generation;
+}
+
 export const useGenerationStore = create<GenerationState>((_set, get) => ({
   async start(params) {
     const listings = useListingsStore.getState();
     const doc = listings.current;
     if (!doc) throw new AppError("INVALID_REQUEST", "No open listing.");
+    if (getServices().runs) return startRemote(params, doc.listing.id);
     const source = doc.images[params.sourceImageId];
     if (!source) throw new AppError("INVALID_IMAGE", "Source image not found.");
     const prompt = params.prompt.trim();
@@ -210,7 +251,8 @@ export const useGenerationStore = create<GenerationState>((_set, get) => ({
     const doc = useListingsStore.getState().current;
     const job = doc?.jobs[jobId];
     if (!job) return;
-    const { queue } = getServices();
+    const { queue, runs } = getServices();
+    if (runs) return remote(runs.retry(jobId), "retry failed");
     // A fresh seed: a diffusion model returns the same image for the same seed, so retrying with the old one
     // would reproduce the same output — and the same safety-filter rejection.
     const patch = job.seed !== undefined ? { seed: randomSeed() } : {};
@@ -225,6 +267,17 @@ export const useGenerationStore = create<GenerationState>((_set, get) => ({
     const generation = job && doc?.generations[job.generationId];
     if (!doc || !job || !generation || !doc.images[job.sourceImageId]) return undefined;
     if (job.status === "queued" || job.status === "generating") return undefined;
+    const { runs } = getServices();
+    if (runs) {
+      // The server answers with the new job only after the request: the tile appears with the listing's next read.
+      if (job.shotId && SHOT_ID.test(job.shotId)) {
+        remote(
+          runs.startPhotos(doc.listing.id, { sourceImageId: job.sourceImageId, shotIds: [job.shotId], aspectRatio: job.aspectRatio }),
+          "regenerate failed",
+        );
+      }
+      return undefined;
+    }
     const next: GenerationJob = {
       ...job,
       id: createId("job"),
@@ -261,10 +314,14 @@ export const useGenerationStore = create<GenerationState>((_set, get) => ({
   },
 
   cancelGeneration(generationId) {
-    getServices().queue.cancelGeneration(generationId);
+    const { queue, runs } = getServices();
+    if (runs) for (const id of activeJobIds(generationId)) remote(runs.cancel(id), "cancel failed");
+    else queue.cancelGeneration(generationId);
   },
 
   cancelAll() {
-    getServices().queue.cancelAll();
+    const { queue, runs } = getServices();
+    if (runs) for (const id of activeJobIds()) remote(runs.cancel(id), "cancel failed");
+    else queue.cancelAll();
   },
 }));

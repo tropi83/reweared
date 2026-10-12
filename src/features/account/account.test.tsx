@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { __setServices, createServices } from "@/app/services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { takeResetPasswordLink, useAccountStore } from "@/app/stores/account-store";
+import { stopLiveUpdates } from "@/app/live-updates";
 import { createApi } from "@/infrastructure/api/createApi";
 import type { FetchLike } from "@/infrastructure/api/ApiClient";
 import { LayeredSecretStore, MemorySecretStore } from "@/infrastructure/auth/SecretStore";
@@ -26,6 +27,8 @@ function fakeApi(handler: (path: string, body: unknown) => Response) {
   const calls: Call[] = [];
   const fetch: FetchLike = async (url, init) => {
     const path = url.replace("https://api.example.test", "");
+    // The live-updates stream opened at sign-in: an empty stream, not part of what the tests look at.
+    if (path === "/api/v1/events") return new Response("", { status: 200, headers: { "content-type": "text/event-stream" } });
     const body: unknown = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
     calls.push({ path, body, authorization: (init?.headers as Record<string, string> | undefined)?.authorization });
     return handler(path, body);
@@ -51,6 +54,7 @@ function setup(handler: (path: string, body: unknown) => Response, tauri = true)
 }
 
 beforeEach(() => useAccountStore.setState({ status: "unknown", me: null }));
+afterEach(() => stopLiveUpdates());
 
 describe("account store", () => {
   it("signs in, keeps the token in the keychain, uses it and forgets it at sign-out", async () => {

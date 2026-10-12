@@ -4,6 +4,7 @@ import { meDto } from "@aiv/contracts/me";
 import { ApiError } from "@/infrastructure/api/ApiClient";
 import { getQueryClient } from "../query/query-client";
 import { getServices } from "../services";
+import { startLiveUpdates, stopLiveUpdates } from "../live-updates";
 import { useListingsStore } from "./listings-store";
 import { createLogger } from "@/lib/logger";
 
@@ -55,6 +56,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     }
     const wasSignedIn = get().status === "signedIn";
     set({ status: "signedIn", me });
+    startLiveUpdates();
     // The account's listings for the sidebar; a failure leaves it empty and the session stands.
     if (!wasSignedIn)
       await useListingsStore
@@ -113,6 +115,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
 /** Nothing of the previous account stays on screen or in caches after a sign-out. */
 function forgetUserData() {
+  stopLiveUpdates();
   getQueryClient().clear();
   useListingsStore.setState({ summaries: [], current: null });
 }

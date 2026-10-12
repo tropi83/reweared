@@ -14,6 +14,7 @@ import { useComposerStore } from "./composer-store";
 import { useGenerationStore } from "./generation-store";
 import { useListingsStore } from "./listings-store";
 import { useSettingsStore } from "./settings-store";
+import { eventError, isTerminalStatus, type RunEvent } from "../ports/remote-run-engine";
 
 /** The listing name derived from a copy title: trimmed, or undefined when there is nothing to name it with. */
 function nameFromTitle(title: string): string | undefined {
@@ -63,8 +64,73 @@ interface ListingState {
 
 let copyController: AbortController | null = null;
 
+/** API mode: the copy job started by `generateCopy`, settled by its SSE event (`settleRemoteCopy`). */
+let pendingCopy: { jobId: string; resolve: (copy: ListingCopy | null) => void } | null = null;
+
+/**
+ * Live job event (API mode): ends the pending copy run. The server wrote the copy and renamed the listing; the open
+ * listing is read again to show them.
+ */
+export async function settleRemoteCopy(event: Extract<RunEvent, { type: "job" }>): Promise<void> {
+  const pending = pendingCopy;
+  if (!pending || pending.jobId !== event.jobId || !isTerminalStatus(event.status)) return;
+  pendingCopy = null;
+  if (event.status === "completed") {
+    await useListingsStore
+      .getState()
+      .reload()
+      .catch((err: unknown) => log.warn("listing not reloaded", err));
+    useListingSetupStore.setState({ copyBusy: false });
+    pending.resolve(useListingsStore.getState().current?.listing.copy ?? null);
+    return;
+  }
+  const error = event.status === "cancelled" ? { code: "CANCELLED" as const, message: "Cancelled.", retryable: false } : eventError(event.error);
+  useListingSetupStore.setState({ copyBusy: false, copyError: error });
+  pending.resolve(null);
+}
+
+/** API mode: the server writes the copy; this waits for its job to end. */
+async function generateRemoteCopy(listingId: string): Promise<ListingCopy | null> {
+  const runs = getServices().runs!;
+  pendingCopy?.resolve(null);
+  pendingCopy = null;
+  useListingSetupStore.setState({ copyBusy: true, copyError: null });
+  try {
+    // The server reads the brand and category from the listing: unsaved edits go first.
+    await useListingsStore.getState().flush();
+    const run = await runs.startCopy(listingId, useSettingsStore.getState().settings.locale);
+    const jobId = run.jobIds[0];
+    if (!jobId) throw new AppError("UNKNOWN_ERROR", "The server started no copy job.");
+    return await new Promise<ListingCopy | null>((resolve) => {
+      pendingCopy = { jobId, resolve };
+    });
+  } catch (err) {
+    const error = toGenerationError(err);
+    log.warn("copy run failed to start", error.code);
+    useListingSetupStore.setState({ copyBusy: false, copyError: error });
+    return null;
+  }
+}
+
+/** API mode: the photo pack is planned and charged by the server from the listing's category and mannequin choice. */
+async function startRemotePhotos(doc: ListingDocument, sourceImageId: string): Promise<ListingPartOutcome> {
+  try {
+    await useListingsStore.getState().flush();
+    const { aspectRatio } = useComposerStore.getState();
+    await getServices().runs!.startPhotos(doc.listing.id, { sourceImageId, aspectRatio });
+    await useListingsStore.getState().reload();
+    return "done";
+  } catch (err) {
+    const error = toGenerationError(err);
+    log.warn("listing photos failed to start", error.code);
+    return { error };
+  }
+}
+
 /** The composer's image provider can run: authenticated (or Mock) with an available model selected. */
 export function photoPartReady(): boolean {
+  // API mode: the platform's provider, always configured (credits are checked by the server).
+  if (getServices().runs) return true;
   const { providerId, modelId } = useComposerStore.getState();
   const authOk = providerId === MOCK_PROVIDER_ID || authStatusSnapshot(providerId)?.state === "authenticated";
   const model = modelsSnapshot(providerId).find((m) => m.id === modelId);
@@ -73,6 +139,7 @@ export function photoPartReady(): boolean {
 
 /** The copy provider chosen in settings exists and is authenticated. */
 export function textPartReady(): boolean {
+  if (getServices().runs) return true;
   const { copyProviderId } = useSettingsStore.getState().settings;
   return getServices().copyProviders.has(copyProviderId) && authStatusSnapshot(copyProviderId)?.state === "authenticated";
 }
@@ -154,6 +221,7 @@ export const useListingSetupStore = create<ListingState>((set, get) => ({
     const doc = listings.current;
     const originalId = doc?.listing.originalImageId;
     if (!doc || !originalId) return null;
+    if (getServices().runs) return generateRemoteCopy(doc.listing.id);
     const asset = doc.images[originalId];
     const { copyProviderId: providerId, copyModelByProvider } = useSettingsStore.getState().settings;
     const provider = getServices().copyProviders.get(providerId);
@@ -224,9 +292,12 @@ export const useListingSetupStore = create<ListingState>((set, get) => ({
     });
     if (!doc || !selection || !sourceImageId || !readiness.canCreate || get().creating) return null;
     set({ creating: true, lastRun: null, lastRunListingId: doc.listing.id });
+    // API mode runs the category's pack: prompt overrides and custom recipes are local-only for now.
     const photos = readiness.skipped.includes("photos")
       ? Promise.resolve<ListingPartOutcome>("skipped-provider")
-      : startPhotos(doc, selection, sourceImageId, options);
+      : getServices().runs
+        ? startRemotePhotos(doc, sourceImageId)
+        : startPhotos(doc, selection, sourceImageId, options);
     const text = readiness.skipped.includes("text")
       ? Promise.resolve<ListingPartOutcome>("skipped-provider")
       : get()
@@ -260,6 +331,14 @@ export const useListingSetupStore = create<ListingState>((set, get) => ({
   cancelCopy() {
     copyController?.abort();
     copyController = null;
+    const pending = pendingCopy;
+    pendingCopy = null;
+    if (pending) {
+      void getServices()
+        .runs?.cancel(pending.jobId)
+        .catch((err: unknown) => log.warn("copy not cancelled", err));
+      pending.resolve(null);
+    }
     set({ copyBusy: false });
   },
 }));

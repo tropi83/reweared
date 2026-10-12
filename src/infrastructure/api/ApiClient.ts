@@ -42,6 +42,11 @@ export interface RequestOptions<T> {
 export class ApiClient {
   constructor(private readonly options: ApiClientOptions) {}
 
+  /** The transport, for streams (`runEventStream`) that read the body themselves. */
+  get fetch(): FetchLike {
+    return this.options.fetch;
+  }
+
   url(path: string): string {
     if (!path.startsWith("/api/")) throw new Error("API paths start with /api/");
     const origin = this.options.origin === "/" ? "" : this.options.origin.replace(/\/$/, "");

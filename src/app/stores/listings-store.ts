@@ -15,6 +15,8 @@ interface ListingsState {
   loadingListing: boolean;
   loadSummaries(): Promise<void>;
   open(listingId: string): Promise<ListingDocument | null>;
+  /** Reads the open listing again (API mode: after the server changed it), keeping edits not saved yet. */
+  reload(): Promise<void>;
   close(): void;
   createFromFile(file: Blob, fileName?: string): Promise<ListingDocument>;
   rename(listingId: string, name: string): Promise<void>;
@@ -92,6 +94,17 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     } finally {
       set({ loadingListing: false });
     }
+  },
+
+  async reload() {
+    const id = get().current?.listing.id;
+    if (!id) return;
+    await get().flush();
+    const doc = await getServices().listings.get(id);
+    // Another listing may have been opened, or an edit made, while the request was out.
+    if (!doc || get().current?.listing.id !== id || saveTimer) return;
+    const summary = summarize(doc);
+    set({ current: doc, summaries: get().summaries.map((s) => (s.id === id ? summary : s)) });
   },
 
   close() {
