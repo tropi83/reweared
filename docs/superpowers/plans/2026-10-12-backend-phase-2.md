@@ -122,7 +122,7 @@
 
 ### Task 10: Documentation
 
-- [ ] Spec §12 amendments (decisions of this plan, answers to the open questions), SECURITY (provider keys in the worker, Redis job data = ids, SSE limits, budget guard), PRIVACY (Cloudflare/Google become real sub-processors for photos sent by the worker; retention of generations), ARCHITECTURE target section, DEVELOPMENT (worker, providers config, mock), skills `backend` (queue/worker patterns), `testing`, `project-context`, `security-review`, CHANGELOG. **Commit** `docs: document the phase 2 worker and credits`.
+- [x] Spec §12 amendments (decisions of this plan, answers to the open questions), SECURITY (provider keys in the worker, Redis job data = ids, SSE limits, budget guard), PRIVACY (Cloudflare/Google become real sub-processors for photos sent by the worker; retention of generations), ARCHITECTURE target section, DEVELOPMENT (worker, providers config, mock), skills `backend` (queue/worker patterns), `testing`, `project-context`, `security-review`, CHANGELOG. **Commit** `docs: document the phase 2 worker and credits`.
 
 ### Task 11: Final verification
 
@@ -163,3 +163,4 @@ Update this section after each task: task number, commit hash, deviations.
   - Caddy flushes `text/event-stream` responses immediately (no `flush_interval` needed); to be confirmed by the compose smoke test in task 9.
 - **Task 8 — done** (`git log --grep "nightly orphan sweep"`); 73 integration tests. Both jobs are BullMQ job schedulers on the existing `maintenance` queue (cron, UTC). `ObjectStore.list(prefix)` was added for the sweep. The sweep keeps objects younger than 24 h (uploads in progress) and never touches keys outside the layout; `deletePrefix("u/")` is refused by the store's guard (too wide), which the test hit — kept as is.
 - **Task 9 — done** (`git log --grep "worker service with the provider keys"`). Deviations and findings: the image's `HEALTHCHECK` (api port) made the worker "unhealthy" — disabled for that service; platform settings shared by api and worker via an `x-platform-env` anchor; Caddy streams SSE without buffering (confirmed by the smoke test, no `flush_interval` needed); `scripts/check-compose.mjs` runs in CI before the stack starts. Smoke test passes end to end; logs checked for emails, tokens, cookies and prompts (none).
+- **Task 10 — done** (`git log --grep "document the phase 2 worker"`): DEVELOPMENT, ARCHITECTURE, SECURITY, PRIVACY, README, CHANGELOG, spec §12 amendments, skills `backend`, `testing`, `project-context`, `security-review`.
