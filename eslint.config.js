@@ -11,13 +11,31 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}", "packages/*/src/**/*.ts"],
     plugins: { "react-hooks": reactHooks, local },
     rules: {
       ...reactHooks.configs.recommended.rules,
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       // Identifiers are English; French lives in comments and i18n labels.
       "local/no-french-identifiers": "error",
+    },
+  },
+  {
+    // @aiv/domain is shared with the server (ADR 0001): no app, UI, Tauri or storage code, no browser globals.
+    files: ["packages/domain/src/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/*", "react", "react-*", "@tauri-apps/*", "zustand", "idb", "@tanstack/*", "fflate", "lucide-react"],
+              message: "packages/domain is shared with the server: no app, UI, Tauri or storage imports.",
+            },
+          ],
+        },
+      ],
+      "no-restricted-globals": ["error", "window", "document", "localStorage", "sessionStorage", "indexedDB", "FileReader", "createImageBitmap", "navigator"],
     },
   },
   {

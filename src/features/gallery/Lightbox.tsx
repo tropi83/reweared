@@ -8,7 +8,7 @@ import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { getServices } from "@/app/services";
 import { Button } from "@/components/ui/Button";
-import type { ImageAsset } from "@/domain/models";
+import type { ImageAsset } from "@aiv/domain/models";
 import { exportSingle } from "@/infrastructure/image/export";
 import { useLocale, useT } from "@/i18n";
 import { cn } from "@/lib/cn";

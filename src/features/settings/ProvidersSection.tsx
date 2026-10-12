@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Label, Switch } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Misc";
-import { toGenerationError, type AuthStatus } from "@/domain/models";
+import { toGenerationError, type AuthStatus } from "@aiv/domain/models";
 import type { GoogleCloudProject } from "@/infrastructure/auth/GoogleOAuthCredentialProvider";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import type { MockScenario } from "@/infrastructure/providers/mock/MockImageProvider";

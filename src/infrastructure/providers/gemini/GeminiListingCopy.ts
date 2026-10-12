@@ -1,4 +1,4 @@
-import { AppError, type AuthStatus } from "@/domain/models";
+import { AppError, type AuthStatus } from "@aiv/domain/models";
 import {
   buildListingCopyPrompt,
   parseListingCopy,
@@ -7,7 +7,7 @@ import {
   type ListingCopyProvider,
   type ListingCopyRequest,
   type ListingCopyResult,
-} from "@/domain/services/listing-copy";
+} from "@aiv/domain/services/listing-copy";
 import { httpFetch } from "@/infrastructure/http/http-client";
 import { createLogger } from "@/lib/logger";
 import { mapGeminiHttpError } from "./GeminiErrors";

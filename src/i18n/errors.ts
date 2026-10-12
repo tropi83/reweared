@@ -1,5 +1,5 @@
-import type { GenerationErrorCode } from "@/domain/models";
-import { QUOTA_RESET_TIME_ZONE } from "@/domain/services/usage-tracker";
+import type { GenerationErrorCode } from "@aiv/domain/models";
+import { QUOTA_RESET_TIME_ZONE } from "@aiv/domain/services/usage-tracker";
 import { en } from "./en";
 import { t, type MessageKey } from "./index";
 

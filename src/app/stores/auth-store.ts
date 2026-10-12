@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { toGenerationError, type AuthStatus, type CredentialKind, type GenerationError } from "@/domain/models";
+import { toGenerationError, type AuthStatus, type CredentialKind, type GenerationError } from "@aiv/domain/models";
 import type { GoogleCloudProject } from "@/infrastructure/auth/GoogleOAuthCredentialProvider";
 import { queryKeys } from "../query/keys";
 import { getQueryClient } from "../query/query-client";

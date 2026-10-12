@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MANNEQUIN, MANNEQUIN_BUILDS, MANNEQUIN_POSES, SKIN_TONES } from "@/domain/models";
+import { DEFAULT_MANNEQUIN, MANNEQUIN_BUILDS, MANNEQUIN_POSES, SKIN_TONES } from "../models";
 import { describeWearer, mannequinApplies, normalizeMannequin, posePhrase } from "./mannequin";
 
 describe("mannequin", () => {

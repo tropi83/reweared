@@ -1,4 +1,4 @@
-import type { AspectRatio, ModelInfo, ProviderOptionSpec } from "@/domain/models";
+import type { AspectRatio, ModelInfo, ProviderOptionSpec } from "@aiv/domain/models";
 
 /**
  * Cloudflare Workers AI models that accept a source image.

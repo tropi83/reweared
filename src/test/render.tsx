@@ -3,7 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderOptions } from "@testing-library/react";
 import { queryKeys } from "@/app/query/keys";
 import { __setQueryClient, createQueryClient, getQueryClient } from "@/app/query/query-client";
-import type { AuthStatus } from "@/domain/models";
+import type { AuthStatus } from "@aiv/domain/models";
 
 /** Fresh query client (no retries) so a test never sees another test's cache. */
 export function resetQueryClient(): void {

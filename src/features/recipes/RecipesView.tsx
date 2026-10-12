@@ -7,10 +7,10 @@ import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Misc";
-import { RECIPE_CATEGORIES, type Recipe, type RecipeCategory } from "@/domain/models";
-import { BUILT_IN_RECIPES, extractVariables } from "@/domain/services/recipes";
+import { RECIPE_CATEGORIES, type Recipe, type RecipeCategory } from "@aiv/domain/models";
+import { BUILT_IN_RECIPES, extractVariables } from "@aiv/domain/services/recipes";
 import { useLocale, useT, type MessageKey } from "@/i18n";
-import { findSubcategory } from "@/domain/services/catalog";
+import { findSubcategory } from "@aiv/domain/services/catalog";
 import { CategoryIcon } from "../catalog/category-icons";
 
 type Draft = { id?: string; name: string; description: string; promptTemplate: string; category: RecipeCategory };

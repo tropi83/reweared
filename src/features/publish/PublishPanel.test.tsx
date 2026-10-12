@@ -15,7 +15,7 @@ import { __setServices, createServices, getServices } from "@/app/services";
 import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { usePublishStore } from "@/app/stores/publish-store";
-import type { FillReport } from "@/domain/services/publish";
+import type { FillReport } from "@aiv/domain/services/publish";
 import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { PublishPanel } from "./PublishPanel";

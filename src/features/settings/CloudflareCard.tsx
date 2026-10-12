@@ -7,7 +7,7 @@ import { getServices } from "@/app/services";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Switch } from "@/components/ui/Input";
 import { Badge, Segmented } from "@/components/ui/Misc";
-import { toGenerationError, type AuthStatus } from "@/domain/models";
+import { toGenerationError, type AuthStatus } from "@aiv/domain/models";
 import type { CloudflareMode } from "@/infrastructure/providers/cloudflare/CloudflareAuth";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { useT, type MessageKey } from "@/i18n";

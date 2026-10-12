@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { Label } from "@/components/ui/Input";
 import { Segmented } from "@/components/ui/Misc";
-import type { ImageMimeType } from "@/domain/models";
+import type { ImageMimeType } from "@aiv/domain/models";
 import { exportMany, type ExportItem } from "@/infrastructure/image/export";
 import { useT } from "@/i18n";
 

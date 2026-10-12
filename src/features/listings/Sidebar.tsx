@@ -4,7 +4,7 @@ import { navigate, useRoute } from "@/app/router";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
-import type { ListingSummary } from "@/domain/models";
+import type { ListingSummary } from "@aiv/domain/models";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { useT } from "@/i18n";
 import { CategoryBadge } from "../catalog/CategoryBadge";

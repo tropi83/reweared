@@ -1,5 +1,5 @@
-import { AppError } from "@/domain/models";
-import { isFillReport, type FillReport, type PublishPayload } from "@/domain/services/publish";
+import { AppError } from "@aiv/domain/models";
+import { isFillReport, type FillReport, type PublishPayload } from "@aiv/domain/services/publish";
 import { createLogger } from "@/lib/logger";
 import type { PollResult, PublishBridge, VintedPath } from "./PublishBridge";
 

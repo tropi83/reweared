@@ -1,5 +1,5 @@
-import type { ImageAsset, ListingDocument } from "@/domain/models";
-import { orderedPhotoIds, PUBLISH_LIMITS, type PublishPayload, type PublishPhoto } from "@/domain/services/publish";
+import type { ImageAsset, ListingDocument } from "@aiv/domain/models";
+import { orderedPhotoIds, PUBLISH_LIMITS, type PublishPayload, type PublishPhoto } from "@aiv/domain/services/publish";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
 import { blobToBase64 } from "@/infrastructure/providers/gemini/GeminiMapper";
 

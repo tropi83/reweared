@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { CURRENT_SCHEMA_VERSION, DEFAULT_SETTINGS, type ListingDocument } from "@/domain/models";
+import { CURRENT_SCHEMA_VERSION, DEFAULT_SETTINGS, type ListingDocument } from "@aiv/domain/models";
 import { IndexedDbStorage } from "./IndexedDbStorage";
 import { migrateListingDocument, migrateSettings, MigrationError } from "./migrations";
 

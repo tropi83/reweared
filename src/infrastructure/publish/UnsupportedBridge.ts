@@ -1,4 +1,4 @@
-import { AppError } from "@/domain/models";
+import { AppError } from "@aiv/domain/models";
 import type { PublishBridge } from "./PublishBridge";
 
 const unsupported = () => Promise.reject(new AppError("PLATFORM_UNSUPPORTED", "Publishing on Vinted needs the desktop app.", { retryable: false }));

@@ -3,7 +3,7 @@ import { navigate } from "@/app/router";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
-import { MAX_IMPORT_BYTES, toGenerationError } from "@/domain/models";
+import { MAX_IMPORT_BYTES, toGenerationError } from "@aiv/domain/models";
 import { t } from "@/i18n";
 import { createLogger } from "@/lib/logger";
 

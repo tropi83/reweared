@@ -1,6 +1,6 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { getServices } from "@/app/services";
-import type { AuthStatus } from "@/domain/models";
+import type { AuthStatus } from "@aiv/domain/models";
 import { queryKeys } from "./keys";
 import { getQueryClient } from "./query-client";
 

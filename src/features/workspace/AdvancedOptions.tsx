@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Label, Switch, Textarea } from "@/components/ui/Input";
 import { Segmented } from "@/components/ui/Misc";
 import { Select } from "@/components/ui/Select";
-import type { ImageSize, ShotSpec } from "@/domain/models";
+import type { ImageSize, ShotSpec } from "@aiv/domain/models";
 import { useLocale, useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
 import { modelLabel } from "../settings/ModelsSection";

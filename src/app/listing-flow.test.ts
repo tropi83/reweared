@@ -15,8 +15,8 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
   };
 });
 
-import { AppError, type GenerationJob } from "@/domain/models";
-import type { ListingCopyProvider, ListingCopyRequest } from "@/domain/services/listing-copy";
+import { AppError, type GenerationJob } from "@aiv/domain/models";
+import type { ListingCopyProvider, ListingCopyRequest } from "@aiv/domain/services/listing-copy";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { listingReadiness } from "./listing-readiness";
 import { ensureModels } from "./query/models";

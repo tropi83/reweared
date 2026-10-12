@@ -1,5 +1,5 @@
 import { zip, type Zippable } from "fflate";
-import type { ImageMimeType } from "@/domain/models";
+import type { ImageMimeType } from "@aiv/domain/models";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { convertForExport, extensionFor } from "./image-processing";
 

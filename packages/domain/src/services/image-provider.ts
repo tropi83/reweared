@@ -1,4 +1,4 @@
-import type { AspectRatio, AuthStatus, ImageMimeType, ImageSize, ModelInfo, ProviderInfo } from "@/domain/models";
+import type { AspectRatio, AuthStatus, ImageMimeType, ImageSize, ModelInfo, ProviderInfo } from "../models";
 
 export interface SourceImageInput {
   blob: Blob;

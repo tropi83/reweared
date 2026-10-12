@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { openDB } from "idb";
-import { CURRENT_SCHEMA_VERSION } from "@/domain/models";
+import { CURRENT_SCHEMA_VERSION } from "@aiv/domain/models";
 import { IndexedDbStorage } from "./IndexedDbStorage";
 import { migrateListingDocument } from "./migrations";
 

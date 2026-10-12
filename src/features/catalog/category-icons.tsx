@@ -53,7 +53,7 @@ import {
   type LucideIcon,
   type LucideProps,
 } from "lucide-react";
-import type { CategoryId, CategorySelection } from "@/domain/models";
+import type { CategoryId, CategorySelection } from "@aiv/domain/models";
 
 /**
  * Icons of the marketplace taxonomy (UI only — the domain catalogue stays free of React). The test next

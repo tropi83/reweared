@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { AppError, toGenerationError, type GenerationError, type ListingDocument } from "@/domain/models";
-import { canPost, stageForUrl, VINTED_SELL_PATH, type FillReport, type PublishBlocker, type PublishStage } from "@/domain/services/publish";
+import { AppError, toGenerationError, type GenerationError, type ListingDocument } from "@aiv/domain/models";
+import { canPost, stageForUrl, VINTED_SELL_PATH, type FillReport, type PublishBlocker, type PublishStage } from "@aiv/domain/services/publish";
 import type { PollResult, PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import { createLogger } from "@/lib/logger";
 import { publishBarText } from "../publish-bar";

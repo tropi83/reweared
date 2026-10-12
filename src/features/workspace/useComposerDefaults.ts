@@ -3,7 +3,7 @@ import { useModels } from "@/app/query/models";
 import { getServices } from "@/app/services";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
-import { ALL_ASPECT_RATIOS, type AspectRatio } from "@/domain/models";
+import { ALL_ASPECT_RATIOS, type AspectRatio } from "@aiv/domain/models";
 
 /** Derived model data of the composer's image provider (the list itself comes from TanStack Query). */
 export function useComposerModels() {

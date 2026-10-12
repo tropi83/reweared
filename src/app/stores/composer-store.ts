@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppSettings, AspectRatio, ImageSize } from "@/domain/models";
+import type { AppSettings, AspectRatio, ImageSize } from "@aiv/domain/models";
 
 interface ComposerState {
   listingId: string | null;

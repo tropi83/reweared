@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import { summarize, type AppSettings, type ListingDocument, type ListingSummary, type Recipe } from "@/domain/models";
-import { assertSafeId } from "@/lib/ids";
+import { summarize, type AppSettings, type ListingDocument, type ListingSummary, type Recipe } from "@aiv/domain/models";
+import { assertSafeId } from "@aiv/domain/lib/ids";
 import { migrateListingDocument, migrateSettings } from "./migrations";
 import type { ImageBucket, StorageProvider, StorageUsage } from "./StorageProvider";
 

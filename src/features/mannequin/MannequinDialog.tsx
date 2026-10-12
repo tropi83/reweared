@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Label } from "@/components/ui/Input";
 import { Segmented } from "@/components/ui/Misc";
-import { DEFAULT_MANNEQUIN, MANNEQUIN_BUILDS, MANNEQUIN_POSES, SKIN_TONE_SWATCH, SKIN_TONES, type Mannequin } from "@/domain/models";
-import { normalizeMannequin } from "@/domain/services/mannequin";
+import { DEFAULT_MANNEQUIN, MANNEQUIN_BUILDS, MANNEQUIN_POSES, SKIN_TONE_SWATCH, SKIN_TONES, type Mannequin } from "@aiv/domain/models";
+import { normalizeMannequin } from "@aiv/domain/services/mannequin";
 import { useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
 

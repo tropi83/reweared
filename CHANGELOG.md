@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Decision to move to accounts and a server** ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)): user accounts, a server-side generation queue with the platform's provider keys, credits with a free plan, Docker on one VPS. The design and the phase 0 plan are in `docs/superpowers/`; the docs (README, ARCHITECTURE, SECURITY, PRIVACY, DEVELOPMENT, CONTRIBUTING, agent instructions and skills, plus a new `backend` skill) now say which architecture they describe. No change to the app yet.
+
 - **Desktop Vinted window: a status bar above vinted.com**, like the status line of the phone screen — sign in → open the sell form → filling → “Photos 2/3 · Title ⧉ · Description ⧉ — click the ⧉ icons to paste the text” → ✓. The window now holds two webviews (bar + Vinted); the bar is an app page without any Tauri capability, fed by `eval` only.
 
 - **Delete a listing from every screen** — a “⋯” actions menu (rename, duplicate, delete) on the listing header, on the home cards and in the drawer rows (always visible on touch screens, revealed on hover with a mouse). Deleting asks for confirmation, stops a run or a Vinted session bound to that listing, leaves the workspace first, then removes the files — on this device only, never on Vinted.
@@ -21,6 +23,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **The domain is a workspace package** (`packages/domain`, imported as `@aiv/domain`): the repo is now a pnpm workspace so the planned server can share the models, catalogue, shot plans, listing-copy contract, errors and retry helpers with the app. The package is typechecked without the DOM, tested under Node, and an ESLint boundary keeps app, React, Tauri and browser code out of it. No change for users.
 - **A listing is named after its generated title.** Once the title and description are generated, the listing takes the title as its name (instead of the imported file name); editing the title in the copy panel renames it too.
 - **“Generate more like this” is gone** (it filled the free prompt, which no longer exists) — on every finished photo (tile and fullscreen viewer) it is replaced by **“Generate this photo again”**: one more photo of the same shot, with the same prompt, source and settings and a fresh seed, added to the same card; the previous photo is kept.
 - **Vinted: the text is pasted on your tap, not typed for you.** The injected script still attaches the photos, but the title and the description now get a paste icon at the end of the field; tapping it inserts the text (fewer automated actions on the page). The warning dialog on phones says to sign in with e-mail, Facebook or Apple — Google refuses OAuth inside embedded app screens. Photo count fixed on the sell form (Vinted renders the media grid outside the form; selectors checked on the live mobile site on 2026-09-13).

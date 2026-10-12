@@ -1,0 +1,21 @@
+{
+  "name": "@aiv/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure domain of AI Image Variations (models, catalogue, shot plans, listing copy, queue, errors), shared by the clients and the server. No I/O, no DOM.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./models": "./src/models/index.ts",
+    "./services/*": "./src/services/*.ts",
+    "./lib/*": "./src/lib/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "~6.0.3",
+    "vitest": "^4.0.0"
+  }
+}

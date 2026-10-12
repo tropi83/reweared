@@ -1,4 +1,4 @@
-import type { AppSettings, ListingDocument, ListingSummary, Recipe } from "@/domain/models";
+import type { AppSettings, ListingDocument, ListingSummary, Recipe } from "@aiv/domain/models";
 
 /** Which bytes bucket an image belongs to. Thumbnails share the asset id of their full image. */
 export type ImageBucket = "original" | "generation" | "thumbnail";

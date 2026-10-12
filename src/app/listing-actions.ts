@@ -1,4 +1,4 @@
-import { toGenerationError } from "@/domain/models";
+import { toGenerationError } from "@aiv/domain/models";
 import { t } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 import { createLogger } from "@/lib/logger";

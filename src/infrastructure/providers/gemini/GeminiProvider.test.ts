@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AppError } from "@/domain/models";
+import { AppError } from "@aiv/domain/models";
 import { __setFetchOverride } from "@/infrastructure/http/http-client";
 import { GeminiProvider } from "./GeminiProvider";
 import { mapGeminiHttpError, parseQuotaInfo, parseRetryAfter } from "./GeminiErrors";

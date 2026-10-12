@@ -1,4 +1,4 @@
-import type { Recipe } from "@/domain/models";
+import type { Recipe } from "../models";
 import { buildShots, CATEGORIES, catalogRecipeId } from "./catalog";
 
 const VARIABLE_PATTERN = /\{\{\s*([a-zA-Z0-9_ -]+?)\s*\}\}/g;

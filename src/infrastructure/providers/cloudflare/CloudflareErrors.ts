@@ -1,4 +1,4 @@
-import { AppError, type GenerationErrorCode } from "@/domain/models";
+import { AppError, type GenerationErrorCode } from "@aiv/domain/models";
 import type { CloudflareErrorBody } from "./CloudflareMapper";
 
 interface Classified {

@@ -1,4 +1,4 @@
-import { AppError, type AuthStatus } from "@/domain/models";
+import { AppError, type AuthStatus } from "@aiv/domain/models";
 import type { LayeredSecretStore } from "@/infrastructure/auth/SecretStore";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 

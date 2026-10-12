@@ -1,4 +1,4 @@
-import { AppError, toGenerationError } from "@/domain/models";
+import { AppError, toGenerationError } from "@aiv/domain/models";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
 import { createLogger } from "@/lib/logger";
 

@@ -4,7 +4,7 @@ import { getServices } from "@/app/services";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
-import { toGenerationError } from "@/domain/models";
+import { toGenerationError } from "@aiv/domain/models";
 import { useT } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 import { Section } from "./SettingsPrimitives";

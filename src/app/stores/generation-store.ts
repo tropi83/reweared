@@ -1,16 +1,16 @@
 import { create } from "zustand";
-import { AppError, deriveGenerationStatus, type AspectRatio, type Generation, type GenerationJob, type ImageSize } from "@/domain/models";
-import type { CategorySelection, ShotSpec } from "@/domain/models";
+import { AppError, deriveGenerationStatus, type AspectRatio, type Generation, type GenerationJob, type ImageSize } from "@aiv/domain/models";
+import type { CategorySelection, ShotSpec } from "@aiv/domain/models";
 import {
   buildRequestForModel,
   inputPreparationFor,
   seedForAttempt,
   type ImageGenerationRequest,
   type ImageGenerationResult,
-} from "@/domain/services/image-provider";
+} from "@aiv/domain/services/image-provider";
 import { prepareForProvider } from "@/infrastructure/image/image-processing";
-import { createId, nowIso } from "@/lib/ids";
-import { softenForSafetyFilter } from "@/domain/services/catalog";
+import { createId, nowIso } from "@aiv/domain/lib/ids";
+import { softenForSafetyFilter } from "@aiv/domain/services/catalog";
 import { createLogger } from "@/lib/logger";
 import { ensureModels, modelsSnapshot } from "../query/models";
 import { getServices } from "../services";

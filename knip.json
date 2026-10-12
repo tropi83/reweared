@@ -1,7 +1,16 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["src/**/*.test.{ts,tsx}", "tools/**/*.test.mjs", "scripts/*.mjs"],
-  "project": ["src/**/*.{ts,tsx}", "tools/**/*.{js,mjs}", "scripts/**/*.mjs"],
-  "ignoreExportsUsedInFile": true,
-  "ignoreDependencies": ["tailwindcss"]
+  "workspaces": {
+    ".": {
+      "entry": ["src/**/*.test.{ts,tsx}", "tools/**/*.test.mjs", "scripts/*.mjs"],
+      "project": ["src/**/*.{ts,tsx}", "tools/**/*.{js,mjs}", "scripts/**/*.mjs"],
+      "ignoreDependencies": ["tailwindcss"]
+    },
+    "packages/domain": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "includeEntryExports": true
+    }
+  },
+  "ignoreExportsUsedInFile": true
 }

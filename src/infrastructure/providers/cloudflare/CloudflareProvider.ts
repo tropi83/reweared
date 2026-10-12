@@ -1,5 +1,5 @@
-import { AppError, type AuthStatus, type ModelInfo, type ProviderInfo } from "@/domain/models";
-import type { GenerateOptions, ImageGenerationRequest, ImageGenerationResult, ImageProvider } from "@/domain/services/image-provider";
+import { AppError, type AuthStatus, type ModelInfo, type ProviderInfo } from "@aiv/domain/models";
+import type { GenerateOptions, ImageGenerationRequest, ImageGenerationResult, ImageProvider } from "@aiv/domain/services/image-provider";
 import { allowHost, httpFetch } from "@/infrastructure/http/http-client";
 import { createLogger } from "@/lib/logger";
 import type { GeminiUsageSink } from "../gemini/GeminiProvider";

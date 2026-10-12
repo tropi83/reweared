@@ -6,7 +6,7 @@ import { useGenerationStore } from "@/app/stores/generation-store";
 import { toast } from "@/app/stores/toast-store";
 import { useUiStore } from "@/app/stores/ui-store";
 import { getServices } from "@/app/services";
-import type { GenerationJob, ListingDocument } from "@/domain/models";
+import type { GenerationJob, ListingDocument } from "@aiv/domain/models";
 import { exportSingle } from "@/infrastructure/image/export";
 import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
 import { openExternal } from "@/lib/open-external";

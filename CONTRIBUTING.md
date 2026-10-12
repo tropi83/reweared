@@ -16,10 +16,12 @@ See [DEVELOPMENT.md](DEVELOPMENT.md), and [BUILDING.md](BUILDING.md) for desktop
 
 ## Ground rules
 
-- No backend, no telemetry; no credential ever leaves the device except to Google.
+- No telemetry or third-party analytics, ever. The app is moving to accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)): until phase 3 ships, the client keeps its rules — no backend call, credentials leave the device only to the provider they belong to. Server work follows the backend design and the `backend` skill.
+- Structural decisions get an ADR in `docs/adr/`; larger features a dated design and plan in `docs/superpowers/`.
 - New outbound hosts, permissions or storage locations need a `SECURITY.md` entry.
 - User-facing strings go through `src/i18n`.
-- Verify the Google / Tauri documentation before changing API calls and record the verification date in the code comment or in `DEVELOPMENT.md`.
+- Update the docs in the same PR when behaviour, permissions, env vars or flows change (README, ARCHITECTURE, SECURITY, PRIVACY, DEVELOPMENT, BUILDING, skills, CHANGELOG).
+- Verify the Google / Cloudflare / Tauri documentation before changing API calls and record the verification date in the code comment or in `DEVELOPMENT.md`.
 
 ## Reporting security issues
 

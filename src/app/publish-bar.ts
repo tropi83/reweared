@@ -1,4 +1,4 @@
-import type { FieldFillResult } from "@/domain/services/publish";
+import type { FieldFillResult } from "@aiv/domain/services/publish";
 import { t } from "@/i18n";
 import type { PublishSession } from "./stores/publish-store";
 

@@ -1,6 +1,6 @@
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { Segmented } from "@/components/ui/Misc";
-import type { Locale, ThemePreference } from "@/domain/models";
+import type { Locale, ThemePreference } from "@aiv/domain/models";
 import { useT } from "@/i18n";
 import { Field, Section } from "./SettingsPrimitives";
 

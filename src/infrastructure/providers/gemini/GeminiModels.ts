@@ -1,4 +1,4 @@
-import type { AspectRatio, ImageSize, ModelInfo } from "@/domain/models";
+import type { AspectRatio, ImageSize, ModelInfo } from "@aiv/domain/models";
 
 /**
  * Capability catalogue for Gemini image models.

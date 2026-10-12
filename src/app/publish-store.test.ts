@@ -20,9 +20,9 @@ vi.mock("@/infrastructure/platform/capabilities", async (importOriginal) => {
   return { ...actual, getPlatform: () => ({ ...actual.getPlatform(), isTauri: true, isMobile: false }) };
 });
 
-import { AppError } from "@/domain/models";
+import { AppError } from "@aiv/domain/models";
 import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
-import type { FillReport, PublishPayload } from "@/domain/services/publish";
+import type { FillReport, PublishPayload } from "@aiv/domain/services/publish";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { __setServices, createServices, getServices } from "./services";
 import { buildPublishPayload } from "./publish-payload";

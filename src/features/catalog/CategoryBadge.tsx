@@ -1,5 +1,5 @@
-import type { CategorySelection } from "@/domain/models";
-import { findSubcategory } from "@/domain/services/catalog";
+import type { CategorySelection } from "@aiv/domain/models";
+import { findSubcategory } from "@aiv/domain/services/catalog";
 import { useLocale } from "@/i18n";
 import { CategoryIcon } from "./category-icons";
 

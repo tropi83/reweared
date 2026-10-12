@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __setFetchOverride } from "@/infrastructure/http/http-client";
 import { LayeredSecretStore, MemorySecretStore, WebLocalSecretStore } from "@/infrastructure/auth/SecretStore";
-import { inputPreparationFor } from "@/domain/services/image-provider";
+import { inputPreparationFor } from "@aiv/domain/services/image-provider";
 import { computeGeometry } from "@/infrastructure/image/image-processing";
 import { CloudflareAuth, normalizeWorkerUrl, type MetaStore } from "./CloudflareAuth";
 import { mapCloudflareEnvelopeError, mapCloudflareHttpError } from "./CloudflareErrors";
