@@ -75,6 +75,7 @@ describe("account store", () => {
     expect(calls.filter((c) => c.path.startsWith("/api/v1/")).map((c) => [c.path, c.authorization])).toEqual([
       ["/api/v1/me", undefined],
       ["/api/v1/me", "Bearer session-token"],
+      ["/api/v1/me/settings", "Bearer session-token"],
       ["/api/v1/listings", "Bearer session-token"],
     ]);
 

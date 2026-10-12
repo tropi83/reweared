@@ -7,6 +7,7 @@ import { MOCK_PROVIDER_ID } from "@/infrastructure/providers/mock/MockImageProvi
 import { nowIso } from "@aiv/domain/lib/ids";
 import { createLogger } from "@/lib/logger";
 import { listingReadiness } from "../listing-readiness";
+import { creditsSnapshot, invalidateCredits, listingRunCost, platformSnapshot } from "../query/credits";
 import { authStatusSnapshot } from "../query/auth-status";
 import { modelsSnapshot } from "../query/models";
 import { getServices } from "../services";
@@ -89,6 +90,17 @@ export async function settleRemoteCopy(event: Extract<RunEvent, { type: "job" }>
   pending.resolve(null);
 }
 
+/** API mode: the balance and the run's cost when both are known (the server checks again and answers 402). */
+function remoteCredits(selection: CategorySelection | undefined): { credits?: { balance: number; cost: number } } {
+  const credits = creditsSnapshot();
+  const platform = platformSnapshot();
+  if (!getServices().runs || !credits || !platform || !selection) return {};
+  const settings = useSettingsStore.getState().settings;
+  const doc = useListingsStore.getState().current;
+  const mannequin = doc?.listing.useMannequin ? normalizeMannequin(settings.mannequin) : undefined;
+  return { credits: { balance: credits.balance, cost: listingRunCost(platform, buildShots(selection, mannequin ? { mannequin } : {}).length) } };
+}
+
 /** API mode: the server writes the copy; this waits for its job to end. */
 async function generateRemoteCopy(listingId: string): Promise<ListingCopy | null> {
   const runs = getServices().runs!;
@@ -99,6 +111,7 @@ async function generateRemoteCopy(listingId: string): Promise<ListingCopy | null
     // The server reads the brand and category from the listing: unsaved edits go first.
     await useListingsStore.getState().flush();
     const run = await runs.startCopy(listingId, useSettingsStore.getState().settings.locale);
+    invalidateCredits();
     const jobId = run.jobIds[0];
     if (!jobId) throw new AppError("UNKNOWN_ERROR", "The server started no copy job.");
     return await new Promise<ListingCopy | null>((resolve) => {
@@ -118,6 +131,7 @@ async function startRemotePhotos(doc: ListingDocument, sourceImageId: string): P
     await useListingsStore.getState().flush();
     const { aspectRatio } = useComposerStore.getState();
     await getServices().runs!.startPhotos(doc.listing.id, { sourceImageId, aspectRatio });
+    invalidateCredits();
     await useListingsStore.getState().reload();
     return "done";
   } catch (err) {
@@ -289,6 +303,7 @@ export const useListingSetupStore = create<ListingState>((set, get) => ({
       hasSelection: !!selection,
       photosReady: photoPartReady(),
       textReady: textPartReady(),
+      ...remoteCredits(selection),
     });
     if (!doc || !selection || !sourceImageId || !readiness.canCreate || get().creating) return null;
     set({ creating: true, lastRun: null, lastRunListingId: doc.listing.id });

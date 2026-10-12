@@ -1,3 +1,4 @@
+import { API_MODE } from "@/app/api-mode";
 import { useT } from "@/i18n";
 import { Section } from "./SettingsPrimitives";
 
@@ -9,7 +10,7 @@ export function AboutSection() {
         <p className="font-medium">{t("app.name")}</p>
         <p className="text-fg-muted">{t("app.tagline")}</p>
         <p className="mt-2 text-fg-muted">{t("about.body")}</p>
-        <p className="mt-2 text-xs text-fg-subtle">{t("about.local")}</p>
+        <p className="mt-2 text-xs text-fg-subtle">{t(API_MODE ? "about.api" : "about.local")}</p>
       </div>
     </Section>
   );

@@ -555,4 +555,19 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "account.error.NETWORK_ERROR": "Le serveur est injoignable. Vérifiez votre connexion.",
   "account.error.RATE_LIMITED": "Trop de tentatives. Patientez un instant puis réessayez.",
   "account.error.generic": "Une erreur est survenue. Réessayez.",
+  "credits.title": "Crédits",
+  "credits.balance": "{count} crédits",
+  "credits.cost": "{count} crédits",
+  "credits.explain":
+    "Chaque mois, le compte reçoit {free} crédits gratuits. Une photo coûte {image} crédit(s), un titre et une description {copy}. Une génération qui échoue est remboursée.",
+  "credits.reason.grant": "Crédits du mois",
+  "credits.reason.reserve": "Génération lancée",
+  "credits.reason.refund": "Remboursement (échec ou annulation)",
+  "credits.reason.adjust": "Ajustement",
+  "listing.needCredits": "Pas assez de crédits pour cette annonce. Voir le solde dans les Réglages.",
+  "error.platform.QUOTA_EXCEEDED": "Pas assez de crédits pour cette génération. Les crédits gratuits reviennent au début du mois prochain.",
+  "error.platform.PROVIDER_BUDGET_EXHAUSTED": "La génération de photos a atteint sa limite du jour pour tout le monde. Réessayez demain.",
+  "privacy.bodyApi":
+    "Vos annonces, photos et textes générés sont stockés sur notre serveur, privés à votre compte : jamais partagés, jamais vendus. Les photos sont envoyées au fournisseur d'IA de la plateforme quand vous créez une annonce. Votre mot de passe n'est jamais stocké en clair et aucune mesure d'audience n'envoie vos images ou vos prompts. Supprimer le compte supprime tout.",
+  "about.api": "Votre compte · photos stockées en sécurité sur le serveur",
 };

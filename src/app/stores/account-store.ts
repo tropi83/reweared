@@ -6,6 +6,7 @@ import { getQueryClient } from "../query/query-client";
 import { getServices } from "../services";
 import { startLiveUpdates, stopLiveUpdates } from "../live-updates";
 import { useListingsStore } from "./listings-store";
+import { useSettingsStore } from "./settings-store";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("account");
@@ -55,6 +56,13 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       throw error;
     }
     const wasSignedIn = get().status === "signedIn";
+    if (!wasSignedIn) {
+      // Before the workspace shows: the account's language, theme and mannequin. A failure keeps the device's.
+      await useSettingsStore
+        .getState()
+        .pullAccountSettings()
+        .catch((error: unknown) => log.warn("account settings not loaded", error));
+    }
     set({ status: "signedIn", me });
     startLiveUpdates();
     // The account's listings for the sidebar; a failure leaves it empty and the session stands.

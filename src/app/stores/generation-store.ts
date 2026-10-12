@@ -17,6 +17,7 @@ import { toast } from "./toast-store";
 import { ensureModels, modelsSnapshot } from "../query/models";
 import { getServices } from "../services";
 import { useListingsStore } from "./listings-store";
+import { invalidateCredits } from "../query/credits";
 
 const log = createLogger("generation");
 import { useSettingsStore } from "./settings-store";
@@ -147,7 +148,10 @@ const SHOT_ID = /^[a-z0-9-]{1,40}$/;
 /** API mode: a server request started from a button; its failure becomes a toast. */
 function remote(action: Promise<unknown>, what: string): void {
   void action
-    .then(() => useListingsStore.getState().reload())
+    .then(() => {
+      invalidateCredits();
+      return useListingsStore.getState().reload();
+    })
     .catch((err: unknown) => {
       const error = toGenerationError(err);
       log.warn(what, error.code);
@@ -174,6 +178,7 @@ async function startRemote(params: StartGenerationParams, listingId: string): Pr
     shotIds: shotIds.slice(0, 10),
     aspectRatio: params.aspectRatio,
   });
+  invalidateCredits();
   await useListingsStore.getState().reload();
   const generation = useListingsStore.getState().current?.generations[run.generationId];
   if (!generation) throw new AppError("UNKNOWN_ERROR", "The run started but the listing could not be read again.");

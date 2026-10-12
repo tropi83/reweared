@@ -4,8 +4,10 @@ export interface ListingReadinessInput {
   hasSelection: boolean;
   photosReady: boolean;
   textReady: boolean;
+  /** API mode: the account's balance and what the run costs; absent while unknown or on the local app. */
+  credits?: { balance: number; cost: number };
 }
-export type ListingBlocker = "composer.needImage" | "listing.needCategory" | "listing.needProviders";
+export type ListingBlocker = "composer.needImage" | "listing.needCategory" | "listing.needProviders" | "listing.needCredits";
 export type ListingPart = "photos" | "text";
 export interface ListingReadiness {
   canCreate: boolean;
@@ -18,5 +20,6 @@ export function listingReadiness(input: ListingReadinessInput): ListingReadiness
   if (!input.hasSelection) return { canCreate: false, blocker: "listing.needCategory", skipped: [] };
   const skipped: ListingPart[] = [...(input.photosReady ? [] : (["photos"] as const)), ...(input.textReady ? [] : (["text"] as const))];
   if (skipped.length === 2) return { canCreate: false, blocker: "listing.needProviders", skipped };
+  if (input.credits && input.credits.balance < input.credits.cost) return { canCreate: false, blocker: "listing.needCredits", skipped };
   return { canCreate: true, blocker: null, skipped };
 }

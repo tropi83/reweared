@@ -1,5 +1,6 @@
 import { createLogger } from "@/lib/logger";
 import { isTerminalStatus, type RunEvent } from "./ports/remote-run-engine";
+import { invalidateCredits } from "./query/credits";
 import { getServices } from "./services";
 import { settleRemoteCopy } from "./stores/listing-setup-store";
 import { useListingsStore } from "./stores/listings-store";
@@ -34,8 +35,12 @@ export function stopLiveUpdates(): void {
 }
 
 export function onEvent(event: RunEvent): void {
-  if (event.type === "credits") return;
-  if (event.type === "job") void settleRemoteCopy(event);
+  if (event.type === "credits") return invalidateCredits();
+  if (event.type === "job") {
+    void settleRemoteCopy(event);
+    // A failed or cancelled job is refunded: the server sends no balance event, so the balance is read again.
+    if (isTerminalStatus(event.status)) invalidateCredits();
+  }
   if (event.listingId === useListingsStore.getState().current?.listing.id) scheduleReload();
   // Covers and names in the sidebar change when a photo or a copy is done (the server sends job events, and a
   // listing event after a copy).

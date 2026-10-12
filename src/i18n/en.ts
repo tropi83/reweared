@@ -573,4 +573,19 @@ export const en = {
   "account.error.NETWORK_ERROR": "The server cannot be reached. Check your connection.",
   "account.error.RATE_LIMITED": "Too many attempts. Wait a moment and try again.",
   "account.error.generic": "Something went wrong. Try again.",
+  "credits.title": "Credits",
+  "credits.balance": "{count} credits",
+  "credits.cost": "{count} credits",
+  "credits.explain":
+    "Every month the account gets {free} free credits. A photo costs {image} credit(s), a title and description {copy}. A run that fails is refunded.",
+  "credits.reason.grant": "Monthly credits",
+  "credits.reason.reserve": "Run started",
+  "credits.reason.refund": "Refund (failed or cancelled)",
+  "credits.reason.adjust": "Adjustment",
+  "listing.needCredits": "Not enough credits for this listing. See your balance in Settings.",
+  "error.platform.QUOTA_EXCEEDED": "Not enough credits for this run. Your free credits come back at the start of next month.",
+  "error.platform.PROVIDER_BUDGET_EXHAUSTED": "Photo generation has reached today's limit for everyone. Try again tomorrow.",
+  "privacy.bodyApi":
+    "Your listings, photos and generated texts are stored on our server, private to your account: never shared, never sold. Photos are sent to the AI provider the platform uses when you create a listing. Your password is never stored in clear text, and no analytics send your images or prompts anywhere. Deleting your account deletes all of it.",
+  "about.api": "Your account · photos stored safely on the server",
 } as const;
