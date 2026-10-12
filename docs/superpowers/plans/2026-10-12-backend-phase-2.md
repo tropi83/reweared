@@ -104,9 +104,9 @@
 
 ### Task 7: Live progress (SSE)
 
-- [ ] **Step 1:** `queue/events.ts`: `publish(userId, event)` → `XADD events:<userId> MAXLEN ~ 1000 * data <json>`; events: `job` (status, attempt, resultImageId, error code/message), `generation` (status), `credits` (balance). Contracts in `@aiv/contracts/events`.
-- [ ] **Step 2:** `GET /api/v1/events`: guard at `onRequest`, `text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, heartbeat comment every 15 s, replay from `Last-Event-ID`, then `XREAD BLOCK` on a dedicated connection closed with the response; at most 3 streams per user. Check that Caddy does not buffer the response (`flush_interval -1` on that route if needed).
-- [ ] **Step 3:** Tests: events arrive in order; reconnecting with `Last-Event-ID` replays exactly the missed ones; another user never receives them; the 4th stream answers 429. **Commit** `feat(api): live job and credit events over SSE`.
+- [x] **Step 1:** `queue/events.ts`: `publish(userId, event)` → `XADD events:<userId> MAXLEN ~ 1000 * data <json>`; events: `job` (status, attempt, resultImageId, error code/message), `generation` (status), `credits` (balance). Contracts in `@aiv/contracts/events`.
+- [x] **Step 2:** `GET /api/v1/events`: guard at `onRequest`, `text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, heartbeat comment every 15 s, replay from `Last-Event-ID`, then `XREAD BLOCK` on a dedicated connection closed with the response; at most 3 streams per user. Check that Caddy does not buffer the response (`flush_interval -1` on that route if needed).
+- [x] **Step 3:** Tests: events arrive in order; reconnecting with `Last-Event-ID` replays exactly the missed ones; another user never receives them; the 4th stream answers 429. **Commit** `feat(api): live job and credit events over SSE`.
 
 ### Task 8: Maintenance jobs
 
@@ -155,3 +155,9 @@ Update this section after each task: task number, commit hash, deviations.
   - **Race found by the tests**: two jobs of one generation finishing together left it `active` (each transaction read the other's job as still running). `refreshGenerationStatus` now locks the generation row first; mutation-checked.
   - A cancel landing while the provider answers is checked again before a result is kept (the 1 s watch alone could miss it).
   - The Mock's `slow` scenario honours `delayMs` (min 300 ms) so cancellation can be tested.
+- **Task 7 — done** (`git log --grep "live job and listing events"`); 71 integration tests. Deviations and findings:
+  - Events: `job`, `generation`, `listing` (copy written). **No `credits` event** yet: clients refetch `GET /credits` when a job event arrives (the balance moves only at reservation and refund); add the event in phase 3 if the UI needs it.
+  - Replay uses `XREAD` from the `Last-Event-ID` (it returns entries after the given id); a missing or malformed id starts after the newest event.
+  - **Gap found by the tests**: the starting cursor was computed after `retry:` was sent, so events published in between were lost; it is now computed before the response starts.
+  - SSE tests use a real listening server (`app.listen({ port: 0 })`): `inject()` cannot read a hijacked stream.
+  - Caddy flushes `text/event-stream` responses immediately (no `flush_interval` needed); to be confirmed by the compose smoke test in task 9.
