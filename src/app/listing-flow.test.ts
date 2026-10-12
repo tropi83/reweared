@@ -173,4 +173,12 @@ describe("listingReadiness", () => {
       skipped: [],
     });
   });
+
+  it("blocks a run the account cannot pay for (API mode)", () => {
+    const ready = { hasImage: true, hasSelection: true, photosReady: true, textReady: true };
+    expect(listingReadiness({ ...ready, credits: { balance: 5, cost: 6 } })).toEqual({ canCreate: false, blocker: "listing.needCredits", skipped: [] });
+    expect(listingReadiness({ ...ready, credits: { balance: 6, cost: 6 } }).canCreate).toBe(true);
+    // A missing image or category is said first.
+    expect(listingReadiness({ ...ready, hasSelection: false, credits: { balance: 0, cost: 6 } }).blocker).toBe("listing.needCategory");
+  });
 });

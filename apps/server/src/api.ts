@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   const google =
     config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET ? { clientId: config.GOOGLE_CLIENT_ID, clientSecret: config.GOOGLE_CLIENT_SECRET } : undefined;
   const auth = createAuth(
-    { publicOrigin: config.PUBLIC_ORIGIN, secret: config.BETTER_AUTH_SECRET, google },
+    { publicOrigin: config.PUBLIC_ORIGIN, appOrigins: config.CORS_ORIGINS, secret: config.BETTER_AUTH_SECRET, google },
     { db: database.db, redis, mailer: createMailer(config), log, afterUserDeleted: deleteUserObjects(store, log) },
   );
   const queueConnection = createQueueConnection(config.REDIS_URL);
@@ -66,6 +66,7 @@ async function main(): Promise<void> {
   };
   const app = await buildApp({
     logger: log,
+    appOrigins: config.CORS_ORIGINS,
     readiness: [
       { name: "database", check: async () => void (await database.db.execute(sql`select 1`)) },
       { name: "redis", check: async () => void (await redis.ping()) },

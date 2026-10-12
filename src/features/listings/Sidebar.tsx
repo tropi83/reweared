@@ -1,5 +1,7 @@
 import { BookOpen, Images, Plus, Settings, Sparkles } from "lucide-react";
+import { API_MODE } from "@/app/api-mode";
 import { useImageUrl } from "@/app/image-urls";
+import { CreditsBadge } from "../account/CreditsBadge";
 import { navigate, useRoute } from "@/app/router";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { useUiStore } from "@/app/stores/ui-store";
@@ -25,7 +27,7 @@ export function Sidebar() {
         </div>
         <div className="min-w-0">
           <div className="truncate text-sm leading-tight font-semibold">{t("app.name")}</div>
-          <div className="truncate text-[11px] text-fg-subtle">{t("about.local")}</div>
+          {API_MODE ? <CreditsBadge /> : <div className="truncate text-[11px] text-fg-subtle">{t("about.local")}</div>}
         </div>
       </div>
 

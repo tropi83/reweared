@@ -5,7 +5,7 @@ description: Use for anything server-side of the backend pivot (ADR 0001) — ap
 
 # Backend (target architecture — ADR 0001)
 
-**Status (2026-10-12): phases 0, 1 and 2 done** — `apps/server` serves accounts, listings, images, settings, recipes, credits, generation/copy runs and SSE; the worker generates with the platform's keys; the compose stack runs with Mock providers in dev (`pnpm stack:up`); no client uses the API yet (phase 3). How to run, layout and configuration: DEVELOPMENT.md → Server. The binding design is
+**Status (2026-10-12): phases 0, 1 and 2 done** — `apps/server` serves accounts, listings, images, settings, recipes, credits, generation/copy runs and SSE; the worker generates with the platform's keys; the compose stack runs with Mock providers in dev (`pnpm stack:up`); phase 3 done: the web and Tauri clients use the API when built with `VITE_API_ORIGIN` (ARCHITECTURE.md → API mode). How to run, layout and configuration: DEVELOPMENT.md → Server. The binding design is
 `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`; each phase has its plan in
 `docs/superpowers/plans/`. If this skill and the design disagree, the design wins — then fix this skill.
 

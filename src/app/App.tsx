@@ -8,7 +8,12 @@ import { Sidebar } from "@/features/listings/Sidebar";
 import { HomeView } from "@/features/workspace/HomeView";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import { useGlobalImport } from "@/features/workspace/useImageImport";
+import { AuthScreens } from "@/features/account/AuthScreens";
+import { ImportLocalOffer } from "@/features/account/ImportLocalDialog";
+import { accountErrorMessage } from "@/features/account/account-errors";
+import { API_MODE } from "./api-mode";
 import { bootstrap } from "./bootstrap";
+import { takeResetPasswordLink, useAccountStore } from "./stores/account-store";
 import { getQueryClient } from "./query/query-client";
 import { useRoute } from "./router";
 import { useUiStore } from "./stores/ui-store";
@@ -34,17 +39,55 @@ export function App() {
       </div>
     );
   }
-  if (!ready) {
+  if (!ready) return <Spinner />;
+  return <QueryClientProvider client={getQueryClient()}>{API_MODE ? <AuthGate /> : <Shell />}</QueryClientProvider>;
+}
+
+// Read once at load: a password-reset link opens the reset screen, whatever the session.
+const resetLink = API_MODE && typeof location !== "undefined" ? takeResetPasswordLink() : null;
+
+/** API mode: the workspace needs an account; without a session the sign-in screens take the whole window. */
+function AuthGate() {
+  const status = useAccountStore((s) => s.status);
+  const [link, setLink] = useState(resetLink);
+  if (link) {
+    // A reset revokes every session: leaving the reset screens checks again whether this one still exists.
+    const leave = () => {
+      setLink(null);
+      useAccountStore
+        .getState()
+        .load()
+        .catch(() => undefined);
+    };
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="size-6 animate-spin rounded-full border-2 border-fg-subtle border-t-transparent" aria-label="Loading" />
-      </div>
+      <>
+        <AuthScreens
+          // Its own instance: leaving the reset screens shows a fresh sign-in screen, not their last state.
+          key="reset-link"
+          initial={"token" in link ? { name: "reset", token: link.token } : { name: "forgot" }}
+          {...("error" in link ? { initialError: accountErrorMessage(link.error) } : {})}
+          onBackToSignIn={leave}
+        />
+        <Toaster />
+      </>
     );
   }
+  if (status === "unknown") return <Spinner />;
+  if (status === "signedOut")
+    return (
+      <>
+        <AuthScreens />
+        <Toaster />
+      </>
+    );
+  return <Shell />;
+}
+
+function Spinner() {
   return (
-    <QueryClientProvider client={getQueryClient()}>
-      <Shell />
-    </QueryClientProvider>
+    <div className="flex h-full items-center justify-center">
+      <div className="size-6 animate-spin rounded-full border-2 border-fg-subtle border-t-transparent" aria-label="Loading" />
+    </div>
   );
 }
 
@@ -91,6 +134,7 @@ function Shell() {
         {route.name === "home" && <HomeView />}
       </main>
       <ImportingOverlay />
+      {API_MODE && <ImportLocalOffer />}
       <Toaster />
     </div>
   );

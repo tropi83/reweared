@@ -26,6 +26,8 @@ services:
     environment:
       NODE_ENV: development
       PUBLIC_ORIGIN: http://localhost:8080
+      # The Vite dev server (`pnpm dev` through its /api proxy, and the `pnpm tauri dev` webview) runs on :1420.
+      CORS_ORIGINS: tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:1420
       MAIL_MODE: smtp
       SMTP_URL: smtp://mailpit:1025
       MAIL_FROM: AI Image Variations <no-reply@localhost>

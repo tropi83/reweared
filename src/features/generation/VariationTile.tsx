@@ -103,7 +103,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
             <UseAsSourceButton assetId={asset.id} />
             <TileButton
               onClick={async () => {
-                const blob = await getServices().storage.readImage(doc.listing.id, "generation", asset.id);
+                const blob = await getServices().listings.readImage(doc.listing.id, "generation", asset.id);
                 if (blob) await exportSingle({ blob, name: `${doc.listing.name}-${job.index}` }, { type: asset.mimeType });
               }}
               label={t("common.download")}

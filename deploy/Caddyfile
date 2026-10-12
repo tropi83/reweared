@@ -32,9 +32,8 @@
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "no-referrer"
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
-		# The web bundle is still the local-first client until phase 3: it talks to Google and Cloudflare itself
-		# (same hosts as the Tauri CSP). Phase 3 shrinks connect-src to 'self'.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com https://cloudresourcemanager.googleapis.com https://api.cloudflare.com https://*.workers.dev; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		# The web bundle is the account version (VITE_API_ORIGIN=/, phase 3): it talks to this origin only.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		-Server
 	}
 }

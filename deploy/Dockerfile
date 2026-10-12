@@ -22,6 +22,9 @@ RUN pnpm --filter @aiv/server build \
  && cp -r apps/server/dist apps/server/drizzle /out/
 
 FROM deps AS web-build
+# The bundle Caddy serves is the account version of the app, on the same origin as the API (phase 3).
+ARG VITE_API_ORIGIN=/
+ENV VITE_API_ORIGIN=${VITE_API_ORIGIN}
 RUN pnpm build
 
 FROM node:22.23.3-alpine3.24 AS server

@@ -8,7 +8,8 @@ const log = createLogger("secrets");
  * Secret keys are a closed set, mirrored by the Rust command allowlist. Adding a secret means
  * adding it here and in src-tauri/src/secrets.rs.
  */
-export type SecretKey = "gemini_api_key" | "google_oauth" | "cloudflare_api_token" | "cloudflare_worker_secret";
+/** `session_token`: the API session of the desktop and phone apps (API mode); the web app uses httpOnly cookies instead. */
+export type SecretKey = "gemini_api_key" | "google_oauth" | "cloudflare_api_token" | "cloudflare_worker_secret" | "session_token";
 
 /**
  * Where credentials live.

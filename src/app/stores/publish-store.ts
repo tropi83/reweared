@@ -87,8 +87,8 @@ async function runDelegated(bridge: PublishBridge, doc: ListingDocument, session
   const listingId = doc.listing.id;
   set({ session: { stage: "browsing", busy: true, listingId } });
   try {
-    const { storage } = getServices();
-    const payload = await buildPublishPayload(doc, (asset) => storage.readImage(listingId, asset.kind, asset.id));
+    const { listings } = getServices();
+    const payload = await buildPublishPayload(doc, (asset) => listings.readImage(listingId, asset.kind, asset.id));
     if (session !== epoch) return;
     const report = await bridge.run(payload);
     if (session !== epoch) return;
@@ -214,10 +214,10 @@ export const usePublishStore = create<PublishState>((set, get) => ({
     if (!doc || current.stage === "closed" || current.busy || doc.listing.id !== current.listingId || !postEligibility(doc).ok) return;
     const session = epoch;
     const stale = () => session !== epoch;
-    const { publish, storage } = getServices();
+    const { publish, listings } = getServices();
     set((s) => ({ session: { ...s.session, busy: true, error: undefined, report: undefined } }));
     try {
-      const payload = await buildPublishPayload(doc, (asset) => storage.readImage(doc.listing.id, asset.kind, asset.id));
+      const payload = await buildPublishPayload(doc, (asset) => listings.readImage(doc.listing.id, asset.kind, asset.id));
       if (stale()) return;
       await publish.prefill(payload);
       const started = Date.now();

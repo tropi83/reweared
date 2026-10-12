@@ -82,12 +82,12 @@ export function ExportDialog({ open, onClose, assetIds }: { open: boolean; onClo
     if (!doc) return;
     setBusy(true);
     try {
-      const { storage } = getServices();
+      const { listings } = getServices();
       const items: ExportItem[] = [];
       for (const id of assetIds) {
         const asset = doc.images[id];
         if (!asset) continue;
-        const blob = await storage.readImage(doc.listing.id, asset.kind, asset.id);
+        const blob = await listings.readImage(doc.listing.id, asset.kind, asset.id);
         if (!blob) continue;
         const job = asset.jobId ? doc.jobs[asset.jobId] : undefined;
         items.push({ blob, name: `${doc.listing.name}-${job ? `variation-${job.index}` : "original"}-${asset.id.slice(-6)}` });

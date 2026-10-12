@@ -11,6 +11,11 @@ interface ImportMetaEnv {
   readonly VITE_GOOGLE_OAUTH_CLIENT_SECRET_DESKTOP?: string;
   /** Enables the Mock provider in the UI (default: enabled in dev builds). */
   readonly VITE_ENABLE_MOCK_PROVIDER?: string;
+  /**
+   * Origin of the AI Image Variations API (accounts, server storage and generation). Set: the app runs in API mode
+   * ("/" for the web bundle served by Caddy, the public origin for Tauri builds). Unset: the local-first app.
+   */
+  readonly VITE_API_ORIGIN?: string;
 }
 
 interface ImportMeta {

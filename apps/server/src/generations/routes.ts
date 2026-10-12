@@ -4,13 +4,23 @@ import { z } from "zod";
 import { idParams } from "@aiv/contracts/common";
 import { startCopyBody, startedRunDto, startGenerationBody } from "@aiv/contracts/generation";
 import { sessionUser } from "../http/auth-guard";
+import type { ObjectStore } from "../storage/object-store";
+import { RedisEventPublisher } from "../queue/events";
+import { deleteGeneration } from "./delete-generation";
 import { cancelJob, retryJob, startCopyRun, startImageRun, type RunDeps } from "./runs";
 
 /** Starting runs is the expensive part of the API: a tighter limit than the global one. */
 const START_LIMIT = { rateLimit: { max: 20, timeWindow: "1 minute" } };
 
-export function registerGenerationRoutes(app: FastifyInstance, deps: RunDeps, guard: onRequestAsyncHookHandler): void {
+export function registerGenerationRoutes(app: FastifyInstance, deps: RunDeps, guard: onRequestAsyncHookHandler, store: ObjectStore): void {
   const api = app.withTypeProvider<ZodTypeProvider>();
+  const events = new RedisEventPublisher(deps.redis);
+
+  /** Deletes a photo pack with its generated photos; unfinished jobs are stopped and refunded. */
+  api.delete("/api/v1/generations/:id", { onRequest: guard, schema: { params: idParams } }, async (req, reply) => {
+    await deleteGeneration({ ...deps, store, events, log: req.log }, sessionUser(req).id, req.params.id);
+    return reply.code(204).send();
+  });
 
   api.post(
     "/api/v1/listings/:id/generations",

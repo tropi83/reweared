@@ -70,11 +70,11 @@ export function PublishPanel() {
   const exportPhotos = async () => {
     setExporting(true);
     try {
-      const { storage } = getServices();
+      const { listings } = getServices();
       const items: ExportItem[] = [];
       for (const id of orderedPhotoIds(doc)) {
         const asset = doc.images[id];
-        const blob = asset && (await storage.readImage(doc.listing.id, asset.kind, asset.id));
+        const blob = asset && (await listings.readImage(doc.listing.id, asset.kind, asset.id));
         if (blob) items.push({ blob, name: `${doc.listing.name}-${items.length + 1}` });
       }
       if (await exportMany(items, { type: "image/jpeg", quality: 0.92 }, `${doc.listing.name}-vinted`)) {

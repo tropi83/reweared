@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown, Sparkles, Square, UserRound, WandSparkles } from "lucide-react";
+import { API_MODE } from "@/app/api-mode";
 import { listingReadiness, type ListingReadiness } from "@/app/listing-readiness";
+import { listingRunCost, useCredits, usePlatform } from "@/app/query/credits";
 import { navigate } from "@/app/router";
 import { getServices } from "@/app/services";
 import { useProviderStatuses } from "@/app/query/auth-status";
@@ -42,6 +44,8 @@ export function ListingSetupCard() {
   useComposerStore((s) => s.modelId);
   const customRecipes = useRecipesStore((s) => s.custom);
   useComposerDefaults();
+  const { credits } = useCredits(API_MODE);
+  const platform = usePlatform(API_MODE);
   const [promptOverrides, setPromptOverrides] = useState<Record<string, string>>({});
   const [customRecipeId, setCustomRecipeId] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -58,15 +62,23 @@ export function ListingSetupCard() {
   const mannequinOn = !!doc.listing.useMannequin && applies && !!mannequin;
   const shots = selection ? buildShots(selection, mannequinOn && mannequin ? { mannequin } : {}) : [];
   const customRecipe = customRecipes.find((r) => r.id === customRecipeId);
-  const readiness = listingReadiness({ hasImage: true, hasSelection: !!selection, photosReady: photoPartReady(), textReady: textPartReady() });
+  const photoCount = customRecipe ? 4 : shots.length;
+  // API mode: what the run costs at the platform's prices, checked against the balance before the server does.
+  const cost = API_MODE && platform && selection ? listingRunCost(platform, photoCount) : undefined;
+  const readiness = listingReadiness({
+    hasImage: true,
+    hasSelection: !!selection,
+    photosReady: photoPartReady(),
+    textReady: textPartReady(),
+    ...(cost !== undefined && credits ? { credits: { balance: credits.balance, cost } } : {}),
+  });
   const alreadyCreated = !!doc.listing.copy || Object.keys(doc.generations).length > 0;
   const activeJobs = Object.values(doc.jobs).filter((j) => j.status === "queued" || j.status === "generating");
   const activeGeneration = activeJobs[0] ? doc.generations[activeJobs[0].generationId] : undefined;
   const activeDone = activeGeneration ? activeGeneration.jobIds.filter((id) => doc.jobs[id]?.status === "completed").length : 0;
   const running = creating || copyBusy || activeJobs.length > 0;
-  const photoCount = customRecipe ? 4 : shots.length;
   // The label says what will actually run: a part whose provider is not usable is skipped; a blocked button promises nothing.
-  const label =
+  const action =
     !selection || readiness.blocker
       ? t("listing.createPlain")
       : alreadyCreated
@@ -76,6 +88,7 @@ export function ListingSetupCard() {
           : readiness.skipped.includes("photos")
             ? t("listing.createText")
             : t("listing.create", { count: photoCount });
+  const label = cost !== undefined && !readiness.blocker ? `${action} · ${t("credits.cost", { count: cost })}` : action;
 
   const run = () =>
     void generateListing({
@@ -188,28 +201,31 @@ export function ListingSetupCard() {
         }}
       />
 
-      <div className="rounded-lg border border-border">
-        <button
-          type="button"
-          className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-fg-muted hover:text-fg"
-          aria-expanded={advancedOpen}
-          onClick={() => setAdvancedOpen((v) => !v)}
-        >
-          {t("listing.advanced")}
-          <ChevronDown className={cn("size-3.5 transition-transform", advancedOpen && "rotate-180")} />
-        </button>
-        {advancedOpen && (
-          <div className="border-t border-border p-3">
-            <AdvancedOptions
-              shots={shots}
-              promptOverrides={promptOverrides}
-              onPromptOverridesChange={setPromptOverrides}
-              customRecipeId={customRecipeId}
-              onCustomRecipeChange={setCustomRecipeId}
-            />
-          </div>
-        )}
-      </div>
+      {/* API mode runs the category's pack only: prompt overrides and custom recipes are local for now. */}
+      {!API_MODE && (
+        <div className="rounded-lg border border-border">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-fg-muted hover:text-fg"
+            aria-expanded={advancedOpen}
+            onClick={() => setAdvancedOpen((v) => !v)}
+          >
+            {t("listing.advanced")}
+            <ChevronDown className={cn("size-3.5 transition-transform", advancedOpen && "rotate-180")} />
+          </button>
+          {advancedOpen && (
+            <div className="border-t border-border p-3">
+              <AdvancedOptions
+                shots={shots}
+                promptOverrides={promptOverrides}
+                onPromptOverridesChange={setPromptOverrides}
+                customRecipeId={customRecipeId}
+                onCustomRecipeChange={setCustomRecipeId}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         {running ? (
@@ -241,7 +257,12 @@ export function ListingSetupCard() {
             {label}
           </Button>
         )}
-        <ListingHints readiness={readiness} lastRun={lastRun} providerId={composerProviderId} copyProviderId={settings.copyProviderId} />
+        <ListingHints
+          readiness={readiness}
+          lastRun={lastRun}
+          providerId={API_MODE ? PLATFORM_ERRORS : composerProviderId}
+          copyProviderId={settings.copyProviderId}
+        />
       </div>
       <ConfirmDialog
         open={confirmRecreate}
@@ -258,6 +279,9 @@ export function ListingSetupCard() {
   );
 }
 
+/** API mode: run errors read as the platform's (credits, daily limit), not as a provider account's. */
+const PLATFORM_ERRORS = "platform";
+
 /** One line per blocker / skipped part / start failure, under the button. Text errors live in the copy panel. */
 function ListingHints({
   readiness,
@@ -271,14 +295,19 @@ function ListingHints({
   copyProviderId: string;
 }) {
   const t = useT();
-  const toSettings = () => navigate({ name: "settings", section: "providers" });
-  const link = (text: string) => (
-    <button type="button" className="inline-flex items-center gap-1 text-left text-accent hover:underline" onClick={toSettings}>
+  const link = (text: string, section = "providers") => (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 text-left text-accent hover:underline"
+      onClick={() => navigate({ name: "settings", section })}
+    >
       <Sparkles className="size-3 shrink-0" /> {text}
     </button>
   );
   const lines: ReactNode[] = [];
-  if (readiness.blocker) lines.push(readiness.blocker === "listing.needProviders" ? link(t(readiness.blocker)) : t(readiness.blocker));
+  if (readiness.blocker === "listing.needProviders") lines.push(link(t(readiness.blocker)));
+  else if (readiness.blocker === "listing.needCredits") lines.push(link(t(readiness.blocker), "credits"));
+  else if (readiness.blocker) lines.push(t(readiness.blocker));
   else {
     if (readiness.skipped.includes("photos")) lines.push(link(t("listing.skipPhotos")));
     if (readiness.skipped.includes("text"))

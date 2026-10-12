@@ -5,6 +5,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 
 const host = process.env.TAURI_DEV_HOST;
+/** The dev stack's public origin (compose.dev.yaml PUBLIC_ORIGIN). */
+const apiProxyTarget = process.env.API_PROXY_TARGET ?? "http://localhost:8080";
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
@@ -20,6 +22,19 @@ export default defineConfig(() => ({
     host: host || false,
     hmr: host ? { protocol: "ws", host, port: 1421 } : undefined,
     watch: { ignored: ["**/src-tauri/**"] },
+    // `VITE_API_ORIGIN=/ pnpm dev`: the API is reached through this proxy, so its session cookies are same-origin
+    // as in production behind Caddy. The proxy presents the stack's own origin, as the bundle Caddy serves would:
+    // the api accepts cookie-authenticated writes from its PUBLIC_ORIGIN only (CSRF guard).
+    proxy: {
+      "/api": {
+        target: apiProxyTarget,
+        configure: (proxy) => {
+          proxy.on("proxyReq", (req) => {
+            if (req.getHeader("origin")) req.setHeader("origin", apiProxyTarget);
+          });
+        },
+      },
+    },
   },
   envPrefix: ["VITE_", "TAURI_ENV_*"],
   build: {

@@ -1,18 +1,12 @@
 import { create } from "zustand";
-import {
-  AppError,
-  CURRENT_SCHEMA_VERSION,
-  summarize,
-  type GenerationJob,
-  type ImageAsset,
-  type ImageMimeType,
-  type ListingDocument,
-  type ListingSummary,
-} from "@aiv/domain/models";
-import { createThumbnail, decodeImage, validateImageFile } from "@/infrastructure/image/image-processing";
-import { createId, nowIso } from "@aiv/domain/lib/ids";
+import { AppError, summarize, toGenerationError, type GenerationJob, type ImageMimeType, type ListingDocument, type ListingSummary } from "@aiv/domain/models";
+import { decodeImage, validateImageFile } from "@/infrastructure/image/image-processing";
+import { nowIso } from "@aiv/domain/lib/ids";
 import { createLogger } from "@/lib/logger";
-import { evictImageUrls, primeImageUrl } from "../image-urls";
+import { evictImageUrls } from "../image-urls";
+import { errorMessage } from "@/i18n/errors";
+import { toast } from "./toast-store";
+import { invalidateCredits } from "../query/credits";
 import { getServices } from "../services";
 
 const log = createLogger("listings");
@@ -24,6 +18,8 @@ interface ListingsState {
   loadingListing: boolean;
   loadSummaries(): Promise<void>;
   open(listingId: string): Promise<ListingDocument | null>;
+  /** Reads the open listing again (API mode: after the server changed it), keeping edits not saved yet. */
+  reload(): Promise<void>;
   close(): void;
   createFromFile(file: Blob, fileName?: string): Promise<ListingDocument>;
   rename(listingId: string, name: string): Promise<void>;
@@ -49,7 +45,7 @@ function scheduleSave(get: () => ListingsState, immediate: boolean) {
     const doc = get().current;
     if (!doc) return;
     try {
-      await getServices().storage.saveListing(doc);
+      await getServices().listings.save(doc);
     } catch (err) {
       log.error("save failed", err);
     }
@@ -69,39 +65,6 @@ function scheduleSave(get: () => ListingsState, immediate: boolean) {
   }
 }
 
-async function storeImageWithThumbnail(listingId: string, kind: ImageAsset["kind"], blob: Blob, mimeType: ImageMimeType, extra: Partial<ImageAsset>) {
-  const { storage } = getServices();
-  const decoded = await decodeImage(blob);
-  let thumbnail: Blob;
-  try {
-    thumbnail = await createThumbnail(decoded.bitmap);
-  } finally {
-    decoded.bitmap.close();
-  }
-  const asset: ImageAsset = {
-    id: createId("img"),
-    listingId,
-    kind,
-    mimeType,
-    width: decoded.width,
-    height: decoded.height,
-    byteSize: blob.size,
-    createdAt: nowIso(),
-    ...extra,
-  };
-  try {
-    await storage.writeImage(listingId, kind, asset.id, blob);
-    await storage.writeImage(listingId, "thumbnail", asset.id, thumbnail);
-  } catch (err) {
-    await storage.deleteImage(listingId, kind, asset.id).catch(() => undefined);
-    await storage.deleteImage(listingId, "thumbnail", asset.id).catch(() => undefined);
-    throw new AppError("STORAGE_ERROR", "The image could not be saved on this device.", { cause: err });
-  }
-  primeImageUrl(listingId, kind, asset.id, blob);
-  primeImageUrl(listingId, "thumbnail", asset.id, thumbnail);
-  return asset;
-}
-
 export const useListingsStore = create<ListingsState>((set, get) => ({
   summaries: [],
   current: null,
@@ -111,7 +74,7 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
   async loadSummaries() {
     set({ loadingList: true });
     try {
-      set({ summaries: await getServices().storage.listListings() });
+      set({ summaries: await getServices().listings.list() });
     } finally {
       set({ loadingList: false });
     }
@@ -128,22 +91,23 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     await get().flush();
     set({ loadingListing: true });
     try {
-      const doc = await getServices().storage.getListing(listingId);
-      if (doc) {
-        // Jobs interrupted by a previous app close must never look alive.
-        for (const job of Object.values(doc.jobs)) {
-          if (job.status === "queued" || job.status === "generating") {
-            job.status = "failed";
-            job.error = { code: "CANCELLED", message: "Interrupted when the app closed.", retryable: false };
-            job.completedAt = nowIso();
-          }
-        }
-      }
+      const doc = await getServices().listings.get(listingId);
       set({ current: doc });
       return doc;
     } finally {
       set({ loadingListing: false });
     }
+  },
+
+  async reload() {
+    const id = get().current?.listing.id;
+    if (!id) return;
+    await get().flush();
+    const doc = await getServices().listings.get(id);
+    // Another listing may have been opened, or an edit made, while the request was out.
+    if (!doc || get().current?.listing.id !== id || saveTimer) return;
+    const summary = summarize(doc);
+    set({ current: doc, summaries: get().summaries.map((s) => (s.id === id ? summary : s)) });
   },
 
   close() {
@@ -153,7 +117,6 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
 
   async createFromFile(file, fileName) {
     const validated = await validateImageFile(file);
-    const listingId = createId("lst");
     const mime: ImageMimeType = validated.mimeType === "image/jpeg" ? "image/jpeg" : validated.mimeType === "image/png" ? "image/png" : "image/webp";
     // Non-native formats (gif/bmp/avif) are re-encoded losslessly to PNG so every stored original is a web-safe file.
     let blob = validated.blob;
@@ -168,19 +131,8 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
       }
       storedMime = "image/png";
     }
-    const asset = await storeImageWithThumbnail(listingId, "original", blob, storedMime, fileName ? { fileName } : {});
-    const now = nowIso();
     const baseName = (fileName ?? "").replace(/\.[^.]+$/, "").trim();
-    const doc: ListingDocument = {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      appVersion: getServices().appVersion,
-      listing: { id: listingId, name: baseName || "Untitled listing", originalImageId: asset.id, coverImageId: asset.id, createdAt: now, updatedAt: now },
-      images: { [asset.id]: asset },
-      generations: {},
-      jobs: {},
-      toPost: [],
-    };
-    await getServices().storage.saveListing(doc);
+    const doc = await getServices().listings.create(baseName || "Untitled listing", { blob, mimeType: storedMime, ...(fileName ? { fileName } : {}) });
     await get().flush();
     set({ current: doc, summaries: [summarize(doc), ...get().summaries] });
     return doc;
@@ -195,11 +147,11 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
       });
       return;
     }
-    const doc = await getServices().storage.getListing(listingId);
+    const doc = await getServices().listings.get(listingId);
     if (!doc) return;
     doc.listing.name = trimmed;
     doc.listing.updatedAt = nowIso();
-    await getServices().storage.saveListing(doc);
+    await getServices().listings.save(doc);
     set({ summaries: get().summaries.map((s) => (s.id === listingId ? summarize(doc) : s)) });
   },
 
@@ -212,29 +164,17 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
       saveTimer = null;
       set({ current: null });
     }
-    await getServices().storage.deleteListing(listingId);
+    await getServices().listings.delete(listingId);
     evictImageUrls(listingId);
     set({ summaries: get().summaries.filter((s) => s.id !== listingId) });
   },
 
   async duplicate(listingId) {
-    const { storage } = getServices();
-    const source = await storage.getListing(listingId);
+    const source = get().summaries.find((s) => s.id === listingId) ?? (await getServices().listings.get(listingId))?.listing;
     if (!source) return null;
-    const newId = createId("lst");
-    const now = nowIso();
-    const doc: ListingDocument = structuredClone(source);
-    doc.listing = { ...doc.listing, id: newId, name: `${source.listing.name} (copy)`, createdAt: now, updatedAt: now };
-    for (const image of Object.values(doc.images)) image.listingId = newId;
-    for (const gen of Object.values(doc.generations)) gen.listingId = newId;
-    for (const job of Object.values(doc.jobs)) job.listingId = newId;
-    for (const image of Object.values(source.images)) {
-      for (const bucket of [image.kind, "thumbnail"] as const) {
-        const blob = await storage.readImage(listingId, bucket, image.id);
-        if (blob) await storage.writeImage(newId, bucket, image.id, blob);
-      }
-    }
-    await storage.saveListing(doc);
+    await get().flush();
+    const doc = await getServices().listings.duplicate(listingId, `${source.name} (copy)`);
+    if (!doc) return null;
     set({ summaries: [summarize(doc), ...get().summaries] });
     return doc;
   },
@@ -256,7 +196,7 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
       const doc = get().current;
       if (doc) {
         savePromise = getServices()
-          .storage.saveListing(doc)
+          .listings.save(doc)
           .catch((err) => log.error("flush failed", err));
       }
     }
@@ -274,7 +214,7 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
   async deleteImages(assetIds) {
     const current = get().current;
     if (!current) return;
-    const { storage, queue } = getServices();
+    const { listings, queue } = getServices();
     const ids = new Set(assetIds.filter((id) => id !== current.listing.originalImageId));
     get().commit(
       (doc) => {
@@ -303,8 +243,7 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     for (const id of ids) {
       const asset = current.images[id];
       if (!asset) continue;
-      await storage.deleteImage(current.listing.id, asset.kind, id).catch((err) => log.warn("delete image failed", err));
-      await storage.deleteImage(current.listing.id, "thumbnail", id).catch(() => undefined);
+      await listings.deleteImage(current.listing.id, asset).catch((err) => log.warn("delete image failed", err));
       evictImageUrls(current.listing.id, id);
     }
   },
@@ -314,6 +253,26 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     if (!current) return;
     const gen = current.generations[generationId];
     if (!gen) return;
+    const { runs } = getServices();
+    if (runs) {
+      // API mode: the server deletes the pack, its jobs and photos in one go, then the listing is read again.
+      try {
+        await runs.deletePack(generationId);
+        // Unfinished jobs were refunded.
+        invalidateCredits();
+      } catch (err) {
+        const error = toGenerationError(err);
+        log.warn("pack not deleted", error.code);
+        toast.error(errorMessage(error));
+        return;
+      }
+      for (const jobId of gen.jobIds) {
+        const imageId = current.jobs[jobId]?.resultImageId;
+        if (imageId) evictImageUrls(current.listing.id, imageId);
+      }
+      await get().reload();
+      return;
+    }
     getServices().queue.cancelGeneration(generationId);
     const imageIds = gen.jobIds.map((j) => current.jobs[j]?.resultImageId).filter((id): id is string => !!id);
     await get().deleteImages(imageIds);
@@ -331,7 +290,7 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     if (!current || current.listing.id !== job.listingId) {
       throw new AppError("CANCELLED", "The listing was closed before the result arrived.", { retryable: false });
     }
-    const asset = await storeImageWithThumbnail(job.listingId, "generation", blob, mimeType, { generationId: job.generationId, jobId: job.id });
+    const asset = await getServices().listings.storeGeneratedImage(job.listingId, blob, mimeType, { generationId: job.generationId, jobId: job.id });
     get().commit((doc) => {
       doc.images[asset.id] = asset;
     });

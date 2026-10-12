@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Copy, FileText, RefreshCw, Settings2, Square } from "lucide-react";
+import { API_MODE } from "@/app/api-mode";
 import { navigate } from "@/app/router";
 import { getServices } from "@/app/services";
 import { useAuthStatus } from "@/app/query/auth-status";
@@ -28,7 +29,9 @@ export function ListingCopyPanel() {
   const copyProviders = [...getServices().copyProviders.values()];
   const copyProviderId = settings.copyProviderId;
   const provider = getServices().copyProviders.get(copyProviderId) ?? copyProviders[0];
-  const canGenerate = useAuthStatus(provider?.id ?? "")?.state === "authenticated";
+  // API mode: the platform writes the copy; there is no provider account to check.
+  const authenticated = useAuthStatus(API_MODE ? "" : (provider?.id ?? ""))?.state === "authenticated";
+  const canGenerate = API_MODE || authenticated;
 
   if (!doc?.listing.originalImageId) return null;
   const copy = doc.listing.copy;
@@ -50,16 +53,18 @@ export function ListingCopyPanel() {
           <FileText className="size-3.5" /> {t("copy.title")}
         </span>
         <div className="flex items-center gap-1">
-          {/* The provider and model are chosen in Settings → Models. */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t("models.change")}
-            title={model ? `${provider?.displayName} · ${model.label}` : undefined}
-            onClick={() => navigate({ name: "settings", section: "models" })}
-          >
-            <Settings2 className="size-3.5" />
-          </Button>
+          {/* The provider and model are chosen in Settings → Models (local app; on the API they are the platform's). */}
+          {!API_MODE && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("models.change")}
+              title={model ? `${provider?.displayName} · ${model.label}` : undefined}
+              onClick={() => navigate({ name: "settings", section: "models" })}
+            >
+              <Settings2 className="size-3.5" />
+            </Button>
+          )}
           {busy ? (
             <Button variant="ghost" size="sm" leftIcon={<Square className="size-3.5" />} onClick={cancelCopy}>
               {t("common.cancel")}

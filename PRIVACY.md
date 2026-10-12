@@ -49,14 +49,21 @@ Generations and listing copy are processed by the provider you chose, under its 
 
 Your data belongs to you. Files are stored in standard formats (JSON, PNG/JPEG/WebP) so they remain usable without this application.
 
-## Planned: accounts and server (ADR 0001)
+## Accounts and server (ADR 0001)
 
-Not implemented yet. When it ships, this page will say, in plain language:
+**Builds made with an account (API mode, phase 3)** work as below; the local-first builds described above are unchanged. Before this release is published, this page is rewritten around the account version and completed with the hosting location, retention periods and the privacy contact.
+
+- **Sign-in**: email and password (stored hashed by the server, never in clear text). The web app keeps the session in an httpOnly cookie; the desktop app keeps a session token in the system keychain (on phones, in memory until the app closes).
+- **Your listings, photos and texts** are stored on the server, private to your account; the app on your device only displays them. Settings shared by your devices (language, theme, mannequin) are stored with the account; provider choices are not (the platform's providers are used).
+- **Importing from this device** is optional and offered once: it copies each listing's original photo, name, category, brand, mannequin choice and texts into the account. Generated photos are not copied. The device keeps its copy.
+- **Signing out** removes the session from the device and empties what the app showed. **Deleting the account** (confirmed by an emailed link) removes its listings, photos and history from the server.
+
+The commitments below were written when this was planned and still apply:
 
 - **What we store** on our server (hosted in the EU — to be confirmed): your account (email, hashed password or Google identity), your listings, photos and generated images, your credit balance and its history, and server logs (without photos, prompts or passwords).
 - **Who processes it for us** (sub-processors): the image and text providers (Cloudflare, Google), the email service (Resend) and the hosting provider. Photos are sent to a provider only for a generation you start.
 - **What changes for you**: no API key to set up; listings follow your account across devices; generation needs the network.
 - **Your rights**: export of your listings, deletion of your account (database records and stored images), retention periods, and the contact for privacy requests.
-- **What the server already does with photos** (phase 1, not yet used by the apps): location (GPS) and camera metadata are removed from every uploaded photo before it is stored; photos are private to their account and never published through a public link; deleting the account requires confirming a link sent by email and removes the photos.
-- **Who the server sends photos to** (phase 2, not yet used by the apps): for a run you start, the worker sends a resized copy of the listing's photo and the shot's prompt to the platform's image provider (Cloudflare Workers AI by default), and the original photo to the text provider (Google Gemini by default) to write the title and description. Generated photos are stored with your listing, without metadata; nothing is sent for analytics.
+- **What the server does with photos**: location (GPS) and camera metadata are removed from every uploaded photo before it is stored; photos are private to their account and never published through a public link; deleting the account requires confirming a link sent by email and removes the photos.
+- **Who the server sends photos to**: for a run you start, the worker sends a resized copy of the listing's photo and the shot's prompt to the platform's image provider (Cloudflare Workers AI by default), and the original photo to the text provider (Google Gemini by default) to write the title and description. Generated photos are stored with your listing, without metadata; nothing is sent for analytics.
 - **What does not change**: no third-party analytics or ad tracking; the Vinted pre-fill still runs on your device and never publishes for you.
