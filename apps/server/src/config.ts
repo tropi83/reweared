@@ -34,6 +34,8 @@ const configSchema = z.object({
   SMTP_URL: z.string().min(1).optional(),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  // Free credits given each month (lazily, on the first read or spend of the month). The economic model may change.
+  FREE_MONTHLY_CREDITS: z.coerce.number().int().nonnegative().default(60),
   MAX_UPLOAD_BYTES: z.coerce
     .number()
     .int()

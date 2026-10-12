@@ -57,7 +57,15 @@ async function main(): Promise<void> {
       { name: "redis", check: async () => void (await redis.ping()) },
       { name: "storage", check: () => store.ping() },
     ],
-    accounts: { auth, publicOrigin: config.PUBLIC_ORIGIN, redis, db: database.db, store, maxUploadBytes: config.MAX_UPLOAD_BYTES },
+    accounts: {
+      auth,
+      publicOrigin: config.PUBLIC_ORIGIN,
+      redis,
+      db: database.db,
+      store,
+      maxUploadBytes: config.MAX_UPLOAD_BYTES,
+      freeMonthlyCredits: config.FREE_MONTHLY_CREDITS,
+    },
   });
 
   const shutdown = (signal: string) => {

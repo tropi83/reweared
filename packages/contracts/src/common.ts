@@ -15,6 +15,9 @@ export const HTTP_ERROR_CODES = [
   "PAYLOAD_TOO_LARGE",
   "UNSUPPORTED_MEDIA_TYPE",
   "RATE_LIMITED",
+  "INSUFFICIENT_CREDITS",
+  "PROVIDER_BUDGET_EXHAUSTED",
+  "CONFLICT",
   "UNKNOWN_ERROR",
 ] as const;
 export type HttpErrorCode = (typeof HTTP_ERROR_CODES)[number];

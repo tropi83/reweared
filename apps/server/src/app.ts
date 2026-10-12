@@ -8,6 +8,7 @@ import type { Auth } from "./auth/auth";
 import { registerAuthRoutes } from "./auth/routes";
 import { requireUser } from "./http/auth-guard";
 import { registerErrorHandling } from "./http/errors";
+import { registerCreditRoutes } from "./credits/routes";
 import { registerImageRoutes } from "./images/routes";
 import { registerListingRoutes } from "./listings/routes";
 import { registerMeRoutes } from "./me/routes";
@@ -27,7 +28,7 @@ export interface AppDeps {
   logger: FastifyBaseLogger | false;
   readiness: ReadinessCheck[];
   /** Accounts and the routes behind them; absent in unit tests of the bare app. */
-  accounts?: { auth: Auth; publicOrigin: string; redis: Redis; db: Db; store: ObjectStore; maxUploadBytes: number };
+  accounts?: { auth: Auth; publicOrigin: string; redis: Redis; db: Db; store: ObjectStore; maxUploadBytes: number; freeMonthlyCredits: number };
 }
 
 /** Builds the API without listening, so tests drive it with `app.inject()`. */
@@ -82,7 +83,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   );
 
   if (deps.accounts) {
-    const { auth, publicOrigin, db, store, maxUploadBytes } = deps.accounts;
+    const { auth, publicOrigin, db, store, maxUploadBytes, freeMonthlyCredits } = deps.accounts;
     const guard = requireUser(auth, [publicOrigin]);
     registerAuthRoutes(app, auth, publicOrigin);
     registerMeRoutes(app, guard);
@@ -90,6 +91,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     registerListingRoutes(app, { db, store, guard, log: app.log });
     registerRecipeRoutes(app, db, guard);
     registerImageRoutes(app, { db, store, guard, log: app.log, maxUploadBytes });
+    registerCreditRoutes(app, db, guard, freeMonthlyCredits);
   }
 
   return app;

@@ -37,7 +37,7 @@ export async function startHarness(origin = "http://app.test"): Promise<Harness>
   const app = await buildApp({
     logger: false,
     readiness: [],
-    accounts: { auth, publicOrigin: origin, redis, db: database.db, store, maxUploadBytes: 2 * 1024 * 1024 },
+    accounts: { auth, publicOrigin: origin, redis, db: database.db, store, maxUploadBytes: 2 * 1024 * 1024, freeMonthlyCredits: 60 },
   });
   // A state-changing route behind the guard, to exercise its CSRF origin check before real ones exist.
   app.post("/api/v1/__test/mutation", { onRequest: requireUser(auth, [origin]) }, async (req) => ({ userId: req.user?.id }));
