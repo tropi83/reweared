@@ -1,5 +1,6 @@
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
+import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
 import type { Redis } from "ioredis";
@@ -10,6 +11,7 @@ import { requireUser } from "./http/auth-guard";
 import { registerErrorHandling } from "./http/errors";
 import { registerCreditRoutes } from "./credits/routes";
 import { registerEventRoutes } from "./events/routes";
+import { registerPlatformRoutes } from "./platform/routes";
 import { registerGenerationRoutes } from "./generations/routes";
 import type { RunDeps } from "./generations/runs";
 import { registerImageRoutes } from "./images/routes";
@@ -32,6 +34,8 @@ export interface AppDeps {
   readiness: ReadinessCheck[];
   /** Accounts and the routes behind them; absent in unit tests of the bare app. */
   accounts?: { auth: Auth; publicOrigin: string; redis: Redis; db: Db; store: ObjectStore; maxUploadBytes: number; freeMonthlyCredits: number };
+  /** Origins of the desktop and phone apps (CORS, bearer tokens only). */
+  appOrigins?: string[];
   /** Generation runs (queues, dispatcher, credits); absent in tests that do not need them. */
   runs?: RunDeps;
 }
@@ -52,6 +56,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     // Must be loaded before the routes are declared: it attaches itself to each route as it is added.
     // Keyed by the proxy-aware client IP (it runs at onRequest, before the session is known); Better Auth
     // limits /api/auth/* itself. Routes tighten it with `config: { rateLimit: { max, timeWindow } }`.
+    // The web app is same-origin behind Caddy and needs no CORS. The Tauri apps call from their own origins with a
+    // bearer token: no credentials (cookies) cross origins, and the session token header is exposed to them.
+    await app.register(cors, {
+      origin: deps.appOrigins ?? [],
+      credentials: false,
+      methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
+      allowedHeaders: ["authorization", "content-type", "last-event-id"],
+      exposedHeaders: ["set-auth-token"],
+      maxAge: 600,
+    });
     await app.register(rateLimit, {
       global: true,
       max: 300,
@@ -100,6 +114,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (deps.runs) {
       registerGenerationRoutes(app, deps.runs, guard);
       registerEventRoutes(app, deps.runs.redis, guard);
+      registerPlatformRoutes(app, deps.runs);
     }
   }
 

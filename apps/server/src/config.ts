@@ -49,6 +49,16 @@ const configSchema = z.object({
   MAX_ACTIVE_JOBS_PER_USER: z.coerce.number().int().min(1).max(20).default(4),
   JOB_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
   CLOUDFLARE_DAILY_NEURON_BUDGET: z.coerce.number().int().nonnegative().default(9000),
+  // Origins of the desktop and phone apps (Tauri webviews); they authenticate with bearer tokens, never cookies.
+  CORS_ORIGINS: z
+    .string()
+    .default("tauri://localhost,http://tauri.localhost,https://tauri.localhost")
+    .transform((v) =>
+      v
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean),
+    ),
   MAX_UPLOAD_BYTES: z.coerce
     .number()
     .int()

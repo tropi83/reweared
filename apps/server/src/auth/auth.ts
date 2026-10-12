@@ -17,6 +17,8 @@ export const CLIENT_IP_HEADER = "x-aiv-client-ip";
 
 export interface AuthConfig {
   publicOrigin: string;
+  /** Other origins allowed to call /api/auth (the Tauri apps). */
+  appOrigins?: string[] | undefined;
   secret: string;
   google?: { clientId: string; clientSecret: string } | undefined;
 }
@@ -49,7 +51,7 @@ export function createAuth(config: AuthConfig, deps: AuthDeps) {
     secret: config.secret,
     database: drizzleAdapter(deps.db, { provider: "pg", schema: { user, session, account, verification } }),
     telemetry: { enabled: false },
-    trustedOrigins: [config.publicOrigin],
+    trustedOrigins: [config.publicOrigin, ...(config.appOrigins ?? [])],
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,

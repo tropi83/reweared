@@ -37,7 +37,7 @@ export async function startHarness(origin = "http://app.test"): Promise<Harness>
   const store = new S3ObjectStore(inject("s3"));
   const silent = { level: "silent", fatal() {}, error() {}, warn() {}, info() {}, debug() {}, trace() {}, silent() {}, child: () => silent } as never;
   const auth = createAuth(
-    { publicOrigin: origin, secret: "test-secret-0123456789-0123456789-abcdef" },
+    { publicOrigin: origin, appOrigins: ["tauri://localhost"], secret: "test-secret-0123456789-0123456789-abcdef" },
     { db: database.db, redis, mailer, log: silent, afterUserDeleted: deleteUserObjects(store, silent) },
   );
   const queueConnection = createQueueConnection(inject("redisUrl"));
@@ -53,6 +53,7 @@ export async function startHarness(origin = "http://app.test"): Promise<Harness>
   };
   const app = await buildApp({
     logger: false,
+    appOrigins: ["tauri://localhost"],
     readiness: [],
     accounts: { auth, publicOrigin: origin, redis, db: database.db, store, maxUploadBytes: 2 * 1024 * 1024, freeMonthlyCredits: 60 },
     runs,
