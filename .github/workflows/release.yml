@@ -54,11 +54,12 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Public OAuth Desktop client configuration (optional; see DEVELOPMENT.md).
-          VITE_GOOGLE_OAUTH_CLIENT_ID_DESKTOP: ${{ vars.GOOGLE_OAUTH_CLIENT_ID_DESKTOP }}
-          VITE_GOOGLE_OAUTH_CLIENT_SECRET_DESKTOP: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET_DESKTOP }}
+          # The public https origin of the API (repository variable); `pnpm tauri build` generates the app's
+          # permission and CSP for it (scripts/tauri.mjs) and refuses to build without it.
+          VITE_API_ORIGIN: ${{ vars.API_ORIGIN }}
           VITE_APP_VERSION: ${{ github.ref_name }}
         with:
+          tauriScript: pnpm tauri
           tagName: ${{ github.ref_name }}
           releaseName: "AI Image Variations ${{ github.ref_name }}"
           releaseBody: "See CHANGELOG.md."
