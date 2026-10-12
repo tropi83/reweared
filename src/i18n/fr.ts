@@ -281,6 +281,7 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "error.RATE_LIMITED": "Limite de débit du fournisseur atteinte. Nouvel essai automatique dès que possible.",
   "error.QUOTA_EXCEEDED":
     "Le quota journalier du fournisseur est épuisé. Réessayez après sa réinitialisation, ou vérifiez votre offre sur le tableau de bord du fournisseur.",
+  "error.PROVIDER_BUDGET_EXHAUSTED": "La génération d’images a atteint la limite du jour. Réessayez demain.",
   "error.gemini.RATE_LIMITED": "Limite de débit Gemini atteinte (requêtes par minute). Nouvel essai automatique dès que possible.",
   "error.gemini.QUOTA_EXCEEDED":
     "Quota Gemini journalier atteint pour ce modèle. Il se réinitialise à minuit heure du Pacifique — {resetLocal} heure locale, dans {resetIn}. Vérifiez votre plan et la facturation dans Google AI Studio.",

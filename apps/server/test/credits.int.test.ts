@@ -34,7 +34,9 @@ describe("credit ledger", () => {
   it("never goes negative under concurrent reservations", async () => {
     const id = await userId("alice@example.test");
     await h.database.db.transaction((tx) => ensureMonthlyGrant(tx, id, 10));
-    const results = await Promise.allSettled(Array.from({ length: 20 }, () => h.database.db.transaction((tx) => reserve(tx, id, 1, createId("gen")))));
+    const results = await Promise.allSettled(
+      Array.from({ length: 20 }, () => h.database.db.transaction((tx) => reserve(tx, id, 1, { generationId: createId("gen") }))),
+    );
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(10);
     const refused = results.filter((r) => r.status === "rejected");
     expect(refused).toHaveLength(10);
@@ -50,12 +52,12 @@ describe("credit ledger", () => {
     let aReserved!: () => void;
     const aHasReserved = new Promise<void>((resolve) => (aReserved = resolve));
     const a = h.database.db.transaction(async (tx) => {
-      await reserve(tx, id, 1, createId("gen"));
+      await reserve(tx, id, 1, { generationId: createId("gen") });
       aReserved();
       await aMayCommit;
     });
     await aHasReserved;
-    const b = h.database.db.transaction((tx) => reserve(tx, id, 1, createId("gen")));
+    const b = h.database.db.transaction((tx) => reserve(tx, id, 1, { generationId: createId("gen") }));
     await new Promise((r) => setTimeout(r, 200));
     releaseA();
     await a;
@@ -66,10 +68,12 @@ describe("credit ledger", () => {
   it("writes nothing when the balance is short, and the reservation rolls back with its transaction", async () => {
     const id = await userId("alice@example.test");
     await h.database.db.transaction((tx) => ensureMonthlyGrant(tx, id, 3));
-    await expect(h.database.db.transaction((tx) => reserve(tx, id, 5, createId("gen")))).rejects.toMatchObject({ code: "INSUFFICIENT_CREDITS" });
+    await expect(h.database.db.transaction((tx) => reserve(tx, id, 5, { generationId: createId("gen") }))).rejects.toMatchObject({
+      code: "INSUFFICIENT_CREDITS",
+    });
     await expect(
       h.database.db.transaction(async (tx) => {
-        await reserve(tx, id, 2, createId("gen"));
+        await reserve(tx, id, 2, { generationId: createId("gen") });
         throw new Error("job insert failed");
       }),
     ).rejects.toThrow("job insert failed");
@@ -82,7 +86,7 @@ describe("credit ledger", () => {
     const generationId = createId("gen");
     const jobId = createId("job");
     await h.database.db.transaction((tx) => ensureMonthlyGrant(tx, id, 5));
-    await h.database.db.transaction((tx) => reserve(tx, id, 2, generationId));
+    await h.database.db.transaction((tx) => reserve(tx, id, 2, { generationId }));
     const first = await h.database.db.transaction((tx) => refund(tx, { userId: id, jobId, credits: 1, generationId }));
     const second = await h.database.db.transaction((tx) => refund(tx, { userId: id, jobId, credits: 1, generationId }));
     expect([first, second]).toEqual([true, false]);

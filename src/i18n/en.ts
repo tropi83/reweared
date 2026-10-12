@@ -296,6 +296,7 @@ export const en = {
   "error.PERMISSION_DENIED": "Your account does not have access to this model or project.",
   "error.RATE_LIMITED": "The provider's rate limit is reached. We'll retry automatically when possible.",
   "error.QUOTA_EXCEEDED": "The provider's daily quota is used up. Try again after it resets, or check your plan on the provider's dashboard.",
+  "error.PROVIDER_BUDGET_EXHAUSTED": "Image generation has reached today's limit. Try again tomorrow.",
   // Provider-specific wordings, picked by errorMessage() when they exist. {resetLocal}/{resetIn} = next quota reset.
   "error.gemini.RATE_LIMITED": "Gemini rate limit reached (requests per minute). We'll retry automatically when possible.",
   "error.gemini.QUOTA_EXCEEDED":

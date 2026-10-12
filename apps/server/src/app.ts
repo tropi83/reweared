@@ -9,6 +9,8 @@ import { registerAuthRoutes } from "./auth/routes";
 import { requireUser } from "./http/auth-guard";
 import { registerErrorHandling } from "./http/errors";
 import { registerCreditRoutes } from "./credits/routes";
+import { registerGenerationRoutes } from "./generations/routes";
+import type { RunDeps } from "./generations/runs";
 import { registerImageRoutes } from "./images/routes";
 import { registerListingRoutes } from "./listings/routes";
 import { registerMeRoutes } from "./me/routes";
@@ -29,6 +31,8 @@ export interface AppDeps {
   readiness: ReadinessCheck[];
   /** Accounts and the routes behind them; absent in unit tests of the bare app. */
   accounts?: { auth: Auth; publicOrigin: string; redis: Redis; db: Db; store: ObjectStore; maxUploadBytes: number; freeMonthlyCredits: number };
+  /** Generation runs (queues, dispatcher, credits); absent in tests that do not need them. */
+  runs?: RunDeps;
 }
 
 /** Builds the API without listening, so tests drive it with `app.inject()`. */
@@ -92,6 +96,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     registerRecipeRoutes(app, db, guard);
     registerImageRoutes(app, { db, store, guard, log: app.log, maxUploadBytes });
     registerCreditRoutes(app, db, guard, freeMonthlyCredits);
+    if (deps.runs) registerGenerationRoutes(app, deps.runs, guard);
   }
 
   return app;

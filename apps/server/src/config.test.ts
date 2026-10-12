@@ -61,6 +61,19 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...base, S3_SECRET_ACCESS_KEY_FILE: "/missing" }, noFiles)).toThrow(/S3_SECRET_ACCESS_KEY_FILE: cannot read the secret file/);
   });
 
+  it("has no provider credential: keys belong to the worker", () => {
+    const config = loadConfig({ ...base, CLOUDFLARE_API_TOKEN: "cf-secret", GEMINI_API_KEY: "AIzaFAKE" }, noFiles) as Record<string, unknown>;
+    expect(Object.keys(config).filter((k) => /CLOUDFLARE_API|GEMINI_API|TOKEN|API_KEY$/.test(k) && k !== "RESEND_API_KEY")).toEqual([]);
+    expect(JSON.stringify(config)).not.toContain("cf-secret");
+    expect(JSON.stringify(config)).not.toContain("AIzaFAKE");
+  });
+
+  it("allows the mock provider only when enabled, and never in production", () => {
+    expect(() => loadConfig({ ...base, IMAGE_PROVIDER: "mock", NODE_ENV: "development" }, noFiles)).toThrow(/ENABLE_MOCK_PROVIDER/);
+    expect(loadConfig({ ...base, IMAGE_PROVIDER: "mock", ENABLE_MOCK_PROVIDER: "true", NODE_ENV: "development" }, noFiles).IMAGE_PROVIDER).toBe("mock");
+    expect(() => loadConfig({ ...base, IMAGE_PROVIDER: "mock", ENABLE_MOCK_PROVIDER: "true" }, noFiles)).toThrow(/not allowed in production/);
+  });
+
   it("refuses to start when Better Auth telemetry would be enabled", () => {
     for (const value of ["1", "true", "YES", "on"])
       expect(() => loadConfig({ ...base, BETTER_AUTH_TELEMETRY: value }, noFiles)).toThrow(/BETTER_AUTH_TELEMETRY/);

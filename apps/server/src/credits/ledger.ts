@@ -56,13 +56,22 @@ export async function ensureMonthlyGrant(tx: Tx, userId: string, amount: number,
 }
 
 /**
- * Reserves `amount` credits for a generation (key `reserve:<generationId>`), inside the transaction that creates
- * its jobs: both commit or neither does. Short balance → 402 INSUFFICIENT_CREDITS and nothing written.
+ * Reserves `amount` credits inside the transaction that creates the jobs they pay for: both commit or neither does.
+ * Key `reserve:<generationId>` for a new run, `reserve:job:<jobId>` for a manual retry of one job.
+ * Short balance → 402 INSUFFICIENT_CREDITS and nothing written.
  */
-export async function reserve(tx: Tx, userId: string, amount: number, generationId: string): Promise<void> {
+export async function reserve(tx: Tx, userId: string, amount: number, target: { generationId: string; retryJobId?: string }): Promise<void> {
   const balance = await lockBalance(tx, userId);
   if (balance < amount) throw new HttpError(402, "INSUFFICIENT_CREDITS", "Not enough credits for this run.");
-  await applyMovement(tx, { userId, delta: -amount, reason: "reserve", key: `reserve:${generationId}`, generationId });
+  const key = target.retryJobId ? `reserve:job:${target.retryJobId}` : `reserve:${target.generationId}`;
+  await applyMovement(tx, {
+    userId,
+    delta: -amount,
+    reason: "reserve",
+    key,
+    generationId: target.generationId,
+    ...(target.retryJobId ? { jobId: target.retryJobId } : {}),
+  });
 }
 
 /** Gives a job's credits back (key `refund:<jobId>`): a second call for the same job does nothing. */
