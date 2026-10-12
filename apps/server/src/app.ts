@@ -9,6 +9,7 @@ import { registerAuthRoutes } from "./auth/routes";
 import { requireUser } from "./http/auth-guard";
 import { registerErrorHandling } from "./http/errors";
 import { registerCreditRoutes } from "./credits/routes";
+import { registerEventRoutes } from "./events/routes";
 import { registerGenerationRoutes } from "./generations/routes";
 import type { RunDeps } from "./generations/runs";
 import { registerImageRoutes } from "./images/routes";
@@ -96,7 +97,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     registerRecipeRoutes(app, db, guard);
     registerImageRoutes(app, { db, store, guard, log: app.log, maxUploadBytes });
     registerCreditRoutes(app, db, guard, freeMonthlyCredits);
-    if (deps.runs) registerGenerationRoutes(app, deps.runs, guard);
+    if (deps.runs) {
+      registerGenerationRoutes(app, deps.runs, guard);
+      registerEventRoutes(app, deps.runs.redis, guard);
+    }
   }
 
   return app;
