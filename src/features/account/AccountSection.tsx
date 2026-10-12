@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { useT } from "@/i18n";
 import { Section } from "@/features/settings/SettingsPrimitives";
 import { accountErrorMessage } from "./account-errors";
+import { ImportLocalDialog, usePendingLocalListings } from "./ImportLocalDialog";
 
 /** Settings → Account (API mode): who is signed in, sign out, delete the account by email link. */
 export function AccountSection() {
@@ -13,6 +14,8 @@ export function AccountSection() {
   const me = useAccountStore((s) => s.me);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState<"signOut" | "delete" | null>(null);
+  const [pendingLocal, refreshPendingLocal] = usePendingLocalListings();
+  const [importOpen, setImportOpen] = useState(false);
 
   const signOut = async () => {
     setBusy("signOut");
@@ -49,7 +52,22 @@ export function AccountSection() {
             {t("account.delete")}
           </Button>
         </div>
+        {!!pendingLocal && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+            <p className="text-fg-muted">{t("import.local.body", { count: pendingLocal })}</p>
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              {t("import.local.title")}
+            </Button>
+          </div>
+        )}
       </div>
+      <ImportLocalDialog
+        open={importOpen}
+        onClose={() => {
+          setImportOpen(false);
+          refreshPendingLocal();
+        }}
+      />
       <ConfirmDialog
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}

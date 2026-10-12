@@ -9,6 +9,7 @@ import { HomeView } from "@/features/workspace/HomeView";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import { useGlobalImport } from "@/features/workspace/useImageImport";
 import { AuthScreens } from "@/features/account/AuthScreens";
+import { ImportLocalOffer } from "@/features/account/ImportLocalDialog";
 import { accountErrorMessage } from "@/features/account/account-errors";
 import { API_MODE } from "./api-mode";
 import { bootstrap } from "./bootstrap";
@@ -131,6 +132,7 @@ function Shell() {
         {route.name === "home" && <HomeView />}
       </main>
       <ImportingOverlay />
+      {API_MODE && <ImportLocalOffer />}
       <Toaster />
     </div>
   );

@@ -588,4 +588,13 @@ export const en = {
   "privacy.bodyApi":
     "Your listings, photos and generated texts are stored on our server, private to your account: never shared, never sold. Photos are sent to the AI provider the platform uses when you create a listing. Your password is never stored in clear text, and no analytics send your images or prompts anywhere. Deleting your account deletes all of it.",
   "about.api": "Your account · photos stored safely on the server",
+  "import.local.title": "Import from this device",
+  "import.local.body": "{count} listing(s) of the app's previous version are still on this device.",
+  "import.local.what":
+    "Importing copies each one into your account: original photo, name, category, brand, mannequin choice, title and description. Generated photos are not copied (you can generate them again) and no credits are used. The device keeps its copy.",
+  "import.local.start": "Import {count} listing(s)",
+  "import.local.retry": "Try again",
+  "import.local.later": "Later",
+  "import.local.progress": "Importing {done} of {total}…",
+  "import.local.done": "{count} listing(s) imported into your account.",
 } as const;

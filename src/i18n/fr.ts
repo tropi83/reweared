@@ -570,4 +570,13 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "privacy.bodyApi":
     "Vos annonces, photos et textes générés sont stockés sur notre serveur, privés à votre compte : jamais partagés, jamais vendus. Les photos sont envoyées au fournisseur d'IA de la plateforme quand vous créez une annonce. Votre mot de passe n'est jamais stocké en clair et aucune mesure d'audience n'envoie vos images ou vos prompts. Supprimer le compte supprime tout.",
   "about.api": "Votre compte · photos stockées en sécurité sur le serveur",
+  "import.local.title": "Importer depuis cet appareil",
+  "import.local.body": "{count} annonce(s) de la version précédente de l'app sont encore sur cet appareil.",
+  "import.local.what":
+    "L'import copie chacune dans votre compte : photo d'origine, nom, catégorie, marque, choix du mannequin, titre et description. Les photos générées ne sont pas copiées (vous pourrez les regénérer) et aucun crédit n'est utilisé. L'appareil garde sa copie.",
+  "import.local.start": "Importer {count} annonce(s)",
+  "import.local.retry": "Réessayer",
+  "import.local.later": "Plus tard",
+  "import.local.progress": "Import {done} sur {total}…",
+  "import.local.done": "{count} annonce(s) importée(s) dans votre compte.",
 };
