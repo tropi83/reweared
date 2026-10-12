@@ -116,9 +116,9 @@
 
 ### Task 9: Compose, CI and the smoke test
 
-- [ ] **Step 1:** `worker` service (same image, `node dist/worker.js`, read-only, `cap_drop: [ALL]`, `stop_grace_period: 60s`, networks internal + an egress network for the providers, provider secrets **only here**), `dev-secrets.mjs` writes placeholder provider secrets, `compose.dev.yaml` sets `ENABLE_MOCK_PROVIDER=true`, `IMAGE_PROVIDER=mock`, `COPY_PROVIDER=mock`. Caddy: no buffering on `/api/v1/events`.
-- [ ] **Step 2:** `server-smoke.mjs` gains: credits granted at verification, enqueue a 2-shot generation with the Mock, SSE until both jobs succeed, download a generated image, copy job fills the title. `docker compose config` check in CI that no provider secret is mounted in `api`.
-- [ ] **Step 3:** **Commit** `feat(docker): worker service with the provider keys`.
+- [x] **Step 1:** `worker` service (same image, `node dist/worker.js`, read-only, `cap_drop: [ALL]`, `stop_grace_period: 60s`, networks internal + an egress network for the providers, provider secrets **only here**), `dev-secrets.mjs` writes placeholder provider secrets, `compose.dev.yaml` sets `ENABLE_MOCK_PROVIDER=true`, `IMAGE_PROVIDER=mock`, `COPY_PROVIDER=mock`. Caddy: no buffering on `/api/v1/events`.
+- [x] **Step 2:** `server-smoke.mjs` gains: credits granted at verification, enqueue a 2-shot generation with the Mock, SSE until both jobs succeed, download a generated image, copy job fills the title. `docker compose config` check in CI that no provider secret is mounted in `api`.
+- [x] **Step 3:** **Commit** `feat(docker): worker service with the provider keys`.
 
 ### Task 10: Documentation
 
@@ -162,3 +162,4 @@ Update this section after each task: task number, commit hash, deviations.
   - SSE tests use a real listening server (`app.listen({ port: 0 })`): `inject()` cannot read a hijacked stream.
   - Caddy flushes `text/event-stream` responses immediately (no `flush_interval` needed); to be confirmed by the compose smoke test in task 9.
 - **Task 8 — done** (`git log --grep "nightly orphan sweep"`); 73 integration tests. Both jobs are BullMQ job schedulers on the existing `maintenance` queue (cron, UTC). `ObjectStore.list(prefix)` was added for the sweep. The sweep keeps objects younger than 24 h (uploads in progress) and never touches keys outside the layout; `deletePrefix("u/")` is refused by the store's guard (too wide), which the test hit — kept as is.
+- **Task 9 — done** (`git log --grep "worker service with the provider keys"`). Deviations and findings: the image's `HEALTHCHECK` (api port) made the worker "unhealthy" — disabled for that service; platform settings shared by api and worker via an `x-platform-env` anchor; Caddy streams SSE without buffering (confirmed by the smoke test, no `flush_interval` needed); `scripts/check-compose.mjs` runs in CI before the stack starts. Smoke test passes end to end; logs checked for emails, tokens, cookies and prompts (none).
