@@ -115,7 +115,8 @@ export class RemoteListingRepository implements ListingRepository {
   async readImage(_listingId: string, bucket: ImageBucket, assetId: string): Promise<Blob | null> {
     try {
       const data = await this.client.get(`/api/v1/images/${encodeURIComponent(assetId)}?variant=${bucket === "thumbnail" ? "thumb" : "full"}`);
-      return data instanceof Blob ? data : null;
+      // Duck-typed: the Blob class differs between runtimes (browser, Tauri, Node + jsdom in tests).
+      return isBlob(data) ? data : null;
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) return null;
       throw toAppError(error);
@@ -152,6 +153,10 @@ export class RemoteListingRepository implements ListingRepository {
       throw toAppError(error);
     }
   }
+}
+
+function isBlob(value: unknown): value is Blob {
+  return typeof value === "object" && value !== null && typeof (value as Blob).arrayBuffer === "function" && typeof (value as Blob).size === "number";
 }
 
 function extension(mimeType: ImageMimeType): string {

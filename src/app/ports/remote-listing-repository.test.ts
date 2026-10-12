@@ -103,12 +103,10 @@ describe("RemoteListingRepository", () => {
 
   it("reads thumbnails and full images from /images, and answers null for a missing one", async () => {
     const { calls, repo } = fakeServer((_method, path) =>
-      path.startsWith(`/api/v1/images/${IMG}`)
-        ? new Response(new Blob([new Uint8Array([9])]), { status: 200, headers: { "content-type": "image/webp" } })
-        : undefined,
+      path.startsWith(`/api/v1/images/${IMG}`) ? new Response(new Uint8Array([9]), { status: 200, headers: { "content-type": "image/webp" } }) : undefined,
     );
-    expect(await repo.readImage(LST, "thumbnail", IMG)).toBeInstanceOf(Blob);
-    expect(await repo.readImage(LST, "original", IMG)).toBeInstanceOf(Blob);
+    expect((await repo.readImage(LST, "thumbnail", IMG))?.size).toBe(1);
+    expect((await repo.readImage(LST, "original", IMG))?.size).toBe(1);
     expect(await repo.readImage(LST, "generation", "img_ffffffffffffffff")).toBeNull();
     expect(calls.map((c) => c.path)).toEqual([
       `/api/v1/images/${IMG}?variant=thumb`,
