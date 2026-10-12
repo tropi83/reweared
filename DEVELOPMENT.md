@@ -70,7 +70,7 @@ Server configuration (environment of the `api` service; secrets as `X_FILE` poin
 
 Running the app on the API (phase 3): `pnpm stack:up`, then `VITE_API_ORIGIN=/ pnpm dev` (web) or `VITE_API_ORIGIN=http://localhost:8080 pnpm tauri:api:dev` (desktop: `scripts/tauri-api-config.mjs` writes the git-ignored `api` capability and CSP patch first; `pnpm tauri:api:build` with the public `https://` origin for a release). On the web, Vite proxies `/api` to the stack (`API_PROXY_TARGET`, default `http://localhost:8080`) and presents the stack's origin, so cookies and the api's CSRF check behave as behind Caddy; `compose.dev.yaml` also trusts `http://localhost:1420` (Tauri dev webview). Emails (verification, reset, deletion) arrive in Mailpit and their links open the stack's web bundle on :8080. In Git Bash, prefix with `MSYS_NO_PATHCONV=1`: it otherwise rewrites `/` into `C:/Program Files/Git/`. The desktop and phone apps keep the session token in the OS keychain (`session_token`; memory only on phones until the keystore lands), the web app uses httpOnly cookies.
 
-Production on one VPS (details in phase 4): put `PUBLIC_ORIGIN`, `MAIL_FROM` and `CADDY_SITE` (the public host, for automatic HTTPS) in a `.env` next to `compose.yaml`, write real secrets into `./secrets` (a real Resend key in `resend_api_key`), then `docker compose up -d --build --wait`.
+Production on one VPS (phase 4: [plan](docs/superpowers/plans/2026-10-12-backend-phase-4.md)): put `PUBLIC_ORIGIN`, `MAIL_FROM` and `CADDY_SITE` (the public host, for automatic HTTPS) in a `.env` next to `compose.yaml`, write real secrets into `./secrets` (a real Resend key in `resend_api_key`), then `docker compose up -d --build --wait`.
 
 ## Environment
 
