@@ -38,7 +38,7 @@
 - [ ] `compose.yaml` takes images from the registry: `image: ghcr.io/tropi83/aiv-server:${AIV_VERSION:?}` / `aiv-web:${AIV_VERSION:?}` (local builds keep working through `compose.dev.yaml`'s `build:` and the `local` tag).
 - [ ] Log rotation on every service (`logging: { driver: json-file, options: { max-size: 10m, max-file: "5" } }`), memory limits (`mem_limit`) sized for D1, `stop_grace_period` checked for the worker (a running job finishes or is retried).
 - [ ] Postgres: `shm_size`, a minimal tuning file (`shared_buffers`, `work_mem`) and `pg_stat_statements` off by default; Redis: AOF `everysec` confirmed, `maxmemory` + `noeviction` (already) with a size for D1.
-- [ ] Worker liveness: the worker writes a heartbeat key (`worker:heartbeat:<hostname>`, TTL 60 s) every 20 s; `/api/v1/ready` reports `worker: down` (503) when no heartbeat exists — today a dead worker is invisible.
+- [ ] Worker liveness from outside the host: the container healthcheck exists since the phase 2 fix (`/tmp/worker-alive`, `worker/heartbeat.ts`), but only Docker sees it. The heartbeat also sets a Redis key (`worker:heartbeat:<hostname>`, TTL 60 s) and `/api/v1/ready` reports `worker: down` (503) when none exists, so the outside uptime check (task 5) catches a dead worker.
 - [ ] `scripts/check-compose.mjs` also asserts: every image pinned by version (no `latest`), log rotation present, no `ENABLE_MOCK_PROVIDER` in production config.
 - [ ] Tests: unit test of the readiness check with and without heartbeat; compose check in CI. **Commit** `feat(docker): production compose with registry images, log rotation and worker liveness`.
 
