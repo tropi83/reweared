@@ -153,7 +153,7 @@ A tiny hash router (`app/router.ts`): `#/`, `#/listing/:id` (legacy `#/project/:
 
 ## Target architecture (planned)
 
-Decided in [ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md) (2026-10-11); binding design: [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). **Phase 1 is implemented** (accounts, listings, uploads, object storage, compose stack — see DEVELOPMENT.md → Server); the queue, the worker, credits and SSE (phase 2) and the client switch (phase 3) are not. The clients still run local-first.
+Decided in [ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md) (2026-10-11); binding design: [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). **Phases 1 and 2 are implemented** (accounts, listings, uploads, object storage, credits, BullMQ queues with per-user dispatch, the worker, SSE, nightly maintenance, compose stack — see DEVELOPMENT.md → Server); the client switch (phase 3) is not. The clients still run local-first.
 
 ```
 clients (web, Tauri desktop/phones) ──HTTPS──► caddy ──► api (Fastify: auth, REST, SSE, uploads)

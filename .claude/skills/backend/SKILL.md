@@ -5,7 +5,7 @@ description: Use for anything server-side of the backend pivot (ADR 0001) — ap
 
 # Backend (target architecture — ADR 0001)
 
-**Status (2026-10-12): phases 0 and 1 done** — `apps/server` serves accounts, listings, images, settings and recipes; the compose stack runs (`pnpm stack:up`); the worker, queues, credits and SSE (phase 2) do not exist yet, and no client uses the API (phase 3). How to run, layout and configuration: DEVELOPMENT.md → Server. The binding design is
+**Status (2026-10-12): phases 0, 1 and 2 done** — `apps/server` serves accounts, listings, images, settings, recipes, credits, generation/copy runs and SSE; the worker generates with the platform's keys; the compose stack runs with Mock providers in dev (`pnpm stack:up`); no client uses the API yet (phase 3). How to run, layout and configuration: DEVELOPMENT.md → Server. The binding design is
 `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`; each phase has its plan in
 `docs/superpowers/plans/`. If this skill and the design disagree, the design wins — then fix this skill.
 
@@ -70,6 +70,13 @@ description: Use for anything server-side of the backend pivot (ADR 0001) — ap
 - Errors: throw `HttpError(status, code, message)` or `AppError`; `http/errors.ts` maps everything else (Fastify, multipart, zod) to `{ code, message }`.
 - Better Auth: options checked in the installed types (`@better-auth/core` `types/init-options.d.mts`) and, when behaviour matters, in its code — several defaults were unsafe for us (deletion by fresh session, env-enabled telemetry). Regenerate `src/db/auth-schema.ts` with `auth:schema` when plugins change.
 - Tests: unit tests next to the code (`src/**/*.test.ts`, project `server`); integration tests in `test/*.int.test.ts` through `startHarness()` (real Better Auth, Postgres, Redis, SeaweedFS, in-memory mailbox). Prove a security test can fail by breaking the protection once.
+
+## Queue and worker (phase 2)
+
+- A run = one transaction: lock the listing, insert generation + jobs `queued`, `ensureMonthlyGrant` + `reserve`; then `dispatcher.offer(userId)` (never add to BullMQ inside the transaction). BullMQ data is `{ jobId }` only.
+- Every state change of a job is a conditional update (`WHERE status = …`); `refreshGenerationStatus` locks the generation row first (two jobs can end together). Final failures and cancellations refund through `refund()` (key `refund:<jobId>`) and free the user's slot (`afterFinal` → `offer`).
+- Retryable errors throw `RetryLater` (BullMQ backs off with `backoffFor`); everything else returns after marking the job. A cancel is `cancel:<jobId>` in Redis, watched during the call and checked again before keeping a result.
+- Tests drive the real worker in-process with `SharpMockImageProvider` (scenarios: `flaky`, `error`, `timeout`, `slow`…) through the harness's `runs`.
 
 ## Before claiming done
 

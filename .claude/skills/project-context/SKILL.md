@@ -17,7 +17,7 @@ The product moves to **user accounts + a server** that is the source of truth an
 | ----- | ----------------------------------------------------------------------------- | ------------------------------------------ |
 | 0     | ADR, docs, pnpm workspace, `packages/domain` extraction — no behaviour change | done (2026-10-11)                          |
 | 1     | compose stack, api: auth, listings, uploads, S3                               | done (2026-10-12), not used by clients yet |
-| 2     | worker, queues, dispatcher, reconciler, credits, SSE, server-side providers   | not started                                |
+| 2     | worker, queues, dispatcher, reconciler, credits, SSE, server-side providers   | done (2026-10-12), not used by clients yet |
 | 3     | web + Tauri clients switch to the API, import of local listings               | not started                                |
 | 4     | production VPS, backups, monitoring, server image release                     | not started                                |
 
