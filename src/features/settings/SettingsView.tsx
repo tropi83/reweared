@@ -1,10 +1,12 @@
 import { useEffect } from "react";
 import { Menu } from "lucide-react";
+import { API_MODE } from "@/app/api-mode";
 import { useUiStore } from "@/app/stores/ui-store";
 import { navigate } from "@/app/router";
 import { Button } from "@/components/ui/Button";
 import { useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/cn";
+import { AccountSection } from "@/features/account/AccountSection";
 import { AboutSection } from "./AboutSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { DiagnosticsSection } from "./DiagnosticsSection";
@@ -18,6 +20,7 @@ import { StorageSection } from "./StorageSection";
 import { UsageSection } from "./UsageSection";
 
 const SECTIONS: Array<{ id: string; key: MessageKey }> = [
+  ...(API_MODE ? [{ id: "account", key: "account.section" as MessageKey }] : []),
   { id: "providers", key: "settings.section.providers" },
   { id: "models", key: "settings.section.models" },
   { id: "usage", key: "usage.title" },
@@ -65,6 +68,7 @@ export function SettingsView({ section }: { section?: string }) {
         </nav>
         <div className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl space-y-10 p-4 pb-24 md:p-6">
+            {API_MODE && <AccountSection />}
             <ProvidersSection />
             <ModelsSection />
             <UsageSection />

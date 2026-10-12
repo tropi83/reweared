@@ -44,15 +44,15 @@
 
 ### Task 1: Server additions for the clients
 
-- [ ] `GET /api/v1/platform` (`{ runCost: { image, copy }, imageModel: { aspectRatios, options }, freeMonthlyCredits }`, contract in `@aiv/contracts/platform`), `@fastify/cors` with `CORS_ORIGINS` (default the three Tauri origins; credentials only for same-origin cookies, `exposedHeaders: ["set-auth-token"]`), Better Auth `trustedOrigins` = `PUBLIC_ORIGIN` + `CORS_ORIGINS`. Integration tests: preflight from `tauri://localhost` allowed and exposes `set-auth-token`, other origins refused; `/platform` content. **Commit** `feat(api): platform info and CORS for the desktop and phone apps`.
+- [x] `GET /api/v1/platform` (`{ runCost: { image, copy }, imageModel: { aspectRatios, options }, freeMonthlyCredits }`, contract in `@aiv/contracts/platform`), `@fastify/cors` with `CORS_ORIGINS` (default the three Tauri origins; credentials only for same-origin cookies, `exposedHeaders: ["set-auth-token"]`), Better Auth `trustedOrigins` = `PUBLIC_ORIGIN` + `CORS_ORIGINS`. Integration tests: preflight from `tauri://localhost` allowed and exposes `set-auth-token`, other origins refused; `/platform` content. **Commit** `feat(api): platform info and CORS for the desktop and phone apps`.
 
 ### Task 2: `ApiClient`, session token, SSE parser
 
-- [ ] `ApiClient` (`VITE_API_ORIGIN`, `credentials: "include"` on the web, `Authorization: Bearer` from `session.ts` in Tauri, captures `set-auth-token` after sign-in, parses with contracts, maps `{ code, message }` to `AppError`, 401 → `onUnauthenticated` callback); `session.ts` (`SecretStore` key `session_token`; `secrets.rs` allowlist); `sse.ts` (parser of `id/event/data` blocks + `EventSource` and fetch-stream transports with `Last-Event-ID` resume and backoff). Unit tests with a fake fetch: auth headers per platform, error mapping, token capture, parser on chunked input, resume id. **Commit** `feat(api-client): typed API client, session token and SSE transport`.
+- [x] `ApiClient` (`VITE_API_ORIGIN`, `credentials: "include"` on the web, `Authorization: Bearer` from `session.ts` in Tauri, captures `set-auth-token` after sign-in, parses with contracts, maps `{ code, message }` to `AppError`, 401 → `onUnauthenticated` callback); `session.ts` (`SecretStore` key `session_token`; `secrets.rs` allowlist); `sse.ts` (parser of `id/event/data` blocks + `EventSource` and fetch-stream transports with `Last-Event-ID` resume and backoff). Unit tests with a fake fetch: auth headers per platform, error mapping, token capture, parser on chunked input, resume id. **Commit** `feat(api-client): typed API client, session token and SSE transport`.
 
 ### Task 3: Accounts in the app
 
-- [ ] `account-store` (load session on start, sign up → "check your email", sign in, sign out, resend verification, request password reset, delete account → "check your email"), routes `#/login`, `#/signup`, `#/verify`, guard sending signed-out users to `#/login` in API mode, `SignInView`/`SignUpView`/`VerifyEmailView` (accessible forms, EN/FR, errors from codes), Settings → Account. Tests: store transitions with a fake API, guard, views render and submit. **Commit** `feat(auth): sign-up, sign-in and account settings in API mode`.
+- [x] `account-store` (load session on start, sign up → "check your email", sign in, sign out, resend verification, request password reset, delete account → "check your email"), routes `#/login`, `#/signup`, `#/verify`, guard sending signed-out users to `#/login` in API mode, `SignInView`/`SignUpView`/`VerifyEmailView` (accessible forms, EN/FR, errors from codes), Settings → Account. Tests: store transitions with a fake API, guard, views render and submit. **Commit** `feat(auth): sign-up, sign-in and account settings in API mode`.
 
 ### Task 4: `ListingRepository` port
 
@@ -76,7 +76,7 @@
 
 ### Task 9: End-to-end check, docs
 
-- [ ] Run the stack + `pnpm dev` with `VITE_API_ORIGIN=http://localhost:8080` (Vite proxy `/api` → stack for same-origin cookies) and walk the flow in a browser (sign-up, verify via Mailpit, import, upload, create the listing, live progress, copy, Vinted payload build, sign-out); `pnpm tauri dev` against the stack. Docs: DEVELOPMENT (running the app in API mode), SECURITY/PRIVACY (API builds), ARCHITECTURE (ports), README, skills (`tanstack-query`: server data now includes credits/platform; `project-context`), CHANGELOG. **Commit** `docs: the apps on the API`.
+- [ ] Run the stack + `pnpm dev` with `VITE_API_ORIGIN=/` (Vite proxy `/api` → stack for same-origin cookies) and walk the flow in a browser (sign-up, verify via Mailpit, import, upload, create the listing, live progress, copy, Vinted payload build, sign-out); `pnpm tauri dev` against the stack. Docs: DEVELOPMENT (running the app in API mode), SECURITY/PRIVACY (API builds), ARCHITECTURE (ports), README, skills (`tanstack-query`: server data now includes credits/platform; `project-context`), CHANGELOG. **Commit** `docs: the apps on the API`.
 
 ### Task 10 (needs the owner's go-ahead): remove the local mode
 
@@ -86,4 +86,6 @@
 
 Update this section after each task: task number, commit hash, deviations.
 
-_Nothing done yet._
+- **Task 1 — done** (`4807a28`). `GET /api/v1/platform`, `@fastify/cors` 11.3.1 for `CORS_ORIGINS`, Better Auth `trustedOrigins` = `PUBLIC_ORIGIN` + `CORS_ORIGINS`. No credentials over CORS: the apps authenticate with the bearer token only. 76 integration tests.
+- **Task 2 — done** (`39ef4f3`). Deviation: one SSE transport, `fetch` streaming, on the web and in Tauri (`EventSource` cannot send the bearer header); errors surface as `ApiError` (server code + status), mapped to messages by the features rather than to `AppError`. `session_token` added to `SecretKey` and to the Rust allowlist (`rust:check` green). 368 unit tests.
+- **Task 3 — done** (`git log --grep "sign-up, sign-in and account settings"`). Deviations: no `#/login`/`#/signup`/`#/verify` routes — in API mode an `AuthGate` shows the sign-in screens (sign in, sign up, forgot password, "check your email", choose a new password) in place of the workspace until a session exists; email verification needs no app screen (Better Auth verifies and signs in from the link, which opens the web app). The reset link lands on `/?token=…#/reset-password` (checked against the dev stack) and the token is removed from the address bar at once. "Resend verification" = signing in again (the server resends on sign-in, `sendOnSignIn`). Settings → Account (API mode only): email, sign out, delete by emailed link. `createApi` refuses an origin other than `/` or `http(s)://host` (Git Bash mangles `/`). Dev: Vite proxy `/api` → stack, `compose.dev.yaml` trusts `http://localhost:1420`. Checked against the dev stack through the proxy: sign-up, `EMAIL_NOT_VERIFIED` on sign-in, verification link, cookie session + `/api/v1/me`, reset redirect, sign-out; the app served by `pnpm dev` in API mode. Not done: looking at the screens in a browser (no browser in this environment; covered by Testing Library tests) — kept for task 9. 377 unit tests.

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { MemorySecretStore } from "@/infrastructure/auth/SecretStore";
+import { LayeredSecretStore, MemorySecretStore } from "@/infrastructure/auth/SecretStore";
 import { ApiClient, ApiError, type FetchLike } from "./ApiClient";
+import { createApi } from "./createApi";
 import { SessionTokenStore } from "./session";
 import { createSseParser, runEventStream } from "./sse";
 
@@ -51,6 +52,16 @@ describe("ApiClient", () => {
     await store.clear();
     expect(await store.get()).toBeNull();
     expect(await new SessionTokenStore(new MemorySecretStore(), false).get()).toBeNull();
+  });
+});
+
+describe("createApi", () => {
+  it("accepts the same origin or an http(s) origin only", () => {
+    const secrets = new LayeredSecretStore(new MemorySecretStore(), null);
+    expect(() => createApi("/", secrets, { tauri: false })).not.toThrow();
+    expect(() => createApi("https://app.example.test", secrets, { tauri: true })).not.toThrow();
+    expect(() => createApi("C:/Program Files/Git/", secrets, { tauri: false })).toThrow(/VITE_API_ORIGIN/);
+    expect(() => createApi("https://app.example.test/api", secrets, { tauri: false })).toThrow();
   });
 });
 

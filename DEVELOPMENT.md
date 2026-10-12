@@ -68,6 +68,8 @@ Server configuration (environment of the `api` service; secrets as `X_FILE` poin
 | `MAX_UPLOAD_BYTES`, `LOG_LEVEL`, `PORT`                                                                   | defaults 40 MiB, `info`, 3000                                                                                                                                |
 | `BETTER_AUTH_TELEMETRY`                                                                                   | must stay unset or `0`: the api refuses to start otherwise                                                                                                   |
 
+Running the app on the API (phase 3, in progress — accounts so far): `pnpm stack:up`, then `VITE_API_ORIGIN=/ pnpm dev`. Vite proxies `/api` to the stack (`API_PROXY_TARGET`, default `http://localhost:8080`), so session cookies are same-origin as behind Caddy; `compose.dev.yaml` trusts the `http://localhost:1420` origin. Emails (verification, reset, deletion) arrive in Mailpit and their links open the stack's web bundle on :8080. In Git Bash, prefix with `MSYS_NO_PATHCONV=1`: it otherwise rewrites `/` into `C:/Program Files/Git/`. The desktop and phone apps keep the session token in the OS keychain (`session_token`; memory only on phones until the keystore lands), the web app uses httpOnly cookies.
+
 Production on one VPS (details in phase 4): put `PUBLIC_ORIGIN`, `MAIL_FROM` and `CADDY_SITE` (the public host, for automatic HTTPS) in a `.env` next to `compose.yaml`, write real secrets into `./secrets` (a real Resend key in `resend_api_key`), then `docker compose up -d --build --wait`.
 
 ## Environment
@@ -80,6 +82,7 @@ Copy `.env.example` to `.env` (git-ignored). All variables are **public build co
 | `VITE_GOOGLE_OAUTH_CLIENT_SECRET_DESKTOP` | the value Google issues alongside a Desktop client. Google's documentation states installed apps cannot keep secrets; it is required by the token endpoint for this client type and is treated as public configuration |
 | `VITE_ENABLE_MOCK_PROVIDER`               | `true` to expose the Mock provider in production builds (always on in dev)                                                                                                                                             |
 | `VITE_APP_VERSION`                        | shown in Settings → About/Diagnostics                                                                                                                                                                                  |
+| `VITE_API_ORIGIN`                         | API mode (phase 3, in progress): `/` for the web bundle and `pnpm dev`, the public `https://` origin for Tauri builds; must be `/` or an `http(s)` origin (the app refuses to start otherwise). Unset: local-first app |
 
 ## Configuring Google OAuth (desktop)
 

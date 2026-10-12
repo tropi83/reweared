@@ -18,6 +18,8 @@ import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
 import "@/infrastructure/http/http-client";
 import { setProviderLoggerFactory } from "@aiv/providers/log";
 import { createLogger } from "@/lib/logger";
+import { createApi, type ApiServices } from "@/infrastructure/api/createApi";
+import { API_ORIGIN } from "./api-mode";
 
 // The shared adapters log through the app's redacting logger (Settings → Diagnostics).
 setProviderLoggerFactory(createLogger);
@@ -41,6 +43,8 @@ export interface AppServices {
   queue: GenerationQueue;
   usage: UsageTracker;
   publish: PublishBridge;
+  /** The API client and session in API mode (`VITE_API_ORIGIN`); null in the local-first app. */
+  api: ApiServices | null;
   appVersion: string;
 }
 
@@ -78,6 +82,7 @@ export function createServices(bindings: {
   persistResult: ConstructorParameters<typeof GenerationQueue>[0]["persistResult"];
   onJobUpdate: ConstructorParameters<typeof GenerationQueue>[0]["onJobUpdate"];
   storage?: StorageProvider;
+  api?: ApiServices | null;
 }): AppServices {
   const storage = bindings.storage ?? createStorageProvider();
   const secrets = createSecretStore();
@@ -97,6 +102,7 @@ export function createServices(bindings: {
   if (GEMINI_IMAGE_GENERATION_ENABLED) providers.set(GEMINI_PROVIDER_ID, gemini);
   if (MOCK_ENABLED) providers.set(MOCK_PROVIDER_ID, mock);
   const publish = createPublishBridge();
+  const api = bindings.api !== undefined ? bindings.api : API_ORIGIN ? createApi(API_ORIGIN, secrets) : null;
 
   const queue = new GenerationQueue(
     {
@@ -116,6 +122,21 @@ export function createServices(bindings: {
     },
   );
 
-  services = { storage, secrets, auth, providers, copyProviders, mock, gemini, cloudflare, cloudflareAuth, queue, usage, publish, appVersion: APP_VERSION };
+  services = {
+    storage,
+    secrets,
+    auth,
+    providers,
+    copyProviders,
+    mock,
+    gemini,
+    cloudflare,
+    cloudflareAuth,
+    queue,
+    usage,
+    publish,
+    api,
+    appVersion: APP_VERSION,
+  };
   return services;
 }

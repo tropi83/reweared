@@ -20,6 +20,9 @@ export default defineConfig(() => ({
     host: host || false,
     hmr: host ? { protocol: "ws", host, port: 1421 } : undefined,
     watch: { ignored: ["**/src-tauri/**"] },
+    // `VITE_API_ORIGIN=/ pnpm dev`: the API is reached through this proxy, so its session cookies are same-origin
+    // as in production behind Caddy (compose.dev.yaml trusts the :1420 origin).
+    proxy: { "/api": { target: process.env.API_PROXY_TARGET ?? "http://localhost:8080" } },
   },
   envPrefix: ["VITE_", "TAURI_ENV_*"],
   build: {
