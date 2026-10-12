@@ -257,6 +257,9 @@ export async function retryJob(deps: RunDeps, userId: string, jobId: string): Pr
 
 /** Recomputes a generation's status from its jobs (the domain's rule); sets completedAt when it is final. */
 export async function refreshGenerationStatus(tx: Tx, generationId: string): Promise<void> {
+  // Two jobs of a generation can end at the same moment: lock the generation first, so the second transaction
+  // waits and then reads the first one's committed job status (READ COMMITTED) instead of a stale snapshot.
+  await tx.select({ id: generation.id }).from(generation).where(eq(generation.id, generationId)).for("update");
   const jobs = await tx
     .select({ status: generationJob.status })
     .from(generationJob)
