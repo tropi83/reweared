@@ -51,6 +51,8 @@ export default tseslint.config(
         FormData: "readonly",
         Blob: "readonly",
         setTimeout: "readonly",
+        AbortController: "readonly",
+        TextDecoder: "readonly",
       },
     },
     plugins: { local },

@@ -39,3 +39,6 @@ ensure("seaweedfs_s3", () =>
 ensure("better_auth_secret", () => random(48));
 // Production sends mail through Resend; dev and CI use Mailpit. Replace this placeholder with a real key in production.
 ensure("resend_api_key", () => "re_placeholder_not_a_real_key");
+// The platform's provider keys (worker only). Dev and CI run the Mock providers; write the real ones in production.
+ensure("cloudflare_api_token", () => "placeholder-not-a-real-token");
+ensure("gemini_api_key", () => "placeholder-not-a-real-key");

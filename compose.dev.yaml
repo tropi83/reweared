@@ -30,8 +30,24 @@ services:
       SMTP_URL: smtp://mailpit:1025
       MAIL_FROM: AI Image Variations <no-reply@localhost>
       LOG_LEVEL: debug
+      IMAGE_PROVIDER: mock
+      IMAGE_MODEL: mock-image
+      COPY_PROVIDER: mock
+      COPY_MODEL: mock-copy
+      ENABLE_MOCK_PROVIDER: "true"
     depends_on:
       mailpit: { condition: service_started }
+
+  # The Mock providers in dev and CI: no provider account, no real key needed.
+  worker:
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      IMAGE_PROVIDER: mock
+      IMAGE_MODEL: mock-image
+      COPY_PROVIDER: mock
+      COPY_MODEL: mock-copy
+      ENABLE_MOCK_PROVIDER: "true"
 
   caddy:
     environment:
