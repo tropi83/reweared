@@ -4,6 +4,10 @@ import { meDto } from "@aiv/contracts/me";
 import { ApiError } from "@/infrastructure/api/ApiClient";
 import { getQueryClient } from "../query/query-client";
 import { getServices } from "../services";
+import { useListingsStore } from "./listings-store";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("account");
 
 export type Me = z.infer<typeof meDto>;
 
@@ -40,15 +44,23 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   me: null,
 
   async load() {
+    let me: Me;
     try {
-      const me = await api().client.get("/api/v1/me", meDto);
-      set({ status: "signedIn", me });
+      me = await api().client.get("/api/v1/me", meDto);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) return get().sessionEnded();
       // Offline or server down: keep a known session, otherwise show the sign-in screen with the error.
       if (get().status === "unknown") set({ status: "signedOut" });
       throw error;
     }
+    const wasSignedIn = get().status === "signedIn";
+    set({ status: "signedIn", me });
+    // The account's listings for the sidebar; a failure leaves it empty and the session stands.
+    if (!wasSignedIn)
+      await useListingsStore
+        .getState()
+        .loadSummaries()
+        .catch((error: unknown) => log.warn("listings not loaded", error));
   },
 
   async signUp(email, password) {
@@ -74,7 +86,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     } finally {
       // Signed out locally even when the server cannot be reached: the token leaves the keychain either way.
       await session.clear();
-      getQueryClient().clear();
+      forgetUserData();
       set({ status: "signedOut", me: null });
     }
   },
@@ -94,10 +106,16 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   sessionEnded() {
     if (get().status === "signedOut") return;
     void getServices().api?.session.clear();
-    getQueryClient().clear();
+    forgetUserData();
     set({ status: "signedOut", me: null });
   },
 }));
+
+/** Nothing of the previous account stays on screen or in caches after a sign-out. */
+function forgetUserData() {
+  getQueryClient().clear();
+  useListingsStore.setState({ summaries: [], current: null });
+}
 
 /**
  * The password-reset link lands on `/?token=…#/reset-password` (or `?error=INVALID_TOKEN`). Returns what it carries

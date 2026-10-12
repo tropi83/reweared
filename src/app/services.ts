@@ -22,6 +22,7 @@ import { createApi, type ApiServices } from "@/infrastructure/api/createApi";
 import { API_ORIGIN } from "./api-mode";
 import type { ListingRepository } from "./ports/listing-repository";
 import { LocalListingRepository } from "./ports/local-listing-repository";
+import { RemoteListingRepository } from "./ports/remote-listing-repository";
 
 // The shared adapters log through the app's redacting logger (Settings → Diagnostics).
 setProviderLoggerFactory(createLogger);
@@ -107,7 +108,7 @@ export function createServices(bindings: {
   if (MOCK_ENABLED) providers.set(MOCK_PROVIDER_ID, mock);
   const publish = createPublishBridge();
   const api = bindings.api !== undefined ? bindings.api : API_ORIGIN ? createApi(API_ORIGIN, secrets) : null;
-  const listings: ListingRepository = new LocalListingRepository(storage, APP_VERSION);
+  const listings: ListingRepository = api ? new RemoteListingRepository(api.client) : new LocalListingRepository(storage, APP_VERSION);
 
   const queue = new GenerationQueue(
     {

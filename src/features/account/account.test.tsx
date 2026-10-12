@@ -58,6 +58,7 @@ describe("account store", () => {
     const { calls, keychain } = setup((path) => {
       if (path === "/api/auth/sign-in/email") return ((signedIn = true), json(200, { token: "t" }, { "set-auth-token": "session-token" }));
       if (path === "/api/v1/me") return signedIn ? json(200, ME) : json(401, { code: "UNAUTHENTICATED", message: "Sign in." });
+      if (path === "/api/v1/listings") return json(200, []);
       if (path === "/api/auth/sign-out") return json(200, { success: true });
       return json(404, { code: "NOT_FOUND", message: "" });
     });
@@ -67,7 +68,11 @@ describe("account store", () => {
     expect(await useAccountStore.getState().signIn("alice@example.test", "correct horse battery")).toBe("signedIn");
     expect(useAccountStore.getState()).toMatchObject({ status: "signedIn", me: ME });
     expect(await keychain.get("session_token")).toBe("session-token");
-    expect(calls.at(-1)).toMatchObject({ path: "/api/v1/me", authorization: "Bearer session-token" });
+    expect(calls.filter((c) => c.path.startsWith("/api/v1/")).map((c) => [c.path, c.authorization])).toEqual([
+      ["/api/v1/me", undefined],
+      ["/api/v1/me", "Bearer session-token"],
+      ["/api/v1/listings", "Bearer session-token"],
+    ]);
 
     await useAccountStore.getState().signOut();
     expect(useAccountStore.getState()).toMatchObject({ status: "signedOut", me: null });
@@ -94,7 +99,10 @@ describe("account store", () => {
   });
 
   it("signs out when the API answers 401 on any call", async () => {
-    setup((path) => (path === "/api/v1/me" ? json(200, ME) : json(401, { code: "UNAUTHENTICATED", message: "" })), false);
+    setup(
+      (path) => (path === "/api/v1/me" ? json(200, ME) : path === "/api/v1/listings" ? json(200, []) : json(401, { code: "UNAUTHENTICATED", message: "" })),
+      false,
+    );
     await useAccountStore.getState().load();
     expect(useAccountStore.getState().status).toBe("signedIn");
     await expect(useAccountStore.getState().requestAccountDeletion()).rejects.toMatchObject({ status: 401 });
