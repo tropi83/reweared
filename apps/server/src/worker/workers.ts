@@ -6,6 +6,7 @@ import { computeBackoffMs } from "@aiv/domain/lib/retry";
 import type { QueueJobData, QueueSet } from "../queue/queues";
 import { queueName } from "../queue/queues";
 import { reconcile } from "../queue/reconciler";
+import { checkCreditDrift, sweepOrphans } from "../maintenance/maintenance";
 import { RetryLater, runJob, type RunJobDeps } from "./run-job";
 
 export interface WorkerOptions {
@@ -50,9 +51,14 @@ export async function startWorkers(deps: RunJobDeps, options: WorkerOptions): Pr
 
   const maintenanceQueue = new Queue(MAINTENANCE_QUEUE, { connection: options.connection, ...(prefix ? { prefix } : {}) });
   await maintenanceQueue.upsertJobScheduler("reconcile", { every: options.reconcileEveryMs ?? 60_000 }, { name: "reconcile" });
+  // Nightly, UTC: orphaned image objects older than a day, then the balance/ledger check.
+  await maintenanceQueue.upsertJobScheduler("sweep", { pattern: "0 3 * * *", tz: "UTC" }, { name: "sweep" });
+  await maintenanceQueue.upsertJobScheduler("drift", { pattern: "30 3 * * *", tz: "UTC" }, { name: "drift" });
   const maintenance = new Worker(
     MAINTENANCE_QUEUE,
-    async () => {
+    async (job) => {
+      if (job.name === "sweep") return void (await sweepOrphans(deps.db, deps.store, deps.log, { minAgeMs: 24 * 3600 * 1000 }));
+      if (job.name === "drift") return void (await checkCreditDrift(deps.db, deps.log));
       const report = await reconcile({ db: deps.db, queues: options.queues, dispatcher: deps.dispatcher, log: deps.log }, { staleAfterMs: deps.timeoutMs * 2 });
       if (report.readded + report.revived > 0) deps.log.warn(report, "reconciler repaired jobs");
     },

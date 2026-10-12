@@ -74,6 +74,17 @@ export class S3ObjectStore implements ObjectStore {
     return removed;
   }
 
+  async *list(prefix: string): AsyncIterable<{ key: string; lastModified: Date }[]> {
+    let continuationToken: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, MaxKeys: 1000, ContinuationToken: continuationToken }),
+      );
+      yield (page.Contents ?? []).flatMap((o) => (o.Key ? [{ key: o.Key, lastModified: o.LastModified ?? new Date(0) }] : []));
+      continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (continuationToken);
+  }
+
   async ping(): Promise<void> {
     await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
   }
