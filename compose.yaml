@@ -126,8 +126,14 @@ services:
     <<: *hardening
     image: aiv-server:local
     command: ["node", "dist/worker.js"]
-    # The image's HEALTHCHECK probes the api's HTTP port; the worker serves nothing.
-    healthcheck: { disable: true }
+    # The worker serves nothing: it writes /tmp/worker-alive every 10 s while Redis answers (worker/heartbeat.ts),
+    # and is healthy while that file is less than a minute old.
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(Date.now() - require('node:fs').statSync('/tmp/worker-alive').mtimeMs < 60000 ? 0 : 1)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]

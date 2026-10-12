@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { pino } from "pino";
 import { ConfigError } from "./config";
 import { connectDatabase } from "./db/client";
@@ -10,6 +11,7 @@ import { RedisEventPublisher } from "./queue/events";
 import { QueueSet, createQueueConnection } from "./queue/queues";
 import { S3ObjectStore } from "./storage/s3-object-store";
 import { loadWorkerConfig } from "./worker/config";
+import { HEARTBEAT_FILE, startHeartbeat } from "./worker/heartbeat";
 import { buildProviders } from "./worker/registry";
 import { startWorkers } from "./worker/workers";
 
@@ -58,9 +60,16 @@ async function main(): Promise<void> {
     },
   );
   log.info({ imageProvider: config.IMAGE_PROVIDER, copyProvider: config.COPY_PROVIDER }, "worker started");
+  const stopHeartbeat = startHeartbeat({
+    ping: () => connection.ping(),
+    write: (content) => writeFile(HEARTBEAT_FILE, content),
+    now: () => Date.now(),
+    onError: (error) => log.error({ err: error }, "worker heartbeat failing: Redis does not answer"),
+  });
 
   const shutdown = (signal: string) => {
     log.info({ signal }, "worker shutting down: finishing active jobs");
+    stopHeartbeat();
     workers
       .close()
       .then(() => Promise.allSettled([queues.close(), database.close()]))
