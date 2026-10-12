@@ -1,0 +1,40 @@
+# The only public entry point. Serves the web bundle and proxies /api/* to the api on the internal network.
+# CADDY_SITE: the public host in production (automatic HTTPS), ":80" in dev and CI.
+{
+	admin off
+}
+
+{$CADDY_SITE::80} {
+	encode zstd gzip
+
+	# Uploads are capped by the api (MAX_UPLOAD_BYTES); everything else is small JSON.
+	@upload path_regexp ^/api/v1/listings/[^/]+/images$
+	request_body @upload {
+		max_size 45MB
+	}
+	@notUpload not path_regexp ^/api/v1/listings/[^/]+/images$
+	request_body @notUpload {
+		max_size 2MB
+	}
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# The web bundle is still the local-first client until phase 3: it talks to Google and Cloudflare itself
+		# (same hosts as the Tauri CSP). Phase 3 shrinks connect-src to 'self'.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com https://cloudresourcemanager.googleapis.com https://api.cloudflare.com https://*.workers.dev; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+}

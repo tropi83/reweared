@@ -57,4 +57,5 @@ Not implemented yet. When it ships, this page will say, in plain language:
 - **Who processes it for us** (sub-processors): the image and text providers (Cloudflare, Google), the email service (Resend) and the hosting provider. Photos are sent to a provider only for a generation you start.
 - **What changes for you**: no API key to set up; listings follow your account across devices; generation needs the network.
 - **Your rights**: export of your listings, deletion of your account (database records and stored images), retention periods, and the contact for privacy requests.
+- **What the server already does with photos** (phase 1, not yet used by the apps): location (GPS) and camera metadata are removed from every uploaded photo before it is stored; photos are private to their account and never published through a public link; deleting the account requires confirming a link sent by email and removes the photos.
 - **What does not change**: no third-party analytics or ad tracking; the Vinted pre-fill still runs on your device and never publishes for you.

@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Server, phase 1 (not yet used by the apps).** `apps/server`: accounts (email + password with mandatory email verification, cookie or bearer sessions, optional Google sign-in, account deletion confirmed by email), listings, settings and recipes scoped to their owner, photo upload with EXIF/GPS removed and WebP thumbnails, images streamed from a private S3 bucket. `docker compose` stack: Caddy, Postgres, Redis, SeaweedFS, Mailpit in dev (`pnpm stack:up`). `@aiv/contracts` holds the API schemas. Integration tests with Testcontainers and an end-to-end smoke test run in CI.
 - **Decision to move to accounts and a server** ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)): user accounts, a server-side generation queue with the platform's provider keys, credits with a free plan, Docker on one VPS. The design and the phase 0 plan are in `docs/superpowers/`; the docs (README, ARCHITECTURE, SECURITY, PRIVACY, DEVELOPMENT, CONTRIBUTING, agent instructions and skills, plus a new `backend` skill) now say which architecture they describe. No change to the app yet.
 
 - **Desktop Vinted window: a status bar above vinted.com**, like the status line of the phone screen — sign in → open the sell form → filling → “Photos 2/3 · Title ⧉ · Description ⧉ — click the ⧉ icons to paste the text” → ✓. The window now holds two webviews (bar + Vinted); the bar is an app page without any Tauri capability, fed by `eval` only.

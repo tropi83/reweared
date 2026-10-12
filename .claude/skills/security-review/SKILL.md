@@ -23,12 +23,12 @@ Two threat models coexist until phase 3 of the backend pivot ([ADR 0001](../../.
 
 1. **Provider keys only in the worker**, as Docker secrets (`/run/secrets/*`); never in Postgres, `.env`, image layers, logs, error bodies, Bull Board or crash reports. The api holds no provider key.
 2. **Authorization on every query**: repositories take the session user; another user's resource answers 404 (not 403). Tested per route.
-3. **Sessions**: web = httpOnly + `Secure` + `SameSite=Lax` cookie and an Origin check on state-changing requests; Tauri = bearer token in the OS keychain. Passwords argon2id; rate limits on sign-in, sign-up, reset; email verification before the first generation.
-4. **Uploads**: size cap, magic-byte sniffing, sharp re-encode that strips EXIF/GPS, private bucket, presigned URLs ≤ 5 min, object keys from `assertSafeId`-checked ids only.
+3. **Sessions**: web = httpOnly + `Secure` + `SameSite=Lax` cookie and an Origin check on state-changing requests; Tauri = bearer token in the OS keychain. Passwords hashed by Better Auth (scrypt); rate limits on sign-in, sign-up, reset; email verification before the first generation.
+4. **Uploads**: size cap, magic-byte sniffing, sharp re-encode that strips EXIF/GPS, private bucket, bytes streamed by the api (never a public or presigned storage URL), object keys from `assertSafeId`-checked ids only.
 5. **Money-like state**: credits change only through the ledger with idempotency keys; `CHECK (balance >= 0)`; no endpoint lets a client set a balance.
 6. **Egress**: the worker contacts allowlisted provider hosts only; the api contacts Resend only. A new host updates the allowlist, `SECURITY.md` and the `PRIVACY.md` sub-processor list.
-7. **Containers**: only Caddy publishes ports; non-root users, read-only root fs, no Docker socket mounted, Postgres/Redis/MinIO on the internal network with their own credentials (Docker secrets).
-8. **Personal data**: account deletion removes DB rows and the user's S3 prefix; logs carry user ids, never emails in full, prompts, images or presigned URLs.
+7. **Containers**: only Caddy publishes ports; non-root users, read-only root fs, no Docker socket mounted, Postgres/Redis/SeaweedFS on the internal network with their own credentials (Docker secrets).
+8. **Personal data**: account deletion removes DB rows and the user's S3 prefix; logs carry user ids, never emails in full, prompts, images, tokens or verification links.
 
 ## Checklist for a change
 
@@ -53,4 +53,4 @@ grep -rn "AIza[0-9A-Za-z_-]\{20,\}\|ya29\.\|1//0" src src-tauri --include=*.ts -
 
 Manual: Settings → Diagnostics → Copy → confirm no key/token in the output.
 
-Server (from phase 1): the Testcontainers suite (cross-user 404, ledger idempotency, upload sniffing/EXIF strip) and `docker compose config` reviewed for published ports, secrets and users.
+Server: `pnpm test:integration` (cross-user 404 on every route, origin check, rate limits, deletion by emailed link, EXIF stripping), `pnpm smoke:server` against `pnpm stack:up`, then `docker compose logs api` searched for emails, tokens and cookies (there must be none), and `docker compose -f compose.yaml config` reviewed: only Caddy publishes ports, no secret value inlined, `BETTER_AUTH_TELEMETRY: "0"`.

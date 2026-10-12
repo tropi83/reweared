@@ -42,6 +42,9 @@ export default defineConfig(() => ({
       },
       // The shared domain runs in plain Node, without the app's aliases or DOM polyfills: the server imports it too.
       { test: { name: "domain", root: "./packages/domain", environment: "node", globals: true, include: ["src/**/*.test.ts"] } },
+      { test: { name: "contracts", root: "./packages/contracts", environment: "node", globals: true, include: ["src/**/*.test.ts"] } },
+      // Server unit tests only; Docker-backed integration tests run with `pnpm test:integration`.
+      { test: { name: "server", root: "./apps/server", environment: "node", globals: true, include: ["src/**/*.test.ts"] } },
     ],
   },
 }));

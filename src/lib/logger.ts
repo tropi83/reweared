@@ -1,26 +1,10 @@
 /**
- * Minimal logger with credential redaction. Everything logged anywhere in the app must go
+ * Minimal logger with credential redaction (patterns shared with the server in `@aiv/domain/lib/redact`). Everything logged anywhere in the app must go
  * through here so API keys, bearer tokens and refresh tokens never reach the console or
  * diagnostics. Images and prompts are never logged either.
  */
 
-const SECRET_PATTERNS: RegExp[] = [
-  /AIza[0-9A-Za-z_-]{20,}/g, // Google API keys
-  /ya29\.[0-9A-Za-z_-]+/g, // Google OAuth access tokens
-  /1\/\/[0-9A-Za-z_-]{20,}/g, // Google refresh tokens
-  /Bearer\s+[0-9A-Za-z._-]+/gi,
-  /("?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|x-goog-api-key|client[_-]?secret)"?\s*[:=]\s*)("?)[^",\s}]+\2/gi,
-];
-
-export function redact(input: string): string {
-  let out = input;
-  for (const pattern of SECRET_PATTERNS) {
-    out = out.replace(pattern, (match, prefix: string | undefined) =>
-      typeof prefix === "string" && match.startsWith(prefix) ? `${prefix}[REDACTED]` : "[REDACTED]",
-    );
-  }
-  return out;
-}
+import { redact } from "@aiv/domain/lib/redact";
 
 function fmt(value: unknown): string {
   if (typeof value === "string") return redact(value);

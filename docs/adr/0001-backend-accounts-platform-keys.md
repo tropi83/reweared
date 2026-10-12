@@ -23,18 +23,18 @@ That model has costs for a second-hand seller, who is not a developer:
 
 We build a backend and make it the source of truth (full decision table in the design, §0):
 
-| Topic          | Decision                                                                                           |
-| -------------- | -------------------------------------------------------------------------------------------------- |
-| Provider keys  | Owned by the platform, held by the server's worker only (Docker secrets). Users never enter a key. |
-| Data           | Postgres + S3-compatible object storage (MinIO) are the source of truth; web and Tauri are clients |
-| Language       | TypeScript / Node 22 in a pnpm workspace that shares the pure domain (`packages/domain`)           |
-| Accounts       | Built-in auth (Better Auth): email + password (argon2id), email verification, Google Sign-In       |
-| Email          | Resend                                                                                             |
-| Consumption    | Credit ledger with a free monthly plan; credits reserved at enqueue, refunded on failure           |
-| Queue          | BullMQ + Redis for dispatch, Postgres for job state; per-user cap for fairness; reconciler         |
-| Progress       | Server-Sent Events                                                                                 |
-| Hosting        | One VPS with `docker compose` behind Caddy                                                         |
-| Image provider | Open: Cloudflare Workers AI by default; the existing Gemini adapter can be re-enabled server-side  |
+| Topic          | Decision                                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider keys  | Owned by the platform, held by the server's worker only (Docker secrets). Users never enter a key.                                           |
+| Data           | Postgres + S3-compatible object storage (SeaweedFS; MinIO until the 2026-10-11 amendment) are the source of truth; web and Tauri are clients |
+| Language       | TypeScript / Node 22 in a pnpm workspace that shares the pure domain (`packages/domain`)                                                     |
+| Accounts       | Built-in auth (Better Auth): email + password (Better Auth default hashing), email verification, Google Sign-In                              |
+| Email          | Resend                                                                                                                                       |
+| Consumption    | Credit ledger with a free monthly plan; credits reserved at enqueue, refunded on failure                                                     |
+| Queue          | BullMQ + Redis for dispatch, Postgres for job state; per-user cap for fairness; reconciler                                                   |
+| Progress       | Server-Sent Events                                                                                                                           |
+| Hosting        | One VPS with `docker compose` behind Caddy                                                                                                   |
+| Image provider | Open: Cloudflare Workers AI by default; the existing Gemini adapter can be re-enabled server-side                                            |
 
 ## Superseded rules
 
