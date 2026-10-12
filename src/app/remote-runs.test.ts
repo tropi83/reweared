@@ -101,6 +101,10 @@ function setup(): Server {
     if (method === "POST" && url === `/api/v1/listings/${LST}/copy`)
       return json(202, { generationId: "gen_aaaaaaaaaaaaaaaa", kind: "copy", jobIds: [COPY_JOB], credits: 1 });
     if (method === "POST" && url.endsWith("/cancel")) return json(200, { status: "cancelling" });
+    if (method === "DELETE" && url === `/api/v1/generations/${GEN}`) {
+      server.state.started = false;
+      return new Response(null, { status: 204 });
+    }
     return json(404, { code: "NOT_FOUND", message: "Not found." });
   };
   __setServices(null);
@@ -178,6 +182,20 @@ describe("photo packs on the server (API mode)", () => {
     await useListingsStore.getState().open(LST);
     useGenerationStore.getState().cancelAll();
     await until(() => server.calls.includes(`POST /api/v1/jobs/${JOB}/cancel`));
+  });
+});
+
+describe("deleting a pack (API mode)", () => {
+  it("asks the server to delete it, then shows the listing without it", async () => {
+    const server = setup();
+    server.state = { started: true, jobStatus: "completed" };
+    await useListingsStore.getState().open(LST);
+    expect(useListingsStore.getState().current?.generations[GEN]).toBeDefined();
+    await useListingsStore.getState().deleteGeneration(GEN);
+    expect(server.calls).toContain(`DELETE /api/v1/generations/${GEN}`);
+    // Not image by image: the server removes the pack's photos itself.
+    expect(server.calls.filter((c) => c.startsWith("DELETE /api/v1/images"))).toEqual([]);
+    expect(useListingsStore.getState().current?.generations).toEqual({});
   });
 });
 

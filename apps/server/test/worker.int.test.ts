@@ -217,3 +217,84 @@ describe("worker", () => {
     expect(row?.name).toBe("Chemise en coton bleue");
   });
 });
+
+describe("DELETE /api/v1/generations/:id", () => {
+  const remove = (u: { headers: Record<string, string> }, id: string) =>
+    h.app.inject({ method: "DELETE", url: `/api/v1/generations/${id}`, headers: u.headers });
+  const refunds = async (jobId: string) =>
+    h.database.db
+      .select()
+      .from(creditLedger)
+      .where(and(eq(creditLedger.reason, "refund"), eq(creditLedger.jobId, jobId)));
+
+  it("deletes a finished pack, its photos and the listing's references to them, without refunding", async () => {
+    await start();
+    const u = await setup();
+    const run = await startRun(u, 2);
+    const jobs = await waitFor(
+      () => Promise.all(run.jobIds.map(job)),
+      (rows) => rows.every((r) => r.status === "completed"),
+    );
+    const first = jobs[0]!.resultImageId!;
+    await h.app.inject({ method: "PATCH", url: `/api/v1/listings/${u.listingId}`, headers: u.headers, payload: { coverImageId: first, toPost: [first] } });
+    const [stored] = await h.database.db.select().from(imageAsset).where(eq(imageAsset.id, first));
+
+    expect((await remove(u, run.generationId)).statusCode).toBe(204);
+    const doc = (await h.app.inject({ method: "GET", url: `/api/v1/listings/${u.listingId}`, headers: u.headers })).json();
+    expect(doc.generations).toEqual({});
+    expect(doc.jobs).toEqual({});
+    expect(Object.values(doc.images).map((i) => (i as { kind: string }).kind)).toEqual(["original"]);
+    expect(doc.toPost).toEqual([]);
+    expect(doc.listing.coverImageId).toBeUndefined();
+    expect(await h.store.get(stored!.objectKey)).toBeNull();
+    expect(await h.store.get(stored!.thumbKey)).toBeNull();
+    // Paid photos stay paid; the ledger keeps its history.
+    expect(await balance(u.userId)).toBe(58);
+    expect(await h.database.db.select().from(creditLedger).where(eq(creditLedger.generationId, run.generationId))).not.toHaveLength(0);
+    const events = await h.runs.redis.xrange(eventStreamKey(u.userId), "-", "+");
+    expect(events.at(-1)?.[1][1]).toBe(JSON.stringify({ type: "listing", listingId: u.listingId }));
+    expect((await remove(u, run.generationId)).statusCode).toBe(404);
+  });
+
+  it("refunds and drops jobs that have not started", async () => {
+    const u = await setup();
+    const run = await startRun(u, 3);
+    expect(await balance(u.userId)).toBe(57);
+    expect((await remove(u, run.generationId)).statusCode).toBe(204);
+    expect(await balance(u.userId)).toBe(60);
+    for (const id of run.jobIds) expect(await refunds(id)).toHaveLength(1);
+    expect(await h.database.db.select().from(generationJob).where(eq(generationJob.generationId, run.generationId))).toEqual([]);
+    for (const id of run.jobIds) expect(await h.runs.queues.get("images", "mock").getJob(id)).toBeUndefined();
+  });
+
+  it("stops a running job: refunded once, and its result is not kept", async () => {
+    image.scenario = "slow";
+    image.delayMs = 1_500;
+    await start();
+    const u = await setup();
+    const run = await startRun(u);
+    await waitFor(
+      () => job(run.jobIds[0]!),
+      (r) => r.status === "active",
+    );
+    expect((await remove(u, run.generationId)).statusCode).toBe(204);
+    expect(await balance(u.userId)).toBe(60);
+    // Give the attempt time to end: it finds no active row and keeps nothing.
+    await new Promise((r) => setTimeout(r, 2_500));
+    expect(await h.database.db.select().from(imageAsset).where(eq(imageAsset.kind, "generation"))).toEqual([]);
+    expect(await refunds(run.jobIds[0]!)).toHaveLength(1);
+    expect(await balance(u.userId)).toBe(60);
+  });
+
+  it("answers 404 for another user's pack and for a copy run", async () => {
+    const alice = await setup();
+    const run = await startRun(alice);
+    const bob = await setup("bob@example.test");
+    expect((await remove(bob, run.generationId)).statusCode).toBe(404);
+    const copy = (
+      await h.app.inject({ method: "POST", url: `/api/v1/listings/${alice.listingId}/copy`, headers: alice.headers, payload: { language: "en" } })
+    ).json();
+    expect((await remove(alice, copy.generationId)).statusCode).toBe(404);
+    expect(await h.database.db.select().from(generation).where(eq(generation.id, run.generationId))).toHaveLength(1);
+  });
+});

@@ -59,6 +59,15 @@ export class RemoteRunEngine {
     }
   }
 
+  /** Deletes a photo pack and its photos; the server stops and refunds the jobs that have not finished. */
+  async deletePack(generationId: string): Promise<void> {
+    try {
+      await this.client.request("DELETE", `/api/v1/generations/${encodeURIComponent(generationId)}`);
+    } catch (error) {
+      throw toAppError(error);
+    }
+  }
+
   retry(jobId: string): Promise<StartedRun> {
     return this.start(`/api/v1/jobs/${encodeURIComponent(jobId)}/retry`);
   }

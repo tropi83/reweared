@@ -150,6 +150,11 @@ Reuses the semantics of today's `GenerationQueue`:
   refund; `active` → Redis flag `cancel:<jobId>`, the worker's signal aborts, **no result is persisted**,
   refund. Same invariant as today: a cancelled job never writes a result.
 - `POST /jobs/:id/retry` (failed, retryable or user-initiated): new reservation, new seed.
+- `DELETE /generations/:id` (photo packs only, added 2026-10-12): one transaction locks the jobs then the
+  generation (the worker's order), refunds the unfinished ones (`refund:<jobId>`), deletes the pack's generated
+  images (and the listing's cover / "to post" references to them) and the generation (jobs cascade; the ledger keeps
+  its rows). Then: cancel flag for active jobs, BullMQ removal for the others, objects deleted, `offer(userId)`, a
+  `listing` event. A worker finishing later finds no `active` row and keeps nothing.
 
 ### Crash safety
 
@@ -177,6 +182,7 @@ commit are swept by a daily job (same idea as today's "Remove orphaned files").
 | `GET /images/:id?variant=thumb\|full`                       | streamed by the api from the private bucket; `ETag`, `Cache-Control: private, immutable` |
 | `POST /listings/:id/generations`, `POST /listings/:id/copy` | enqueue (§4)                                                                             |
 | `POST /jobs/:id/cancel`, `POST /jobs/:id/retry`             | §4                                                                                       |
+| `DELETE /generations/:id`                                   | delete a photo pack with its photos; unfinished jobs stopped and refunded (§4)           |
 | `GET /events` (SSE)                                         | job transitions, credit balance; `Last-Event-ID` replays from a Redis stream             |
 | `GET /credits`, `GET /models`                               | balance + ledger page; models/shots the platform offers                                  |
 | `GET /listings/:id/export`                                  | ZIP of a listing (data portability) — phase 3                                            |

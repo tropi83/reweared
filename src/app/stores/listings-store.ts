@@ -1,9 +1,12 @@
 import { create } from "zustand";
-import { AppError, summarize, type GenerationJob, type ImageMimeType, type ListingDocument, type ListingSummary } from "@aiv/domain/models";
+import { AppError, summarize, toGenerationError, type GenerationJob, type ImageMimeType, type ListingDocument, type ListingSummary } from "@aiv/domain/models";
 import { decodeImage, validateImageFile } from "@/infrastructure/image/image-processing";
 import { nowIso } from "@aiv/domain/lib/ids";
 import { createLogger } from "@/lib/logger";
 import { evictImageUrls } from "../image-urls";
+import { errorMessage } from "@/i18n/errors";
+import { toast } from "./toast-store";
+import { invalidateCredits } from "../query/credits";
 import { getServices } from "../services";
 
 const log = createLogger("listings");
@@ -250,6 +253,26 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     if (!current) return;
     const gen = current.generations[generationId];
     if (!gen) return;
+    const { runs } = getServices();
+    if (runs) {
+      // API mode: the server deletes the pack, its jobs and photos in one go, then the listing is read again.
+      try {
+        await runs.deletePack(generationId);
+        // Unfinished jobs were refunded.
+        invalidateCredits();
+      } catch (err) {
+        const error = toGenerationError(err);
+        log.warn("pack not deleted", error.code);
+        toast.error(errorMessage(error));
+        return;
+      }
+      for (const jobId of gen.jobIds) {
+        const imageId = current.jobs[jobId]?.resultImageId;
+        if (imageId) evictImageUrls(current.listing.id, imageId);
+      }
+      await get().reload();
+      return;
+    }
     getServices().queue.cancelGeneration(generationId);
     const imageIds = gen.jobIds.map((j) => current.jobs[j]?.resultImageId).filter((id): id is string => !!id);
     await get().deleteImages(imageIds);

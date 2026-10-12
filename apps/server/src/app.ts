@@ -112,7 +112,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     registerImageRoutes(app, { db, store, guard, log: app.log, maxUploadBytes });
     registerCreditRoutes(app, db, guard, freeMonthlyCredits);
     if (deps.runs) {
-      registerGenerationRoutes(app, deps.runs, guard);
+      registerGenerationRoutes(app, deps.runs, guard, store);
       registerEventRoutes(app, deps.runs.redis, guard);
       registerPlatformRoutes(app, deps.runs);
     }
