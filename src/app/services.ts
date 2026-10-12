@@ -20,6 +20,8 @@ import { setProviderLoggerFactory } from "@aiv/providers/log";
 import { createLogger } from "@/lib/logger";
 import { createApi, type ApiServices } from "@/infrastructure/api/createApi";
 import { API_ORIGIN } from "./api-mode";
+import type { ListingRepository } from "./ports/listing-repository";
+import { LocalListingRepository } from "./ports/local-listing-repository";
 
 // The shared adapters log through the app's redacting logger (Settings → Diagnostics).
 setProviderLoggerFactory(createLogger);
@@ -30,6 +32,8 @@ setProviderLoggerFactory(createLogger);
  */
 export interface AppServices {
   storage: StorageProvider;
+  /** Listings and their photos: on this device, or on the API in API mode. */
+  listings: ListingRepository;
   /** Credentials: session memory plus the platform's persistent tier when there is one (`canPersist`). */
   secrets: LayeredSecretStore;
   auth: GeminiAuthManager;
@@ -103,6 +107,7 @@ export function createServices(bindings: {
   if (MOCK_ENABLED) providers.set(MOCK_PROVIDER_ID, mock);
   const publish = createPublishBridge();
   const api = bindings.api !== undefined ? bindings.api : API_ORIGIN ? createApi(API_ORIGIN, secrets) : null;
+  const listings: ListingRepository = new LocalListingRepository(storage, APP_VERSION);
 
   const queue = new GenerationQueue(
     {
@@ -136,6 +141,7 @@ export function createServices(bindings: {
     usage,
     publish,
     api,
+    listings,
     appVersion: APP_VERSION,
   };
   return services;

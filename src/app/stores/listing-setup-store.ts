@@ -166,7 +166,7 @@ export const useListingSetupStore = create<ListingState>((set, get) => ({
     const { signal } = copyController;
     set({ copyBusy: true, copyError: null });
     try {
-      const blob = await getServices().storage.readImage(doc.listing.id, asset.kind, asset.id);
+      const blob = await getServices().listings.readImage(doc.listing.id, asset.kind, asset.id);
       if (!blob) throw new AppError("INVALID_IMAGE", "The original image file is missing.");
       const prepared = await prepareForProvider(blob, asset.mimeType, { maxDimension: COPY_IMAGE_MAX_DIMENSION, format: "image/jpeg" });
       const language = useSettingsStore.getState().settings.locale;

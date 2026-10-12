@@ -36,7 +36,7 @@ export async function loadImageUrl(listingId: string, bucket: ImageBucket, asset
   const pending = inflight.get(k);
   if (pending) return pending;
   const promise = (async () => {
-    const blob = await getServices().storage.readImage(listingId, bucket, assetId);
+    const blob = await getServices().listings.readImage(listingId, bucket, assetId);
     if (!blob) return null;
     const url = URL.createObjectURL(blob);
     touch(k, url);

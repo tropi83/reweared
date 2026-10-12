@@ -67,7 +67,7 @@ function preparedKey(listingId: string, assetId: string, spec: { maxDimension: n
 }
 
 export async function buildRequestForJob(job: GenerationJob, _signal: AbortSignal): Promise<ImageGenerationRequest> {
-  const { storage } = getServices();
+  const { listings } = getServices();
   const doc = useListingsStore.getState().current;
   const asset = doc?.images[job.sourceImageId];
   if (!doc || doc.listing.id !== job.listingId || !asset) {
@@ -85,7 +85,7 @@ export async function buildRequestForJob(job: GenerationJob, _signal: AbortSigna
   let prepared = preparedCache.get(key);
   if (!prepared) {
     prepared = (async () => {
-      const blob = await storage.readImage(job.listingId, asset.kind, asset.id);
+      const blob = await listings.readImage(job.listingId, asset.kind, asset.id);
       if (!blob) throw new AppError("INVALID_IMAGE", "The source image file is missing.", { retryable: false });
       const out = await prepareForProvider(blob, asset.mimeType, {
         maxDimension: spec.maxDimension,

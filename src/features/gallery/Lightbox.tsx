@@ -103,7 +103,7 @@ export function Lightbox() {
   };
 
   const download = async () => {
-    const blob = await getServices().storage.readImage(doc.listing.id, asset.kind, asset.id);
+    const blob = await getServices().listings.readImage(doc.listing.id, asset.kind, asset.id);
     if (blob) await exportSingle({ blob, name: `${doc.listing.name}-${job?.index ?? "original"}` }, { type: asset.mimeType });
   };
 
