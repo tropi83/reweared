@@ -110,9 +110,9 @@
 
 ### Task 8: Maintenance jobs
 
-- [ ] **Step 1:** Nightly orphan sweep: object keys under `u/` with no matching row (account or listing deleted while the store was down, crash between put and insert) older than 24 h are deleted; counts logged.
-- [ ] **Step 2:** Nightly drift check: `credit_balance.balance` vs `SUM(credit_ledger.delta)` per user; a mismatch is logged as an error (never auto-corrected).
-- [ ] **Step 3:** Tests for both. **Commit** `feat(worker): nightly orphan sweep and credit drift check`.
+- [x] **Step 1:** Nightly orphan sweep: object keys under `u/` with no matching row (account or listing deleted while the store was down, crash between put and insert) older than 24 h are deleted; counts logged.
+- [x] **Step 2:** Nightly drift check: `credit_balance.balance` vs `SUM(credit_ledger.delta)` per user; a mismatch is logged as an error (never auto-corrected).
+- [x] **Step 3:** Tests for both. **Commit** `feat(worker): nightly orphan sweep and credit drift check`.
 
 ### Task 9: Compose, CI and the smoke test
 
@@ -161,3 +161,4 @@ Update this section after each task: task number, commit hash, deviations.
   - **Gap found by the tests**: the starting cursor was computed after `retry:` was sent, so events published in between were lost; it is now computed before the response starts.
   - SSE tests use a real listening server (`app.listen({ port: 0 })`): `inject()` cannot read a hijacked stream.
   - Caddy flushes `text/event-stream` responses immediately (no `flush_interval` needed); to be confirmed by the compose smoke test in task 9.
+- **Task 8 — done** (`git log --grep "nightly orphan sweep"`); 73 integration tests. Both jobs are BullMQ job schedulers on the existing `maintenance` queue (cron, UTC). `ObjectStore.list(prefix)` was added for the sweep. The sweep keeps objects younger than 24 h (uploads in progress) and never touches keys outside the layout; `deletePrefix("u/")` is refused by the store's guard (too wide), which the test hit — kept as is.
