@@ -62,6 +62,8 @@ function AuthGate() {
     return (
       <>
         <AuthScreens
+          // Its own instance: leaving the reset screens shows a fresh sign-in screen, not their last state.
+          key="reset-link"
           initial={"token" in link ? { name: "reset", token: link.token } : { name: "forgot" }}
           {...("error" in link ? { initialError: accountErrorMessage(link.error) } : {})}
           onBackToSignIn={leave}

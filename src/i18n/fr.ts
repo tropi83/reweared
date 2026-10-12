@@ -579,4 +579,6 @@ export const fr: Partial<Record<keyof typeof en, string>> = {
   "import.local.later": "Plus tard",
   "import.local.progress": "Import {done} sur {total}…",
   "import.local.done": "{count} annonce(s) importée(s) dans votre compte.",
+  "listings.empty.bodyApi": "Importez une photo de l'article pour créer votre première annonce. Elle est conservée dans votre compte.",
+  "app.taglineApi": "Un studio photo IA pour vos annonces de seconde main.",
 };

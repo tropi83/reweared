@@ -122,7 +122,7 @@ Not implemented yet — design §7 in [`docs/superpowers/specs/2026-10-11-backen
 | Credits / provider budget                   | double spending, refund replay, free-credit abuse                   | ledger with idempotency keys and `CHECK (balance >= 0)`; reservation in the enqueue transaction; per-user caps; provider budget guard                                          |
 | Infrastructure                              | exposed databases, container escape, data loss                      | only Caddy publishes ports; non-root, read-only containers; no Docker socket; nightly off-site backups with restore drills                                                     |
 
-Logging moves to pino with the same redaction rules as `src/lib/logger.ts`; prompts, images, full emails, tokens and verification links are never logged. The Tauri capabilities, CSP and `ALLOWED_HOSTS` shrink to the API origin in phase 3; the OAuth loopback and provider credential storage leave the client.
+Logging moves to pino with the same redaction rules as `src/lib/logger.ts`; prompts, images, full emails, tokens and verification links are never logged. Phase 3 (done, API builds): the Tauri apps reach the API through the generated `api` capability and CSP entry (see above), with a bearer token in the OS keychain; the web app uses httpOnly cookies, and the api accepts cookie-authenticated writes from its own origin only. The Google/Cloudflare scopes, `ALLOWED_HOSTS`, the OAuth loopback and provider credential storage stay for local builds and leave the client with the removal of the local mode (phase 3 task 10, on the owner's go-ahead).
 
 ## Reporting
 

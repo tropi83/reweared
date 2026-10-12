@@ -13,15 +13,15 @@ Local-first AI photo studio for second-hand listings (Vinted-style): import the 
 
 The product moves to **user accounts + a server** that is the source of truth and runs generations with the **platform's** provider keys: [`docs/adr/0001-backend-accounts-platform-keys.md`](../../../docs/adr/0001-backend-accounts-platform-keys.md), design `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`. Stack: TypeScript/Node in a pnpm workspace sharing `packages/domain`, Fastify api + BullMQ worker (same image), Postgres (drizzle), Redis, SeaweedFS (S3 API), Better Auth, Resend, SSE, credit ledger with a free plan, one VPS with `docker compose` + Caddy. Image provider stays open (Cloudflare by default; the Gemini adapter exists).
 
-| Phase | Content                                                                       | Status (2026-10-11)                        |
-| ----- | ----------------------------------------------------------------------------- | ------------------------------------------ |
-| 0     | ADR, docs, pnpm workspace, `packages/domain` extraction — no behaviour change | done (2026-10-11)                          |
-| 1     | compose stack, api: auth, listings, uploads, S3                               | done (2026-10-12), not used by clients yet |
-| 2     | worker, queues, dispatcher, reconciler, credits, SSE, server-side providers   | done (2026-10-12), not used by clients yet |
-| 3     | web + Tauri clients switch to the API, import of local listings               | not started                                |
-| 4     | production VPS, backups, monitoring, server image release                     | not started                                |
+| Phase | Content                                                                       | Status (2026-10-11)                                                                               |
+| ----- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 0     | ADR, docs, pnpm workspace, `packages/domain` extraction — no behaviour change | done (2026-10-11)                                                                                 |
+| 1     | compose stack, api: auth, listings, uploads, S3                               | done (2026-10-12), not used by clients yet                                                        |
+| 2     | worker, queues, dispatcher, reconciler, credits, SSE, server-side providers   | done (2026-10-12)                                                                                 |
+| 3     | web + Tauri clients switch to the API, import of local listings               | done (2026-10-12) behind `VITE_API_ORIGIN`; removing the local mode (task 10) waits for the owner |
+| 4     | production VPS, backups, monitoring, server image release                     | not started                                                                                       |
 
-Until phase 3 ships, everything below that says BYOK / local-first still describes the client and still binds changes to `src/`. Server work follows the `backend` skill.
+Builds without `VITE_API_ORIGIN` are still the local-first, BYOK client: everything below that says so binds changes to that mode. Builds with it run on the API (ARCHITECTURE.md → API mode): accounts, listings and runs on the server, `ApiClient` only. Server work follows the `backend` skill.
 
 ## Map
 
@@ -66,7 +66,7 @@ Until phase 3 ships, everything below that says BYOK / local-first still describ
 - **The aggregate is a `Listing`** (was `Project` until 2026-09-13): `ListingDocument`, `useListingsStore`, `features/listings`, route `#/listing/:id`. The catalogue side is `Category*` / `catalog.ts`; `Listing.category` is the chosen taxonomy. Identifiers are English — ESLint `no-french-identifiers` enforces it.
 - Storage layout: `listings/<id>/{listing.json, original/, generations/, thumbnails/}` (schema v3; `projects/` layouts and IndexedDB v1 migrate on first launch); `schemaVersion` + migrations; images are files, never inside JSON.
 - Variations are independent jobs; the UI shows progressive results; retry only for retryable codes.
-- Hash router (`#/listing/:id`, `#/settings/:section`, `#/recipes`); zustand stores; no react-router. **TanStack Query** only for fetched provider metadata until phase 3, when listings, credits and models become server data (model lists, auth statuses — `src/app/query`, skill `tanstack-query`); documents, settings, jobs stay in zustand.
+- Hash router (`#/listing/:id`, `#/settings/:section`, `#/recipes`); zustand stores; no react-router. **TanStack Query** for fetched provider metadata and, in API mode, credits and platform info (`src/app/query`, skill `tanstack-query`); documents, settings, jobs stay in zustand (in API mode the open listing is re-read on SSE events).
 - **Post on Vinted = pre-fill, never publish** (desktop window; phones use the native screen of the `vinted-webview` plugin in delegated mode — the app's WebView is paused underneath, so the native side drives the flow). A second `WebviewWindow` with an isolated profile and a navigation allow-list; vinted.com never gets Tauri IPC; the script is compiled into the binary and only fills title, description and photos. DOM selectors live in one file (`src/infrastructure/publish/vinted/selectors.ts`). Vinted's terms forbid automated tools → one-time warning (`vintedAutomationAcknowledged`). Photos to post = the “À publier” marks (`ListingDocument.toPost`, since schema v2). Stays on the device after the backend pivot: the client downloads the marked photos from the API. Window-creating commands must be `async` (WebView2 deadlock in sync commands on Windows).
 - **Mobile builds**: `keyring` is a desktop-only dependency (keyring 4 refuses to compile without `v1`/`cli`, and `secrets.rs` has no mobile keychain yet). Android builds on Windows need Developer Mode (cargo-mobile2 symlinks the `.so` into `jniLibs`, no copy fallback) — never build from an elevated terminal instead. `src-tauri/gen/android` is committed; the bundle identifier (`com.aiimagevariations.app`, Tauri warns about `.app`) is kept until a data migration exists (BUILDING.md §6).
 

@@ -8,7 +8,7 @@ export function AboutSection() {
     <Section id="about" title={t("settings.section.about")}>
       <div className="rounded-xl border border-border bg-bg-elevated p-4 text-sm">
         <p className="font-medium">{t("app.name")}</p>
-        <p className="text-fg-muted">{t("app.tagline")}</p>
+        <p className="text-fg-muted">{t(API_MODE ? "app.taglineApi" : "app.tagline")}</p>
         <p className="mt-2 text-fg-muted">{t("about.body")}</p>
         <p className="mt-2 text-xs text-fg-subtle">{t(API_MODE ? "about.api" : "about.local")}</p>
       </div>

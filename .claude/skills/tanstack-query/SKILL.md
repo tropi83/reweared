@@ -9,15 +9,16 @@ description: Use when reading or adding provider metadata (model lists, auth sta
 or the app produces. Do not blur the line: a document, a setting, a secret, a generation job or a publish session is
 never a query.
 
-> **Planned change (backend phase 3, ADR 0001):** when the client switches to the API, server data — listings,
-> listing detail, credits, the platform's `/models` — becomes TanStack Query data, invalidated or patched by SSE
-> events; provider auth statuses disappear (no user keys). The rules below hold until that phase's plan rewrites
-> this skill. Do not move listings to Query before then.
+> **API mode (backend phase 3, `VITE_API_ORIGIN`):** the account's credits and the platform info are queries
+> (`src/app/query/credits.ts`). Listings and the open listing deliberately stay in zustand (`listings-store`
+> behind the `ListingRepository` port): an SSE event re-reads the open listing's document (`live-updates.ts`), so
+> the editing, saving and run code is the same in both modes. Do not move listings to Query without a plan.
 
 | Data                                              | Owner          | Where                                                      |
 | ------------------------------------------------- | -------------- | ---------------------------------------------------------- |
 | Model list per provider (`provider.getModels()`)  | TanStack Query | `src/app/query/models.ts`                                  |
 | Auth status per provider (`getAuthStatus()`)      | TanStack Query | `src/app/query/auth-status.ts`                             |
+| API mode: credits (`/credits`), platform info     | TanStack Query | `src/app/query/credits.ts`                                 |
 | Listings, generations, jobs, settings, composer   | zustand        | `src/app/stores/*`                                         |
 | Commands with progress (generate, describe, post) | stores + queue | `generation-store`, `listing-setup-store`, `publish-store` |
 
@@ -33,7 +34,9 @@ never a query.
   accessor for stores (`ensureX` = cached-or-fetch, `xSnapshot` = synchronous cache read). Stores never import
   `useQuery`; they use the accessors.
 - **Invalidation points**: `useAuthStore.refresh()` invalidates `allAuthStatus` and `allModels` after any
-  credential change (availability depends on credentials). Add a new invalidation only where the underlying data
+  credential change (availability depends on credentials). API mode: `invalidateCredits()` after a run starts and
+  on terminal job events (the server sends no balance event); credits use `staleTime: 0`; sign-out clears the
+  whole cache. Add a new invalidation only where the underlying data
   actually changes (e.g. a provider setting), and invalidate the parent key.
 - **Network rule** unchanged: a query may only call endpoints already in `ALLOWED_HOSTS` / the Tauri `http`
   scope / the CSP; images never leave the device through a query.

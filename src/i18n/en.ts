@@ -597,4 +597,6 @@ export const en = {
   "import.local.later": "Later",
   "import.local.progress": "Importing {done} of {total}…",
   "import.local.done": "{count} listing(s) imported into your account.",
+  "listings.empty.bodyApi": "Import a photo of the item to create your first listing. It is kept in your account.",
+  "app.taglineApi": "An AI photo studio for your second-hand listings.",
 } as const;

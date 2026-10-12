@@ -6,7 +6,7 @@ AI photo studio for second-hand listings: React 19 + TypeScript 6 + Vite 8 + Tai
 
 The product is moving from a local-first, bring-your-own-key app to **user accounts + a server** that runs generations with the platform's provider keys: [ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md), design [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md), phases 0–4.
 
-- **Until phase 3 ships, the client in `src/` keeps the client rules below** (local-first, BYOK, no call to any server of ours). Do not wire the client to the backend before the phase 3 plan.
+- **Phase 3 is done behind a build switch**: with `VITE_API_ORIGIN` the client runs on the API (accounts, server listings and runs; ARCHITECTURE.md → API mode); without it, the local-first client and the client rules below apply unchanged. API-mode code reaches the server only through `ApiClient` (one origin, `/api/` paths), keeps the session token in `SecretStore` (`session_token`) and never a provider key. Removing the local mode is phase 3 task 10 and needs the owner's explicit go-ahead.
 - **Server code** (`apps/server`, from phase 1) follows the server rules below and the `backend` skill.
 - Know which architecture a document describes: current-release docs say so, target-architecture sections are marked _planned_.
 
@@ -21,7 +21,7 @@ The product is moving from a local-first, bring-your-own-key app to **user accou
 - **The Vinted pre-fill stays on the device** and never clicks Vinted's submit button.
 - **CI never needs a provider account** (Google, Cloudflare, Resend): Mock provider, `fake-indexeddb`, Testcontainers.
 
-### Client (`src/`, `src-tauri/`) — current release, until phase 3
+### Client (`src/`, `src-tauri/`) — local builds (no `VITE_API_ORIGIN`)
 
 - **No backend of ours.** Requests go from the user's device straight to the provider (Cloudflare, Google), with the user's own credentials.
 - **Images leave the device only on Generate**, directly to the configured provider.
