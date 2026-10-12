@@ -51,3 +51,7 @@ test-results
 
 # TypeScript incremental build info (never committed)
 *.tsbuildinfo
+
+# Tauri API-mode scope and CSP, generated from VITE_API_ORIGIN (scripts/tauri-api-config.mjs)
+src-tauri/capabilities/api.json
+src-tauri/tauri.api.conf.json

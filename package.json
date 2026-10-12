@@ -20,6 +20,8 @@
     "knip": "knip",
     "rust:check": "cd src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo test",
     "tauri": "tauri",
+    "tauri:api:dev": "node scripts/tauri-api-config.mjs && tauri dev --config src-tauri/tauri.api.conf.json",
+    "tauri:api:build": "node scripts/tauri-api-config.mjs && tauri build --config src-tauri/tauri.api.conf.json",
     "android:doctor": "node scripts/mobile-doctor.mjs android",
     "android:dev": "node scripts/mobile-doctor.mjs android && tauri android dev",
     "android:apk": "node scripts/mobile-doctor.mjs android && tauri android build --apk --debug",
