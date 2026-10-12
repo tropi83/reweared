@@ -65,7 +65,7 @@ export const GEMINI_IMAGE_MODELS: ModelInfo[] = [
     id: "gemini-2.5-flash-image",
     displayName: "Legacy",
     tier: "legacy",
-    description: "Gemini 2.5 Flash Image — deprecated, shuts down 2026-10-02.",
+    description: "Gemini 2.5 Flash Image — deprecated (Google gives 2026-10-02 on its pricing page, 2027-03-15 on its deprecations page; checked 2026-10-12).",
     available: true,
     capabilities: {
       imageGeneration: true,

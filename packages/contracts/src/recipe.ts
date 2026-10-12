@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isoDateTime, safeId } from "./common";
-import { categorySelection } from "./listing";
+import { categorySelection } from "./shared";
 
 const localized = z.strictObject({ en: z.string().max(80), fr: z.string().max(80) });
 

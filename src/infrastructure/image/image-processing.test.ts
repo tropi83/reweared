@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { fitWithin, sniffMimeType, validateImageFile } from "./image-processing";
+import { fitWithin } from "@aiv/domain/services/image-geometry";
+import { sniffMimeType, validateImageFile } from "./image-processing";
 
 function blobOf(bytes: number[], type = ""): Blob {
   return new Blob([Uint8Array.from(bytes)], { type });

@@ -8,6 +8,24 @@ x-hardening: &hardening
   security_opt: ["no-new-privileges:true"]
   restart: unless-stopped
 
+# The platform's providers and models: the api plans and reserves with them, the worker runs them. Same values
+# for both; only the worker gets the provider keys.
+x-platform-env: &platform-env
+  IMAGE_PROVIDER: ${IMAGE_PROVIDER:-cloudflare}
+  IMAGE_MODEL: ${IMAGE_MODEL:-@cf/black-forest-labs/flux-2-klein-4b}
+  COPY_PROVIDER: ${COPY_PROVIDER:-gemini}
+  COPY_MODEL: ${COPY_MODEL:-gemini-3.1-flash-lite}
+  ENABLE_MOCK_PROVIDER: ${ENABLE_MOCK_PROVIDER:-false}
+  MAX_ACTIVE_JOBS_PER_USER: ${MAX_ACTIVE_JOBS_PER_USER:-4}
+  JOB_ATTEMPTS: ${JOB_ATTEMPTS:-3}
+  CLOUDFLARE_DAILY_NEURON_BUDGET: ${CLOUDFLARE_DAILY_NEURON_BUDGET:-9000}
+  REDIS_URL_FILE: /run/secrets/redis_url
+  S3_ENDPOINT: http://seaweedfs:8333
+  S3_REGION: us-east-1
+  S3_BUCKET: aiv-images
+  S3_ACCESS_KEY_ID_FILE: /run/secrets/s3_access_key_id
+  S3_SECRET_ACCESS_KEY_FILE: /run/secrets/s3_secret_access_key
+
 x-server-env: &server-env
   NODE_ENV: production
   # Better Auth sends telemetry when this is truthy; the api refuses to start if it is.
@@ -83,16 +101,10 @@ services:
     cap_drop: [ALL]
     stop_grace_period: 30s
     environment:
-      <<: *server-env
+      <<: [*server-env, *platform-env]
       PORT: "3000"
       # Required (the api refuses to start without them, naming them): set in .env next to this file.
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
-      REDIS_URL_FILE: /run/secrets/redis_url
-      S3_ENDPOINT: http://seaweedfs:8333
-      S3_REGION: us-east-1
-      S3_BUCKET: aiv-images
-      S3_ACCESS_KEY_ID_FILE: /run/secrets/s3_access_key_id
-      S3_SECRET_ACCESS_KEY_FILE: /run/secrets/s3_secret_access_key
       BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
       MAIL_MODE: ${MAIL_MODE:-resend}
       MAIL_FROM: ${MAIL_FROM:-}
@@ -102,6 +114,40 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
     secrets: [database_url, redis_url, s3_access_key_id, s3_secret_access_key, better_auth_secret, resend_api_key]
     # internal: databases and store; edge: Caddy, and the way out to Resend.
+    networks: [internal, edge]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      seaweedfs: { condition: service_healthy }
+
+  # Generation worker: the only service holding the platform's provider keys. No published port, no healthcheck
+  # endpoint (it serves nothing); scale with `docker compose up -d --scale worker=N`.
+  worker:
+    <<: *hardening
+    image: aiv-server:local
+    command: ["node", "dist/worker.js"]
+    # The worker serves nothing: it writes /tmp/worker-alive every 10 s while Redis answers (worker/heartbeat.ts),
+    # and is healthy while that file is less than a minute old.
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(Date.now() - require('node:fs').statSync('/tmp/worker-alive').mtimeMs < 60000 ? 0 : 1)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    # Lets running generations finish on shutdown.
+    stop_grace_period: 60s
+    environment:
+      <<: [*server-env, *platform-env]
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN_FILE: /run/secrets/cloudflare_api_token
+      GEMINI_API_KEY_FILE: /run/secrets/gemini_api_key
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    secrets: [database_url, redis_url, s3_access_key_id, s3_secret_access_key, cloudflare_api_token, gemini_api_key]
+    # internal: databases and store; edge: the way out to Cloudflare and Google.
     networks: [internal, edge]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -146,3 +192,5 @@ secrets:
   seaweedfs_s3: { file: ./secrets/seaweedfs_s3 }
   better_auth_secret: { file: ./secrets/better_auth_secret }
   resend_api_key: { file: ./secrets/resend_api_key }
+  cloudflare_api_token: { file: ./secrets/cloudflare_api_token }
+  gemini_api_key: { file: ./secrets/gemini_api_key }

@@ -1,8 +1,9 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { z } from "zod";
-import type { AppSettings, ImageAsset, Listing, ListingSummary, Mannequin, Recipe } from "@aiv/domain/models";
+import type { AppSettings, Generation, GenerationJob, ImageAsset, Listing, ListingSummary, Mannequin, Recipe } from "@aiv/domain/models";
 import { createId } from "@aiv/domain/lib/ids";
 import { errorBody } from "./common";
+import { generationDto, generationJobDto, startCopyBody, startGenerationBody } from "./generation";
 import { createListingBody, imageAssetDto, listingDocumentDto, listingDto, listingSummaryDto, patchListingBody } from "./listing";
 import { meDto } from "./me";
 import { recipeDto } from "./recipe";
@@ -89,5 +90,19 @@ describe("settings and account contracts", () => {
     expect(meDto.parse({ id: "u_1", email: "seller@example.com", emailVerified: true, name: "Seller" }).emailVerified).toBe(true);
     expect(meDto.safeParse({ id: "u_1", email: "not-an-email", emailVerified: true, name: "" }).success).toBe(false);
     expect(errorBody.parse({ code: "NOT_FOUND", message: "Not found." })).toEqual({ code: "NOT_FOUND", message: "Not found." });
+  });
+});
+
+describe("generation contracts", () => {
+  it("mirror the domain's Generation and GenerationJob", () => {
+    expectTypeOf<SameShape<z.infer<typeof generationDto>, Generation>>().toEqualTypeOf<true>();
+    expectTypeOf<SameShape<z.infer<typeof generationJobDto>, GenerationJob>>().toEqualTypeOf<true>();
+  });
+
+  it("accept per-run options but never a provider, a model or a key", () => {
+    expect(startGenerationBody.parse({ aspectRatio: "4:5", options: { guidance: 3 } })).toEqual({ aspectRatio: "4:5", options: { guidance: 3 } });
+    expect(startGenerationBody.safeParse({ provider: "gemini" }).success).toBe(false);
+    expect(startGenerationBody.safeParse({ model: "x" }).success).toBe(false);
+    expect(startCopyBody.safeParse({ language: "de" }).success).toBe(false);
   });
 });

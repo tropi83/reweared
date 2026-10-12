@@ -17,8 +17,13 @@
       "includeEntryExports": true
     },
     "apps/server": {
-      "entry": ["src/migrate.ts", "scripts/auth-schema.config.ts", "src/**/*.test.ts", "test/**/*.int.test.ts"],
+      "entry": ["src/worker.ts", "src/migrate.ts", "scripts/auth-schema.config.ts", "src/**/*.test.ts", "test/**/*.int.test.ts"],
       "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
+    },
+    "packages/providers": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "includeEntryExports": true
     }
   },
   "ignoreExportsUsedInFile": true

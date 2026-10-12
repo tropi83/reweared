@@ -4,7 +4,7 @@ import type { ListingDocument, ListingSummary } from "@aiv/domain/models";
 import type { z } from "zod";
 import type { patchListingBody } from "@aiv/contracts/listing";
 import type { Db } from "../db/client";
-import { imageAsset, listing } from "../db/schema";
+import { generation, generationJob, imageAsset, listing } from "../db/schema";
 import { HttpError } from "../http/errors";
 import { toDocument, toSummary } from "./to-dto";
 
@@ -45,11 +45,21 @@ export async function getDocument(db: Db, userId: string, listingId: string): Pr
     .from(listing)
     .where(and(eq(listing.id, listingId), eq(listing.userId, userId)));
   if (!row) throw notFound();
-  const images = await db
-    .select()
-    .from(imageAsset)
-    .where(and(eq(imageAsset.listingId, listingId), eq(imageAsset.userId, userId)));
-  return toDocument(row, images);
+  const [images, generations, jobs] = await Promise.all([
+    db
+      .select()
+      .from(imageAsset)
+      .where(and(eq(imageAsset.listingId, listingId), eq(imageAsset.userId, userId))),
+    db
+      .select()
+      .from(generation)
+      .where(and(eq(generation.listingId, listingId), eq(generation.userId, userId))),
+    db
+      .select()
+      .from(generationJob)
+      .where(and(eq(generationJob.listingId, listingId), eq(generationJob.userId, userId))),
+  ]);
+  return toDocument(row, images, generations, jobs);
 }
 
 export async function createListing(db: Db, userId: string, name: string | undefined): Promise<ListingDocument> {

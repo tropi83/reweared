@@ -102,6 +102,73 @@ if (thumb.headers.get("content-type") !== "image/webp") fail("read thumbnail", `
 const document = await (await call("read listing", `/api/v1/listings/${listing.listing.id}`)).json();
 if (document.listing.originalImageId !== image.id) fail("read listing", "the upload is not the listing's original");
 
+// --- Generation through the worker (Mock providers in dev/CI), followed live over SSE through Caddy.
+const credits = await (await call("free monthly credits", "/api/v1/credits")).json();
+if (credits.balance <= 0) fail("free monthly credits", "no credits granted");
+await call("set the category", `/api/v1/listings/${listing.listing.id}`, {
+  method: "PATCH",
+  json: { category: { categoryId: "women", subcategoryId: "clothing" } },
+});
+
+const sse = new AbortController();
+const stream = await fetch(new URL("/api/v1/events", base), { headers: { cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") }, signal: sse.signal });
+if (stream.status !== 200 || !stream.headers.get("content-type")?.includes("text/event-stream")) fail("open the event stream", `HTTP ${stream.status}`);
+console.log("✓ open the event stream");
+const reader = stream.body.getReader();
+const decoder = new TextDecoder();
+let buffered = "";
+// Wait for the stream to be live before starting the run, so no event can be missed.
+while (!buffered.includes("retry:")) buffered += decoder.decode((await reader.read()).value, { stream: true });
+
+const run = await (
+  await call("start a 2-photo run", `/api/v1/listings/${listing.listing.id}/generations`, {
+    method: "POST",
+    json: { shotIds: ["retouch", "studio"] },
+    expect: 202,
+  })
+).json();
+const pending = new Set(run.jobIds);
+const deadline = Date.now() + 60_000;
+while (pending.size > 0) {
+  if (Date.now() > deadline) fail("jobs completed (SSE)", `still waiting for ${pending.size} job(s)`);
+  const { value, done } = await Promise.race([reader.read(), new Promise((resolve) => setTimeout(() => resolve({ value: undefined, done: false }), 1000))]);
+  if (done) fail("jobs completed (SSE)", "the stream ended");
+  if (value) buffered += decoder.decode(value, { stream: true });
+  let end;
+  while ((end = buffered.indexOf("\n\n")) >= 0) {
+    const block = buffered.slice(0, end);
+    buffered = buffered.slice(end + 2);
+    const data = block.match(/^data: (.+)$/m)?.[1];
+    if (!data) continue;
+    const event = JSON.parse(data);
+    if (event.type === "job" && pending.has(event.jobId)) {
+      if (event.status === "failed") fail("jobs completed (SSE)", `job failed: ${event.error?.code}`);
+      if (event.status === "completed") pending.delete(event.jobId);
+    }
+  }
+}
+sse.abort();
+console.log("✓ jobs completed (SSE)");
+const generated = await (await call("read the generations", `/api/v1/listings/${listing.listing.id}`)).json();
+const resultId = generated.jobs[run.jobIds[0]]?.resultImageId;
+if (!resultId) fail("read the generations", "no result image");
+const result = await call("download a generated photo", `/api/v1/images/${resultId}`);
+if (!["image/png", "image/jpeg", "image/webp"].includes(result.headers.get("content-type"))) fail("download a generated photo", "not an image");
+const after = await (await call("credits after the run", "/api/v1/credits")).json();
+if (after.balance !== credits.balance - 2) fail("credits after the run", `expected ${credits.balance - 2}, got ${after.balance}`);
+
+await call("write title and description", `/api/v1/listings/${listing.listing.id}/copy`, { method: "POST", json: { language: "en" }, expect: 202 });
+let named = false;
+for (let i = 0; i < 60 && !named; i++) {
+  const doc = await (
+    await fetch(new URL(`/api/v1/listings/${listing.listing.id}`, base), { headers: { cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") } })
+  ).json();
+  named = Boolean(doc.listing.copy?.title) && doc.listing.name === doc.listing.copy.title;
+  if (!named) await new Promise((r) => setTimeout(r, 500));
+}
+if (!named) fail("title written and listing renamed", "no copy after 30 s");
+console.log("✓ title written and listing renamed");
+
 await call("ask to delete the account", "/api/auth/delete-user", { method: "POST", json: {} });
 await call("confirm deletion from the mailed link", await mailedLink("deletion email", "/delete-user/callback"), { expect: [200, 302] });
 jar.clear();

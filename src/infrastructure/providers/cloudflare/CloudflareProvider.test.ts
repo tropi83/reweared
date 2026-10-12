@@ -2,12 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __setFetchOverride } from "@/infrastructure/http/http-client";
 import { LayeredSecretStore, MemorySecretStore, WebLocalSecretStore } from "@/infrastructure/auth/SecretStore";
 import { inputPreparationFor } from "@aiv/domain/services/image-provider";
-import { computeGeometry } from "@/infrastructure/image/image-processing";
+import { computeGeometry } from "@aiv/domain/services/image-geometry";
 import { CloudflareAuth, normalizeWorkerUrl, type MetaStore } from "./CloudflareAuth";
-import { mapCloudflareEnvelopeError, mapCloudflareHttpError } from "./CloudflareErrors";
-import { FLUX_KEEP_SUBJECT_HINT, fluxOutputSize, normalizeCloudflareOptions, randomSeed, toCloudflareBody, toCloudflareRequest } from "./CloudflareMapper";
-import { CLOUDFLARE_IMAGE_MODELS, DEFAULT_CLOUDFLARE_MODEL_ID } from "./CloudflareModels";
-import { CloudflareProvider } from "./CloudflareProvider";
+import { mapCloudflareEnvelopeError, mapCloudflareHttpError } from "@aiv/providers/cloudflare/CloudflareErrors";
+import {
+  FLUX_KEEP_SUBJECT_HINT,
+  fluxOutputSize,
+  normalizeCloudflareOptions,
+  randomSeed,
+  toCloudflareBody,
+  toCloudflareRequest,
+} from "@aiv/providers/cloudflare/CloudflareMapper";
+import { CLOUDFLARE_IMAGE_MODELS, DEFAULT_CLOUDFLARE_MODEL_ID } from "@aiv/providers/cloudflare/CloudflareModels";
+import { CloudflareProvider } from "@aiv/providers/cloudflare/CloudflareProvider";
 
 const ACCOUNT = "0123456789abcdef0123456789abcdef";
 const SD_MODEL_ID = "@cf/runwayml/stable-diffusion-v1-5-img2img";

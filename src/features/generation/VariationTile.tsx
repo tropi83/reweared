@@ -8,7 +8,7 @@ import { useUiStore } from "@/app/stores/ui-store";
 import { getServices } from "@/app/services";
 import type { GenerationJob, ListingDocument } from "@aiv/domain/models";
 import { exportSingle } from "@/infrastructure/image/export";
-import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
+import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@aiv/providers/gemini/GeminiErrors";
 import { openExternal } from "@/lib/open-external";
 import { useLocale, useT } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";

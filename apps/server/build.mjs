@@ -7,7 +7,7 @@ const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), 
 const external = Object.keys(pkg.dependencies ?? {}).filter((name) => !name.startsWith("@aiv/"));
 
 await build({
-  entryPoints: { api: "src/api.ts", migrate: "src/migrate.ts" },
+  entryPoints: { api: "src/api.ts", migrate: "src/migrate.ts", worker: "src/worker.ts" },
   outdir: "dist",
   bundle: true,
   platform: "node",

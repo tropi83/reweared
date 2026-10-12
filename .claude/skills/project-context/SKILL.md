@@ -17,7 +17,7 @@ The product moves to **user accounts + a server** that is the source of truth an
 | ----- | ----------------------------------------------------------------------------- | ------------------------------------------ |
 | 0     | ADR, docs, pnpm workspace, `packages/domain` extraction — no behaviour change | done (2026-10-11)                          |
 | 1     | compose stack, api: auth, listings, uploads, S3                               | done (2026-10-12), not used by clients yet |
-| 2     | worker, queues, dispatcher, reconciler, credits, SSE, server-side providers   | not started                                |
+| 2     | worker, queues, dispatcher, reconciler, credits, SSE, server-side providers   | done (2026-10-12), not used by clients yet |
 | 3     | web + Tauri clients switch to the API, import of local listings               | not started                                |
 | 4     | production VPS, backups, monitoring, server image release                     | not started                                |
 
@@ -33,8 +33,8 @@ Until phase 3 ships, everything below that says BYOK / local-first still describ
 | Listing card, one-button orchestration, readiness           | `src/features/workspace/ListingSetupCard.tsx`, `src/app/stores/listing-setup-store.ts` (`generateListing`), `src/app/listing-readiness.ts`                                                                      |
 | Job queue (concurrency, retry, cancel, timeout)             | `packages/domain/src/services/generation-queue.ts`                                                                                                                                                              |
 | Provider contract + request builder                         | `packages/domain/src/services/image-provider.ts`                                                                                                                                                                |
-| Gemini adapter, models catalogue, error mapping             | `src/infrastructure/providers/gemini/*`                                                                                                                                                                         |
-| Cloudflare Workers AI adapter, auth (direct/worker), models | `src/infrastructure/providers/cloudflare/*`, `cloudflare-worker/`                                                                                                                                               |
+| Gemini adapter, models catalogue, error mapping             | `packages/providers/src/gemini/*` (shared with the server worker)                                                                                                                                               |
+| Cloudflare Workers AI adapter, auth (direct/worker), models | `packages/providers/src/cloudflare/*` (adapters), `src/infrastructure/providers/cloudflare/CloudflareAuth.ts` (app credentials), `cloudflare-worker/`                                                           |
 | Mock provider (dev/tests)                                   | `src/infrastructure/providers/mock/MockImageProvider.ts`                                                                                                                                                        |
 | Credentials (API key, OAuth PKCE+loopback, SecretStore)     | `src/infrastructure/auth/*`                                                                                                                                                                                     |
 | Storage (IndexedDB web / Tauri fs native), migrations       | `src/infrastructure/storage/*`                                                                                                                                                                                  |

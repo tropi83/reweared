@@ -116,7 +116,7 @@ Requires the app to be built with an OAuth Desktop client ID (see [DEVELOPMENT.m
 | Professional | `gemini-3-pro-image`          | 1K · 2K · 4K         | complex edits             |
 | Legacy       | `gemini-2.5-flash-image`      | —                    | no `image_size` parameter |
 
-Aspect ratios: 1:1, 3:2, 2:3, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9 (or _Original_). Capabilities are centralized in [`GeminiModels.ts`](src/infrastructure/providers/gemini/GeminiModels.ts); the UI never offers, and the adapter never sends, an unsupported parameter. Verified against the official docs on 2026-09-11.
+Aspect ratios: 1:1, 3:2, 2:3, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9 (or _Original_). Capabilities are centralized in [`GeminiModels.ts`](packages/providers/src/gemini/GeminiModels.ts); the UI never offers, and the adapter never sends, an unsupported parameter. Verified against the official docs on 2026-09-11.
 
 ## Tech stack
 
@@ -213,7 +213,7 @@ On Linux the OS credential store is the Secret Service (GNOME Keyring or KWallet
 
 MVP delivered (see [CHANGELOG.md](CHANGELOG.md)).
 
-**Next: accounts and a server** ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)) — phase 0 (docs, pnpm workspace, shared `packages/domain`) and phase 1 (Docker stack and API: accounts, listings, uploads — not yet used by the apps, see [DEVELOPMENT.md](DEVELOPMENT.md#server-backend-phase-1)) are done; next the Docker stack and API (1), the job queue, credits and live progress (2), the web and desktop/phone clients on the API with an import of local listings (3), production (4).
+**Next: accounts and a server** ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)) — phase 0 (docs, pnpm workspace, shared `packages/domain`) phases 1–2 (Docker stack and API: accounts, listings, uploads, credits, a generation queue and worker with the platform's provider keys, live progress — not yet used by the apps, see [DEVELOPMENT.md](DEVELOPMENT.md#server-backend-phase-1)) are done; next the web and desktop/phone clients on the API with an import of local listings (3), then production (4).
 
 Also planned: share sheet on phones, before/after slider, optional ad-supported free tier (behind an `AdProvider` abstraction that never sees images or prompts). Mobile secure storage and web OAuth are superseded by the account sign-in of phase 3.
 

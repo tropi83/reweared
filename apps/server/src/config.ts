@@ -34,6 +34,21 @@ const configSchema = z.object({
   SMTP_URL: z.string().min(1).optional(),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  // Free credits given each month (lazily, on the first read or spend of the month). The economic model may change.
+  FREE_MONTHLY_CREDITS: z.coerce.number().int().nonnegative().default(60),
+  // The platform's providers and models (configuration, never a user choice). No provider key here: keys are
+  // the worker's (Docker secrets), the api never calls a provider.
+  IMAGE_PROVIDER: z.enum(["cloudflare", "gemini", "mock"]).default("cloudflare"),
+  IMAGE_MODEL: z.string().min(1).default("@cf/black-forest-labs/flux-2-klein-4b"),
+  COPY_PROVIDER: z.enum(["gemini", "cloudflare", "mock"]).default("gemini"),
+  COPY_MODEL: z.string().min(1).default("gemini-3.1-flash-lite"),
+  ENABLE_MOCK_PROVIDER: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  MAX_ACTIVE_JOBS_PER_USER: z.coerce.number().int().min(1).max(20).default(4),
+  JOB_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
+  CLOUDFLARE_DAILY_NEURON_BUDGET: z.coerce.number().int().nonnegative().default(9000),
   MAX_UPLOAD_BYTES: z.coerce
     .number()
     .int()
@@ -51,6 +66,9 @@ function crossFieldProblems(env: Record<string, string | undefined>): string[] {
   if (/^(1|true|yes|on)$/i.test(env.BETTER_AUTH_TELEMETRY ?? "")) problems.push("BETTER_AUTH_TELEMETRY: telemetry is not allowed; unset it or set it to 0");
   if (Boolean(env.GOOGLE_CLIENT_ID) !== Boolean(env.GOOGLE_CLIENT_SECRET))
     problems.push("GOOGLE_CLIENT_ID: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET go together");
+  const mock = env.IMAGE_PROVIDER === "mock" || env.COPY_PROVIDER === "mock";
+  if (mock && env.ENABLE_MOCK_PROVIDER !== "true") problems.push("IMAGE_PROVIDER/COPY_PROVIDER: mock needs ENABLE_MOCK_PROVIDER=true");
+  if (env.ENABLE_MOCK_PROVIDER === "true" && (env.NODE_ENV ?? "production") === "production") problems.push("ENABLE_MOCK_PROVIDER: not allowed in production");
   return problems;
 }
 

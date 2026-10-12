@@ -9,6 +9,10 @@ import { connectDatabase } from "./db/client";
 import { describeError, loggerOptions } from "./log";
 import { deleteUserObjects } from "./me/account-cleanup";
 import { connectRedis } from "./redis";
+import { NeuronBudget } from "./queue/budget";
+import { Dispatcher } from "./queue/dispatcher";
+import { QueueSet, createQueueConnection } from "./queue/queues";
+import { assertPlatformCopyModel, platformImageModel } from "./providers/catalogue";
 import { S3ObjectStore } from "./storage/s3-object-store";
 
 function createMailer(config: ServerConfig): Mailer {
@@ -50,6 +54,16 @@ async function main(): Promise<void> {
     { publicOrigin: config.PUBLIC_ORIGIN, secret: config.BETTER_AUTH_SECRET, google },
     { db: database.db, redis, mailer: createMailer(config), log, afterUserDeleted: deleteUserObjects(store, log) },
   );
+  const queueConnection = createQueueConnection(config.REDIS_URL);
+  const queues = new QueueSet({ connection: queueConnection, attempts: config.JOB_ATTEMPTS });
+  const dispatcher = new Dispatcher({ db: database.db, redis: queueConnection, queues, maxActivePerUser: config.MAX_ACTIVE_JOBS_PER_USER, log });
+  assertPlatformCopyModel(config.COPY_PROVIDER, config.COPY_MODEL);
+  const platform = {
+    imageProvider: config.IMAGE_PROVIDER,
+    imageModel: platformImageModel(config.IMAGE_PROVIDER, config.IMAGE_MODEL),
+    copyProvider: config.COPY_PROVIDER,
+    copyModelId: config.COPY_MODEL,
+  };
   const app = await buildApp({
     logger: log,
     readiness: [
@@ -57,14 +71,31 @@ async function main(): Promise<void> {
       { name: "redis", check: async () => void (await redis.ping()) },
       { name: "storage", check: () => store.ping() },
     ],
-    accounts: { auth, publicOrigin: config.PUBLIC_ORIGIN, redis, db: database.db, store, maxUploadBytes: config.MAX_UPLOAD_BYTES },
+    accounts: {
+      auth,
+      publicOrigin: config.PUBLIC_ORIGIN,
+      redis,
+      db: database.db,
+      store,
+      maxUploadBytes: config.MAX_UPLOAD_BYTES,
+      freeMonthlyCredits: config.FREE_MONTHLY_CREDITS,
+    },
+    runs: {
+      db: database.db,
+      redis: queueConnection,
+      queues,
+      dispatcher,
+      budget: new NeuronBudget(queueConnection, config.CLOUDFLARE_DAILY_NEURON_BUDGET),
+      platform,
+      freeMonthlyCredits: config.FREE_MONTHLY_CREDITS,
+    },
   });
 
   const shutdown = (signal: string) => {
     app.log.info({ signal }, "shutting down");
     app
       .close()
-      .then(() => Promise.allSettled([database.close(), redis.quit(), Promise.resolve(store.close())]))
+      .then(() => Promise.allSettled([database.close(), redis.quit(), queues.close().then(() => queueConnection.quit()), Promise.resolve(store.close())]))
       .then(
         () => process.exit(0),
         () => process.exit(1),

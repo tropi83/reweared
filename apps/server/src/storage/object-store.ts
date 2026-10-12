@@ -18,6 +18,8 @@ export interface ObjectStore {
   delete(key: string): Promise<void>;
   /** Removes every object under `prefix` and returns how many were removed. */
   deletePrefix(prefix: string): Promise<number>;
+  /** Every object under `prefix`, page by page (maintenance: the orphan sweep). */
+  list(prefix: string): AsyncIterable<{ key: string; lastModified: Date }[]>;
   /** Throws when the store or the bucket cannot be reached (readiness). */
   ping(): Promise<void>;
 }

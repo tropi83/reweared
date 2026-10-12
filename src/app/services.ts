@@ -4,16 +4,23 @@ import { UsageTracker } from "@aiv/domain/services/usage-tracker";
 import type { ImageProvider } from "@aiv/domain/services/image-provider";
 import { GeminiAuthManager } from "@/infrastructure/auth/GeminiAuthManager";
 import { CloudflareAuth } from "@/infrastructure/providers/cloudflare/CloudflareAuth";
-import { CLOUDFLARE_PROVIDER_ID, CloudflareProvider } from "@/infrastructure/providers/cloudflare/CloudflareProvider";
-import { GEMINI_PROVIDER_ID, GeminiProvider } from "@/infrastructure/providers/gemini/GeminiProvider";
-import { CloudflareListingCopyProvider } from "@/infrastructure/providers/cloudflare/CloudflareListingCopy";
-import { GeminiListingCopyProvider } from "@/infrastructure/providers/gemini/GeminiListingCopy";
+import { CLOUDFLARE_PROVIDER_ID, CloudflareProvider } from "@aiv/providers/cloudflare/CloudflareProvider";
+import { GEMINI_PROVIDER_ID, GeminiProvider } from "@aiv/providers/gemini/GeminiProvider";
+import { CloudflareListingCopyProvider } from "@aiv/providers/cloudflare/CloudflareListingCopy";
+import { GeminiListingCopyProvider } from "@aiv/providers/gemini/GeminiListingCopy";
 import type { ListingCopyProvider } from "@aiv/domain/services/listing-copy";
 import { createSecretStore, type LayeredSecretStore } from "@/infrastructure/auth/SecretStore";
 import { MOCK_PROVIDER_ID, MockImageProvider } from "@/infrastructure/providers/mock/MockImageProvider";
 import { createStorageProvider, type StorageProvider } from "@/infrastructure/storage";
 import { createPublishBridge } from "@/infrastructure/publish/createPublishBridge";
 import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
+// Installs the Tauri/browser fetch into the shared provider adapters before any of them runs.
+import "@/infrastructure/http/http-client";
+import { setProviderLoggerFactory } from "@aiv/providers/log";
+import { createLogger } from "@/lib/logger";
+
+// The shared adapters log through the app's redacting logger (Settings → Diagnostics).
+setProviderLoggerFactory(createLogger);
 
 /**
  * Composition root. Everything stateful and long-lived is created once here and injected

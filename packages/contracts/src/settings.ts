@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LOCALES } from "./listing";
+import { LOCALES } from "./shared";
 
 export const mannequinDto = z.strictObject({
   build: z.enum(["S", "M", "L"]),

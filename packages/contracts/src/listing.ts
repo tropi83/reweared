@@ -1,14 +1,9 @@
 import { z } from "zod";
 import { safeId, isoDateTime } from "./common";
+import { generationDto, generationJobDto } from "./generation";
+import { categorySelection, LISTING_CONDITIONS, LOCALES } from "./shared";
 
-export const CATEGORY_IDS = ["women", "men", "kids", "home", "electronics", "entertainment", "hobbies", "sport", "pets", "luxury"] as const;
-export const LISTING_CONDITIONS = ["new_with_tags", "new", "very_good", "good", "satisfactory"] as const;
-export const LOCALES = ["en", "fr"] as const;
-
-export const categorySelection = z.strictObject({
-  categoryId: z.enum(CATEGORY_IDS),
-  subcategoryId: z.string().regex(/^[a-z0-9-]{1,40}$/),
-});
+export { CATEGORY_IDS, LISTING_CONDITIONS, LOCALES, categorySelection } from "./shared";
 
 export const listingCopy = z.strictObject({
   title: z.string().max(200),
@@ -51,16 +46,15 @@ export const listingDto = z.object({
 });
 
 /**
- * The `ListingDocument` shape the clients already use. Generations and jobs are produced by the worker
- * (phase 2); until then they are empty records and their schemas are not pinned here.
+ * The `ListingDocument` shape the clients already use; generations and jobs are the photo-pack runs.
  */
 export const listingDocumentDto = z.object({
   schemaVersion: z.number().int(),
   appVersion: z.string(),
   listing: listingDto,
   images: z.record(safeId, imageAssetDto),
-  generations: z.record(safeId, z.unknown()),
-  jobs: z.record(safeId, z.unknown()),
+  generations: z.record(safeId, generationDto),
+  jobs: z.record(safeId, generationJobDto),
   toPost: z.array(safeId),
 });
 

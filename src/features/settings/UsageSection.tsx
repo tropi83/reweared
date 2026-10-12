@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Misc";
 import { resolveCopyModel } from "@aiv/domain/services/listing-copy";
 import type { UsageSnapshot } from "@aiv/domain/services/usage-tracker";
-import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@/infrastructure/providers/gemini/GeminiErrors";
+import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@aiv/providers/gemini/GeminiErrors";
 import { useT } from "@/i18n";
 import { openExternal } from "@/lib/open-external";
 import { CF_WORKERS_AI_DASHBOARD } from "./CloudflareCard";

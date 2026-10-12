@@ -94,6 +94,14 @@ Phones cannot drive a second window from the app's JavaScript (the app's WebView
 
 Not implemented yet — design §7 in [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). This section becomes the main threat model when phase 3 ships.
 
+**Implemented in phase 2** (same status):
+
+- Provider keys: Docker secrets mounted in the `worker` service only; the api's configuration has no provider variable (tested), and `scripts/check-compose.mjs` fails CI if any other service receives one. The worker reaches providers through the shared host allowlist.
+- Jobs: BullMQ data is the job id only — prompts stay in Postgres, images in the private bucket, emails never leave the account tables. Credits are reserved in the transaction that creates the jobs (402 writes nothing), refunded once per failed or cancelled job (idempotency keys, row lock; concurrency-tested), and a nightly check reports any balance that differs from its ledger.
+- Cancellation never persists a result; a duplicate delivery stores one result; a cancelled or failed job frees the user's slot. Per-user cap on active jobs (fairness) and a daily Cloudflare neuron budget (503 before anything is reserved).
+- SSE: session checked before the stream opens, the user's own Redis stream only (tested), at most 3 streams per user, events carry ids and statuses — never a prompt or an image.
+- Maintenance: orphaned image objects older than a day are deleted nightly; keys outside the storage layout are only reported.
+
 **Implemented in phase 1** (in the repository and tested; not yet used by the shipped clients):
 
 - Accounts: Better Auth 1.7, password hashing by its default scrypt, sign-in refused until the email is verified, rate limits stored in Redis (sign-in 5/min, sign-up 5/h, reset and verification 3/h, per client IP resolved by Fastify behind Caddy; a client-supplied IP header is always overwritten). Telemetry is off in the config and the api refuses to start when `BETTER_AUTH_TELEMETRY` is truthy (it enables telemetry on its own). Stored Google tokens are encrypted; `/get-access-token` and `/refresh-token` are disabled.

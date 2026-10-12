@@ -8,6 +8,11 @@ import type { Database } from "../src/db/client";
 import { deleteUserObjects } from "../src/me/account-cleanup";
 import { connectRedis } from "../src/redis";
 import { S3ObjectStore } from "../src/storage/s3-object-store";
+import { NeuronBudget } from "../src/queue/budget";
+import { Dispatcher } from "../src/queue/dispatcher";
+import { QueueSet, createQueueConnection } from "../src/queue/queues";
+import { MOCK_COPY_MODEL_ID, MOCK_IMAGE_MODEL } from "../src/providers/catalogue";
+import type { RunDeps } from "../src/generations/runs";
 import { openTestDatabase, truncateAll } from "./db-harness";
 
 export const PASSWORD = "correct horse battery";
@@ -18,6 +23,7 @@ export interface Harness {
   mailer: MemoryMailer;
   database: Database;
   store: S3ObjectStore;
+  runs: RunDeps;
   origin: string;
   close(): Promise<void>;
   reset(): Promise<void>;
@@ -34,10 +40,22 @@ export async function startHarness(origin = "http://app.test"): Promise<Harness>
     { publicOrigin: origin, secret: "test-secret-0123456789-0123456789-abcdef" },
     { db: database.db, redis, mailer, log: silent, afterUserDeleted: deleteUserObjects(store, silent) },
   );
+  const queueConnection = createQueueConnection(inject("redisUrl"));
+  const queues = new QueueSet({ connection: queueConnection, attempts: 3, prefix: "test-api" });
+  const runs: RunDeps = {
+    db: database.db,
+    redis: queueConnection,
+    queues,
+    dispatcher: new Dispatcher({ db: database.db, redis: queueConnection, queues, maxActivePerUser: 4, log: silent }),
+    budget: new NeuronBudget(queueConnection, 9000),
+    platform: { imageProvider: "mock", imageModel: MOCK_IMAGE_MODEL, copyProvider: "mock", copyModelId: MOCK_COPY_MODEL_ID },
+    freeMonthlyCredits: 60,
+  };
   const app = await buildApp({
     logger: false,
     readiness: [],
-    accounts: { auth, publicOrigin: origin, redis, db: database.db, store, maxUploadBytes: 2 * 1024 * 1024 },
+    accounts: { auth, publicOrigin: origin, redis, db: database.db, store, maxUploadBytes: 2 * 1024 * 1024, freeMonthlyCredits: 60 },
+    runs,
   });
   // A state-changing route behind the guard, to exercise its CSRF origin check before real ones exist.
   app.post("/api/v1/__test/mutation", { onRequest: requireUser(auth, [origin]) }, async (req) => ({ userId: req.user?.id }));
@@ -48,11 +66,14 @@ export async function startHarness(origin = "http://app.test"): Promise<Harness>
     mailer,
     database,
     store,
+    runs,
     origin,
     async close() {
       await app.close();
       await Promise.allSettled([database.close(), redis.quit()]);
       store.close();
+      await queues.close();
+      queueConnection.disconnect();
     },
     async reset() {
       await truncateAll(database);

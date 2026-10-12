@@ -2,28 +2,32 @@
  * Normalized error vocabulary shared by every provider, the job queue and the UI.
  * Providers map their raw HTTP/SDK errors into one of these codes (see GeminiErrors.ts).
  */
-export type GenerationErrorCode =
-  | "AUTH_REQUIRED"
-  | "AUTH_EXPIRED"
-  | "INVALID_CREDENTIAL"
-  | "PERMISSION_DENIED"
-  | "RATE_LIMITED"
-  | "QUOTA_EXCEEDED"
-  | "NETWORK_ERROR"
-  | "TIMEOUT"
-  | "PROVIDER_UNAVAILABLE"
-  | "INVALID_REQUEST"
-  | "INVALID_IMAGE"
-  | "UNSUPPORTED_FORMAT"
-  | "MODEL_UNAVAILABLE"
-  | "MODEL_NOT_IN_PLAN"
-  | "FREE_TIER_NO_ACCESS"
-  | "CONTENT_REJECTED"
-  | "NO_IMAGE_RETURNED"
-  | "CANCELLED"
-  | "STORAGE_ERROR"
-  | "PLATFORM_UNSUPPORTED"
-  | "UNKNOWN_ERROR";
+export const GENERATION_ERROR_CODES = [
+  "AUTH_REQUIRED",
+  "AUTH_EXPIRED",
+  "INVALID_CREDENTIAL",
+  "PERMISSION_DENIED",
+  "RATE_LIMITED",
+  "QUOTA_EXCEEDED",
+  "PROVIDER_BUDGET_EXHAUSTED",
+  "NETWORK_ERROR",
+  "TIMEOUT",
+  "PROVIDER_UNAVAILABLE",
+  "INVALID_REQUEST",
+  "INVALID_IMAGE",
+  "UNSUPPORTED_FORMAT",
+  "MODEL_UNAVAILABLE",
+  "MODEL_NOT_IN_PLAN",
+  "FREE_TIER_NO_ACCESS",
+  "CONTENT_REJECTED",
+  "NO_IMAGE_RETURNED",
+  "CANCELLED",
+  "STORAGE_ERROR",
+  "PLATFORM_UNSUPPORTED",
+  "UNKNOWN_ERROR",
+] as const;
+
+export type GenerationErrorCode = (typeof GENERATION_ERROR_CODES)[number];
 
 export interface GenerationError {
   code: GenerationErrorCode;

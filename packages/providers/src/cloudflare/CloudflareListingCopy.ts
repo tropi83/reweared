@@ -10,9 +10,9 @@ import {
   type ListingCopyRequest,
   type ListingCopyResult,
 } from "@aiv/domain/services/listing-copy";
-import { allowHost, httpFetch } from "@/infrastructure/http/http-client";
-import { createLogger } from "@/lib/logger";
-import type { CloudflareAuth } from "./CloudflareAuth";
+import { allowHost, httpFetch } from "../http";
+import { createLogger } from "../log";
+import type { CloudflareCredentials } from "./credentials";
 import { mapCloudflareEnvelopeError, mapCloudflareHttpError } from "./CloudflareErrors";
 import type { CloudflareErrorBody } from "./CloudflareMapper";
 
@@ -46,7 +46,7 @@ export class CloudflareListingCopyProvider implements ListingCopyProvider {
   readonly displayName = "Cloudflare Workers AI";
   readonly models = CLOUDFLARE_VISION_MODELS;
 
-  constructor(private readonly auth: CloudflareAuth) {}
+  constructor(private readonly auth: CloudflareCredentials) {}
 
   getAuthStatus(): Promise<AuthStatus> {
     return this.auth.getStatus();

@@ -99,6 +99,8 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/dev-secrets.mjs
+      - name: Provider keys reach the worker only
+        run: docker compose -f compose.yaml config --format json | node scripts/check-compose.mjs
       - run: docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait --wait-timeout 300
       - run: node scripts/server-smoke.mjs http://localhost:8080 http://localhost:8025
       - name: Compose logs
