@@ -1,17 +1,12 @@
 import { useState } from "react";
-import { Check, Copy, FileText, RefreshCw, Settings2, Square } from "lucide-react";
-import { API_MODE } from "@/app/api-mode";
-import { navigate } from "@/app/router";
-import { getServices } from "@/app/services";
-import { useAuthStatus } from "@/app/query/auth-status";
+import { Check, Copy, FileText, RefreshCw, Square } from "lucide-react";
 import { useListingSetupStore } from "@/app/stores/listing-setup-store";
 import { useListingsStore } from "@/app/stores/listings-store";
-import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Misc";
-import { LISTING_COPY_LIMITS, resolveCopyModel } from "@aiv/domain/services/listing-copy";
+import { LISTING_COPY_LIMITS } from "@aiv/domain/services/listing-copy";
 import { useT, type MessageKey } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 
@@ -19,23 +14,15 @@ import { errorMessage } from "@/i18n/errors";
 export function ListingCopyPanel() {
   const t = useT();
   const doc = useListingsStore((s) => s.current);
-  const settings = useSettingsStore((s) => s.settings);
   const busy = useListingSetupStore((s) => s.copyBusy);
   const error = useListingSetupStore((s) => s.copyError);
   const generateCopy = useListingSetupStore((s) => s.generateCopy);
   const updateCopy = useListingSetupStore((s) => s.updateCopy);
   const cancelCopy = useListingSetupStore((s) => s.cancelCopy);
   const [copied, setCopied] = useState<"title" | "description" | "all" | null>(null);
-  const copyProviders = [...getServices().copyProviders.values()];
-  const copyProviderId = settings.copyProviderId;
-  const provider = getServices().copyProviders.get(copyProviderId) ?? copyProviders[0];
-  // API mode: the platform writes the copy; there is no provider account to check.
-  const authenticated = useAuthStatus(API_MODE ? "" : (provider?.id ?? ""))?.state === "authenticated";
-  const canGenerate = API_MODE || authenticated;
 
   if (!doc?.listing.originalImageId) return null;
   const copy = doc.listing.copy;
-  const model = provider ? resolveCopyModel(provider, settings.copyModelByProvider[provider.id]) : undefined;
 
   const copyText = async (what: "title" | "description" | "all") => {
     if (!copy) return;
@@ -53,32 +40,13 @@ export function ListingCopyPanel() {
           <FileText className="size-3.5" /> {t("copy.title")}
         </span>
         <div className="flex items-center gap-1">
-          {/* The provider and model are chosen in Settings → Models (local app; on the API they are the platform's). */}
-          {!API_MODE && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t("models.change")}
-              title={model ? `${provider?.displayName} · ${model.label}` : undefined}
-              onClick={() => navigate({ name: "settings", section: "models" })}
-            >
-              <Settings2 className="size-3.5" />
-            </Button>
-          )}
           {busy ? (
             <Button variant="ghost" size="sm" leftIcon={<Square className="size-3.5" />} onClick={cancelCopy}>
               {t("common.cancel")}
             </Button>
           ) : copy ? (
             // The first text comes from "Create the listing"; this only rewrites it.
-            <Button
-              variant="ghost"
-              size="sm"
-              leftIcon={<RefreshCw className="size-3.5" />}
-              disabled={!canGenerate}
-              onClick={() => void generateCopy()}
-              title={canGenerate ? undefined : t("copy.needProvider", { provider: provider?.displayName ?? "" })}
-            >
+            <Button variant="ghost" size="sm" leftIcon={<RefreshCw className="size-3.5" />} onClick={() => void generateCopy()}>
               {t("copy.regenerateText")}
             </Button>
           ) : null}
@@ -88,7 +56,7 @@ export function ListingCopyPanel() {
       {busy && <div className="shimmer h-16 rounded-lg" aria-busy />}
       {error && !busy && (
         <p className="text-xs text-danger" role="alert">
-          {errorMessage(error, copyProviderId)}
+          {errorMessage(error, "platform")}
           {error.detail ? <span className="text-fg-subtle"> — {error.detail}</span> : null}
         </p>
       )}

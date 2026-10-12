@@ -1,5 +1,4 @@
-import { BookOpen, Images, Plus, Settings, Sparkles } from "lucide-react";
-import { API_MODE } from "@/app/api-mode";
+import { Images, Plus, Settings, Sparkles } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { CreditsBadge } from "../account/CreditsBadge";
 import { navigate, useRoute } from "@/app/router";
@@ -27,7 +26,7 @@ export function Sidebar() {
         </div>
         <div className="min-w-0">
           <div className="truncate text-sm leading-tight font-semibold">{t("app.name")}</div>
-          {API_MODE ? <CreditsBadge /> : <div className="truncate text-[11px] text-fg-subtle">{t("about.local")}</div>}
+          <CreditsBadge />
         </div>
       </div>
 
@@ -53,12 +52,6 @@ export function Sidebar() {
 
       <nav className="mt-3 px-3">
         <NavItem active={route.name === "home"} icon={<Images className="size-4" />} label={t("nav.listings")} onClick={() => navigate({ name: "home" })} />
-        <NavItem
-          active={route.name === "recipes"}
-          icon={<BookOpen className="size-4" />}
-          label={t("nav.recipes")}
-          onClick={() => navigate({ name: "recipes" })}
-        />
         <NavItem
           active={route.name === "settings"}
           icon={<Settings className="size-4" />}

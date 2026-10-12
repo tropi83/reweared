@@ -17,6 +17,7 @@
   "dependencies": {
     "@aiv/contracts": "workspace:*",
     "@aiv/domain": "workspace:*",
+    "@aiv/providers": "workspace:*",
     "@aws-sdk/client-s3": "3.1149.0",
     "@better-auth/drizzle-adapter": "1.7.7",
     "@better-auth/utils": "0.4.2",

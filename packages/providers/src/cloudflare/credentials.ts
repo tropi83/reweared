@@ -2,9 +2,9 @@ import type { AuthStatus } from "@aiv/domain/models";
 
 /**
  * Two ways to reach Workers AI:
- * - "direct": the Cloudflare REST API with an account ID + API token (the server's worker, the desktop app);
- * - "worker": a small Worker deployed in the user's own account (template in cloudflare-worker/), for browsers
- *   (api.cloudflare.com sends no CORS headers).
+ * - "direct": the Cloudflare REST API with an account ID + API token (what the server's worker uses);
+ * - "worker": a small Worker deployed in a Cloudflare account, for browsers (api.cloudflare.com sends no CORS headers).
+ *   It served the bring-your-own-key releases (template on the `byok` branch); the platform does not use it.
  */
 export type CloudflareMode = "direct" | "worker";
 

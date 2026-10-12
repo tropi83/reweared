@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -12,73 +12,48 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
   };
 });
 
-import { __setServices, createServices } from "@/app/services";
-import { useComposerStore } from "@/app/stores/composer-store";
-import { ensureModels } from "@/app/query/models";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { useListingSetupStore } from "@/app/stores/listing-setup-store";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
-import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
-import { renderWithQuery, resetQueryClient, seedAuthStatus } from "@/test/render";
+import { useFakeServices, type FakeServer } from "@/test/fake-api";
+import { renderWithQuery, resetQueryClient } from "@/test/render";
 import { ListingSetupCard } from "./ListingSetupCard";
 
 const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])], { type: "image/png" });
 
 describe("ListingSetupCard", () => {
-  const storage = new IndexedDbStorage("listing-card-test");
-  beforeAll(async () => {
-    __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
-    await storage.init();
-  });
+  let server: FakeServer;
   beforeEach(async () => {
     resetQueryClient();
-    seedAuthStatus("gemini", { state: "unauthenticated", kind: "api_key" });
-    seedAuthStatus("cloudflare", { state: "unauthenticated", kind: "api_key" });
+    ({ server } = await useFakeServices());
     useListingSetupStore.setState({ creating: false, lastRun: null, lastRunListingId: null, copyBusy: false, copyError: null });
-    useSettingsStore.setState({
-      settings: { ...useSettingsStore.getState().settings, mannequin: undefined, activeProviderId: "mock", copyProviderId: "gemini" },
-    });
+    useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, mannequin: undefined } });
     await useListingsStore.getState().createFromFile(PNG, "item.png");
-    useComposerStore.getState().setProvider("mock");
-    await ensureModels("mock");
-    useComposerStore.getState().setModel("mock-fast");
   });
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
   });
 
-  it("is disabled until the category is chosen, then runs generateListing once", async () => {
+  it("is disabled until the category is chosen, then says what runs and what it costs, and runs generateListing once", async () => {
     const user = userEvent.setup();
     const create = vi.spyOn(useListingSetupStore.getState(), "generateListing").mockResolvedValue(null);
     renderWithQuery(<ListingSetupCard />);
     expect(screen.getByRole("button", { name: "Create the listing" })).toBeDisabled();
     expect(screen.getByText("Choose a category and a subcategory to generate")).toBeInTheDocument();
     act(() => useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" }));
-    // No text provider connected in this test: the button says what will actually run.
-    const button = await screen.findByRole("button", { name: "Create the listing · 5 photos" });
+    // One credit per photo and one for the text, at the platform's prices.
+    const button = await screen.findByRole("button", { name: "Create the listing · 5 photos + text · 6 credits" });
     expect(button).toBeEnabled();
-    expect(screen.getByText(/Text skipped/)).toBeInTheDocument();
     await user.click(button);
     expect(create).toHaveBeenCalledTimes(1);
   });
 
-  it("announces photos + text when both providers are usable", async () => {
-    seedAuthStatus("gemini", { state: "authenticated", kind: "api_key" });
+  it("blocks a run the balance cannot pay for and points to the credits", async () => {
+    server.balance = 3;
     act(() => useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" }));
     renderWithQuery(<ListingSetupCard />);
-    expect(await screen.findByRole("button", { name: "Create the listing · 5 photos + text" })).toBeEnabled();
-  });
-
-  it("does not promise photos when no provider at all is usable", async () => {
-    // Cloudflare selected but not connected, and no text provider: both parts are skipped, nothing can run.
-    useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, activeProviderId: "cloudflare" } });
-    useComposerStore.getState().setProvider("cloudflare");
-    act(() => useListingSetupStore.getState().setCategory({ categoryId: "men", subcategoryId: "shoes" }));
-    renderWithQuery(<ListingSetupCard />);
-    expect(await screen.findByText("Connect an image provider or a text provider in Settings.")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Not enough credits/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create the listing" })).toBeDisabled();
   });
 
@@ -136,7 +111,7 @@ describe("ListingSetupCard", () => {
       });
     });
     renderWithQuery(<ListingSetupCard />);
-    await user.click(screen.getByRole("button", { name: "Re-create the listing" }));
+    await user.click(await screen.findByRole("button", { name: "Re-create the listing · 6 credits" }));
     expect(create).not.toHaveBeenCalled();
     await user.click(screen.getAllByRole("button", { name: "Re-create the listing" }).at(-1)!);
     expect(create).toHaveBeenCalledTimes(1);

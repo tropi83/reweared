@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { AppError, summarize, toGenerationError, type GenerationJob, type ImageMimeType, type ListingDocument, type ListingSummary } from "@aiv/domain/models";
+import { summarize, toGenerationError, type ImageMimeType, type ListingDocument, type ListingSummary } from "@aiv/domain/models";
 import { decodeImage, validateImageFile } from "@/infrastructure/image/image-processing";
 import { nowIso } from "@aiv/domain/lib/ids";
 import { createLogger } from "@/lib/logger";
@@ -18,7 +18,7 @@ interface ListingsState {
   loadingListing: boolean;
   loadSummaries(): Promise<void>;
   open(listingId: string): Promise<ListingDocument | null>;
-  /** Reads the open listing again (API mode: after the server changed it), keeping edits not saved yet. */
+  /** Reads the open listing again after the server changed it, keeping edits not saved yet. */
   reload(): Promise<void>;
   close(): void;
   createFromFile(file: Blob, fileName?: string): Promise<ListingDocument>;
@@ -31,8 +31,6 @@ interface ListingsState {
   toggleToPost(assetId: string): void;
   deleteImages(assetIds: string[]): Promise<void>;
   deleteGeneration(generationId: string): Promise<void>;
-  /** Stores a generated result (full image + thumbnail) and links it to its job. */
-  addResultImage(job: GenerationJob, blob: Blob, mimeType: ImageMimeType): Promise<string>;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -82,12 +80,6 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
 
   async open(listingId) {
     if (get().current?.listing.id === listingId) return get().current;
-    // Jobs of the listing being left would otherwise run on against a closed document and fail one by one.
-    const { queue } = getServices();
-    if (queue.activeCount > 0) {
-      queue.cancelAll();
-      await queue.settled();
-    }
     await get().flush();
     set({ loadingListing: true });
     try {
@@ -157,9 +149,7 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
 
   async remove(listingId) {
     if (get().current?.listing.id === listingId) {
-      // Running jobs abort on the next tick: wait for them so nothing is written into the folder being removed.
-      getServices().queue.cancelAll();
-      await getServices().queue.settled();
+      // The server stops the listing's jobs when it deletes it; a pending save would recreate nothing but fail.
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = null;
       set({ current: null });
@@ -214,7 +204,7 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
   async deleteImages(assetIds) {
     const current = get().current;
     if (!current) return;
-    const { listings, queue } = getServices();
+    const { listings } = getServices();
     const ids = new Set(assetIds.filter((id) => id !== current.listing.originalImageId));
     get().commit(
       (doc) => {
@@ -226,7 +216,6 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
           if (asset.jobId) {
             const job = doc.jobs[asset.jobId];
             if (job) {
-              queue.cancel(job.id);
               delete doc.jobs[job.id];
               const gen = doc.generations[job.generationId];
               if (gen) {
@@ -253,48 +242,21 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     if (!current) return;
     const gen = current.generations[generationId];
     if (!gen) return;
-    const { runs } = getServices();
-    if (runs) {
-      // API mode: the server deletes the pack, its jobs and photos in one go, then the listing is read again.
-      try {
-        await runs.deletePack(generationId);
-        // Unfinished jobs were refunded.
-        invalidateCredits();
-      } catch (err) {
-        const error = toGenerationError(err);
-        log.warn("pack not deleted", error.code);
-        toast.error(errorMessage(error));
-        return;
-      }
-      for (const jobId of gen.jobIds) {
-        const imageId = current.jobs[jobId]?.resultImageId;
-        if (imageId) evictImageUrls(current.listing.id, imageId);
-      }
-      await get().reload();
+    // The server deletes the pack, its jobs and photos in one go (unfinished jobs refunded), then the listing is read again.
+    try {
+      await getServices().runs.deletePack(generationId);
+      invalidateCredits();
+    } catch (err) {
+      const error = toGenerationError(err);
+      log.warn("pack not deleted", error.code);
+      toast.error(errorMessage(error));
       return;
     }
-    getServices().queue.cancelGeneration(generationId);
-    const imageIds = gen.jobIds.map((j) => current.jobs[j]?.resultImageId).filter((id): id is string => !!id);
-    await get().deleteImages(imageIds);
-    get().commit(
-      (doc) => {
-        for (const jobId of gen.jobIds) delete doc.jobs[jobId];
-        delete doc.generations[generationId];
-      },
-      { immediate: true },
-    );
-  },
-
-  async addResultImage(job, blob, mimeType) {
-    const current = get().current;
-    if (!current || current.listing.id !== job.listingId) {
-      throw new AppError("CANCELLED", "The listing was closed before the result arrived.", { retryable: false });
+    for (const jobId of gen.jobIds) {
+      const imageId = current.jobs[jobId]?.resultImageId;
+      if (imageId) evictImageUrls(current.listing.id, imageId);
     }
-    const asset = await getServices().listings.storeGeneratedImage(job.listingId, blob, mimeType, { generationId: job.generationId, jobId: job.id });
-    get().commit((doc) => {
-      doc.images[asset.id] = asset;
-    });
-    return asset.id;
+    await get().reload();
   },
 }));
 

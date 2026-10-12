@@ -1,42 +1,39 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { __setFetchOverride } from "@/infrastructure/http/http-client";
-import { LayeredSecretStore, MemorySecretStore, WebLocalSecretStore } from "@/infrastructure/auth/SecretStore";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AuthStatus } from "@aiv/domain/models";
+import { __setFetchOverride } from "../http";
 import { inputPreparationFor } from "@aiv/domain/services/image-provider";
 import { computeGeometry } from "@aiv/domain/services/image-geometry";
-import { CloudflareAuth, normalizeWorkerUrl, type MetaStore } from "./CloudflareAuth";
-import { mapCloudflareEnvelopeError, mapCloudflareHttpError } from "@aiv/providers/cloudflare/CloudflareErrors";
-import {
-  FLUX_KEEP_SUBJECT_HINT,
-  fluxOutputSize,
-  normalizeCloudflareOptions,
-  randomSeed,
-  toCloudflareBody,
-  toCloudflareRequest,
-} from "@aiv/providers/cloudflare/CloudflareMapper";
-import { CLOUDFLARE_IMAGE_MODELS, DEFAULT_CLOUDFLARE_MODEL_ID } from "@aiv/providers/cloudflare/CloudflareModels";
-import { CloudflareProvider } from "@aiv/providers/cloudflare/CloudflareProvider";
+import { mapCloudflareEnvelopeError, mapCloudflareHttpError } from "./CloudflareErrors";
+import { FLUX_KEEP_SUBJECT_HINT, fluxOutputSize, normalizeCloudflareOptions, randomSeed, toCloudflareBody, toCloudflareRequest } from "./CloudflareMapper";
+import { CLOUDFLARE_IMAGE_MODELS, DEFAULT_CLOUDFLARE_MODEL_ID } from "./CloudflareModels";
+import { CloudflareProvider } from "./CloudflareProvider";
+import { CLOUDFLARE_API_BASE, type CloudflareConfig } from "./credentials";
 
 const ACCOUNT = "0123456789abcdef0123456789abcdef";
 const SD_MODEL_ID = "@cf/runwayml/stable-diffusion-v1-5-img2img";
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 
-function meta(): MetaStore & { data: Record<string, unknown> } {
-  const data: Record<string, unknown> = {};
-  return {
-    data,
-    read: async <T>(key: string) => (data[key] as T | undefined) ?? null,
-    write: async (key: string, value: unknown) => {
-      data[key] = value;
+/** The adapter's credentials as the server's worker provides them (direct mode, from Docker secrets). */
+function directAuth(configured = true) {
+  const auth = {
+    rejected: false,
+    getConfig: async (): Promise<CloudflareConfig | null> => (configured ? { mode: "direct", accountId: ACCOUNT } : null),
+    getStatus: async (): Promise<AuthStatus> =>
+      auth.rejected
+        ? { state: "invalid", kind: "api_key" }
+        : configured
+          ? { state: "authenticated", kind: "api_key" }
+          : { state: "unauthenticated", kind: "none" },
+    resolveEndpoint: async (modelId: string) => ({
+      url: `${CLOUDFLARE_API_BASE}/accounts/${ACCOUNT}/ai/run/${modelId}`,
+      headers: { Authorization: "Bearer cf_token_1234567890abcdef" },
+    }),
+    markRejected: () => {
+      auth.rejected = true;
     },
   };
+  return auth;
 }
-
-function makeAuth(desktop = true) {
-  vi.spyOn(CloudflareAuth.prototype, "directSupported", "get").mockReturnValue(desktop);
-  return new CloudflareAuth(new LayeredSecretStore(new MemorySecretStore(), new WebLocalSecretStore()), meta());
-}
-
-beforeEach(() => localStorage.clear());
 afterEach(() => {
   __setFetchOverride(undefined);
   vi.restoreAllMocks();
@@ -70,7 +67,7 @@ describe("CloudflareMapper", () => {
   });
 
   it("rejects unsupported input formats and empty prompts", async () => {
-    await expect(toCloudflareBody({ prompt: "x", model: "m", sourceImage: { blob: new Blob(), mimeType: "image/webp" } })).rejects.toMatchObject({
+    await expect(toCloudflareBody({ prompt: "x", model: "m", sourceImage: { blob: new Blob([]), mimeType: "image/webp" } })).rejects.toMatchObject({
       code: "UNSUPPORTED_FORMAT",
     });
     await expect(toCloudflareBody({ prompt: "   ", model: "m" })).rejects.toMatchObject({ code: "INVALID_REQUEST" });
@@ -137,45 +134,9 @@ describe("CloudflareErrors", () => {
   });
 });
 
-describe("CloudflareAuth", () => {
-  it("validates direct-mode inputs and builds the REST endpoint", async () => {
-    const auth = makeAuth();
-    await expect(auth.saveDirect({ accountId: "nope", apiToken: "x".repeat(40), remember: false })).rejects.toMatchObject({ code: "INVALID_CREDENTIAL" });
-    await expect(auth.saveDirect({ accountId: ACCOUNT, apiToken: "short", remember: false })).rejects.toMatchObject({ code: "INVALID_CREDENTIAL" });
-    await auth.saveDirect({ accountId: ACCOUNT.toUpperCase(), apiToken: "cf_token_1234567890abcdef", remember: true });
-    expect(await auth.getStatus()).toMatchObject({ state: "authenticated", kind: "api_token", label: `012345… · token …cdef` });
-    expect(await auth.isRemembered()).toBe(true);
-    const ep = await auth.resolveEndpoint("@cf/x/y");
-    expect(ep.url).toBe(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/ai/run/@cf/x/y`);
-    expect(ep.headers.Authorization).toBe("Bearer cf_token_1234567890abcdef");
-    await auth.clear();
-    expect((await auth.getStatus()).state).toBe("unauthenticated");
-    expect(localStorage.length).toBe(0);
-  });
-
-  it("refuses direct mode in a browser but allows worker mode", async () => {
-    const auth = makeAuth(false);
-    await auth.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
-    await expect(auth.resolveEndpoint("@cf/x/y")).rejects.toMatchObject({ code: "AUTH_REQUIRED" });
-    await auth.saveWorker({ workerUrl: "https://aiv.me.workers.dev/", secret: "s3cret-s3cret", remember: false });
-    const ep = await auth.resolveEndpoint("@cf/x/y");
-    expect(ep).toEqual({ url: "https://aiv.me.workers.dev/run/@cf/x/y", headers: { Authorization: "Bearer s3cret-s3cret" } });
-    expect((await auth.getStatus()).label).toBe("aiv.me.workers.dev");
-  });
-
-  it("normalizes and rejects bad worker URLs", () => {
-    expect(normalizeWorkerUrl(" https://aiv.me.workers.dev/ ")).toBe("https://aiv.me.workers.dev");
-    expect(normalizeWorkerUrl("https://example.com/base/")).toBe("https://example.com/base");
-    expect(() => normalizeWorkerUrl("http://aiv.me.workers.dev")).toThrow(/https/);
-    expect(() => normalizeWorkerUrl("https://user:pw@aiv.me.workers.dev")).toThrow();
-    expect(() => normalizeWorkerUrl("not a url")).toThrow();
-  });
-});
-
 describe("CloudflareProvider", () => {
   async function directProvider() {
-    const auth = makeAuth();
-    await auth.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
+    const auth = directAuth();
     const events: unknown[] = [];
     return { provider: new CloudflareProvider(auth, { track: (e) => events.push(e), learnLimit: () => undefined }), auth, events };
   }
@@ -234,7 +195,7 @@ describe("CloudflareProvider", () => {
         { signal: new AbortController().signal },
       ),
     ).rejects.toMatchObject({ code: "INVALID_CREDENTIAL" });
-    expect((await auth.getStatus()).state).toBe("invalid");
+    expect(auth.rejected).toBe(true);
   });
 
   it("refuses unknown models and missing source images before any request", async () => {
@@ -250,7 +211,7 @@ describe("CloudflareProvider", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("validates credentials through the model search route in direct mode", async () => {
+  it("validates credentials through the model search route", async () => {
     const calls: string[] = [];
     __setFetchOverride(async (url) => {
       calls.push(url);
@@ -259,25 +220,6 @@ describe("CloudflareProvider", () => {
     const { provider } = await directProvider();
     expect((await provider.validateCredentials()).state).toBe("authenticated");
     expect(calls[0]).toContain(`/accounts/${ACCOUNT}/ai/models/search`);
-  });
-
-  it("uses the worker endpoint and health route in worker mode", async () => {
-    const calls: string[] = [];
-    __setFetchOverride(async (url) => {
-      calls.push(url);
-      return url.endsWith("/health")
-        ? new Response(JSON.stringify({ ok: true }), { status: 200 })
-        : new Response(PNG, { status: 200, headers: { "Content-Type": "image/png" } });
-    });
-    const auth = makeAuth(false);
-    await auth.saveWorker({ workerUrl: "https://aiv.me.workers.dev", secret: "", remember: false });
-    const provider = new CloudflareProvider(auth);
-    expect((await provider.validateCredentials()).state).toBe("authenticated");
-    await provider.generate(
-      { prompt: "p", model: DEFAULT_CLOUDFLARE_MODEL_ID, sourceImage: { blob: new Blob([PNG]), mimeType: "image/png" } },
-      { signal: new AbortController().signal },
-    );
-    expect(calls).toEqual(["https://aiv.me.workers.dev/health", `https://aiv.me.workers.dev/run/${DEFAULT_CLOUDFLARE_MODEL_ID}`]);
   });
 });
 
@@ -313,8 +255,7 @@ describe("input preparation for diffusion models", () => {
 
 describe("private / restricted models (error 5018)", () => {
   it("maps 403 5018 to MODEL_NOT_IN_PLAN without marking the credential rejected", async () => {
-    const auth = makeAuth();
-    await auth.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
+    const auth = directAuth();
     __setFetchOverride(
       async () =>
         new Response(
@@ -339,8 +280,7 @@ describe("private / restricted models (error 5018)", () => {
   });
 
   it("marks catalogue models the account cannot run as unavailable", async () => {
-    const auth = makeAuth();
-    await auth.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
+    const auth = directAuth();
     __setFetchOverride(async (url) => {
       expect(url).toContain(`/accounts/${ACCOUNT}/ai/models/search?task=Text-to-Image`);
       return new Response(
@@ -365,10 +305,9 @@ describe("private / restricted models (error 5018)", () => {
 
   it("falls back to the full catalogue when listing fails or no configuration exists", async () => {
     __setFetchOverride(async () => new Response("{}", { status: 500 }));
-    const configured = makeAuth();
-    await configured.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
+    const configured = directAuth();
     expect((await new CloudflareProvider(configured).getModels()).every((m) => m.available)).toBe(true);
-    expect((await new CloudflareProvider(makeAuth()).getModels()).every((m) => m.available)).toBe(true);
+    expect((await new CloudflareProvider(directAuth(false)).getModels()).every((m) => m.available)).toBe(true);
   });
 });
 
@@ -380,8 +319,7 @@ describe("FLUX.2 [klein] requests", () => {
       calls.push({ url, init });
       return new Response(JSON.stringify({ success: true, result: { image: b64 } }), { status: 200, headers: { "Content-Type": "application/json" } });
     });
-    const auth = makeAuth();
-    await auth.saveDirect({ accountId: ACCOUNT, apiToken: "cf_token_1234567890abcdef", remember: false });
+    const auth = directAuth();
     const provider = new CloudflareProvider(auth);
     const result = await provider.generate(
       {
@@ -427,7 +365,7 @@ describe("FLUX.2 [klein] requests", () => {
   it("computes output sizes from the ratio or the source, in multiples of 16 within 256-1920", () => {
     expect(fluxOutputSize({ prompt: "p", model: "m", aspectRatio: "16:9" })).toEqual({ width: 1024, height: 576 });
     expect(fluxOutputSize({ prompt: "p", model: "m", aspectRatio: "9:16", imageSize: "512px" })).toEqual({ width: 288, height: 512 });
-    expect(fluxOutputSize({ prompt: "p", model: "m", sourceImage: { blob: new Blob(), mimeType: "image/png", width: 3000, height: 4000 } })).toEqual({
+    expect(fluxOutputSize({ prompt: "p", model: "m", sourceImage: { blob: new Blob([]), mimeType: "image/png", width: 3000, height: 4000 } })).toEqual({
       width: 768,
       height: 1024,
     });

@@ -1,5 +1,5 @@
-/** Deleting a listing from the app (never from Vinted): everything bound to it stops first, then the files go. */
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+/** Deleting a listing from the app (never from Vinted): everything bound to it stops first, then the server deletes it. */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/infrastructure/image/image-processing")>();
@@ -11,28 +11,23 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
   };
 });
 
-import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
+import { json, useFakeServices, type FakeServer } from "@/test/fake-api";
 import { deleteListing } from "./listing-actions";
 import { currentRoute, navigate } from "./router";
-import { __setServices, createServices, getServices } from "./services";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "./stores/generation-store";
+import { getServices } from "./services";
+import { useGenerationStore } from "./stores/generation-store";
 import { useListingsStore } from "./stores/listings-store";
 import { usePublishStore } from "./stores/publish-store";
-import { ensureModels } from "./query/models";
-import { useComposerStore } from "./stores/composer-store";
-import { useGenerationStore } from "./stores/generation-store";
 import { useToastStore } from "./stores/toast-store";
 
 const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])], { type: "image/png" });
 
+let server: FakeServer;
+
 describe("deleteListing", () => {
-  const storage = new IndexedDbStorage("listing-actions-test");
-  beforeAll(async () => {
-    __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
-    await storage.init();
-  });
-  beforeEach(() => {
+  beforeEach(async () => {
+    ({ server } = await useFakeServices());
+    useListingsStore.setState({ current: null, summaries: [] });
     useToastStore.setState({ toasts: [] });
     usePublishStore.setState({ session: { stage: "closed", busy: false } });
   });
@@ -47,7 +42,7 @@ describe("deleteListing", () => {
 
     await deleteListing(id);
 
-    expect(await storage.getListing(id)).toBeNull();
+    expect(server.docs.has(id)).toBe(false);
     expect(useListingsStore.getState().current).toBeNull();
     expect(useListingsStore.getState().summaries.find((s) => s.id === id)).toBeUndefined();
     expect(currentRoute()).toEqual({ name: "home" });
@@ -65,46 +60,35 @@ describe("deleteListing", () => {
 
     await deleteListing(other.listing.id);
 
-    expect(await storage.getListing(other.listing.id)).toBeNull();
+    expect(server.docs.has(other.listing.id)).toBe(false);
     expect(useListingsStore.getState().current?.listing.id).toBe(current.listing.id);
     expect(currentRoute()).toEqual({ name: "listing", id: current.listing.id });
     expect(usePublishStore.getState().session.stage).toBe("browsing");
     expect(close).not.toHaveBeenCalled();
   });
 
-  it("reports a storage failure instead of pretending", async () => {
+  it("reports a server failure instead of pretending", async () => {
     const doc = await useListingsStore.getState().createFromFile(PNG, "x.png");
-    vi.spyOn(getServices().storage, "deleteListing").mockRejectedValue(new Error("disk"));
+    server.override = (method) => (method === "DELETE" ? json(500, { code: "UNKNOWN_ERROR", message: "Down." }) : undefined);
     await deleteListing(doc.listing.id);
     expect(useToastStore.getState().toasts.at(-1)?.kind).toBe("error");
-    expect(await storage.getListing(doc.listing.id)).not.toBeNull();
+    expect(server.docs.has(doc.listing.id)).toBe(true);
   });
 
-  it("cancels the photos being generated for the listing before removing it (no quota burnt, no write into a deleted folder)", async () => {
+  it("stops the photos being generated for the open listing before deleting it", async () => {
     const doc = await useListingsStore.getState().createFromFile(PNG, "busy.png");
-    const services = getServices();
-    services.mock.setOptions({ latencyMs: 2000, scenario: "success" });
-    services.queue.configure({ concurrency: 2, maxAttempts: 1, timeoutMs: 10_000 });
-    useComposerStore.getState().setProvider("mock");
-    await ensureModels("mock");
-    const gen = await useGenerationStore.getState().start({
-      sourceImageId: doc.listing.originalImageId!,
-      prompt: "studio",
-      providerId: "mock",
-      modelId: "mock-fast",
-      aspectRatio: "original",
-      variationCount: 3,
-    });
-    expect(services.queue.activeCount).toBe(3);
+    navigate({ name: "listing", id: doc.listing.id });
+    useListingsStore.getState().commit((d) => void (d.listing.category = { categoryId: "women", subcategoryId: "clothing" }), { immediate: true });
+    const gen = await useGenerationStore
+      .getState()
+      .start({ sourceImageId: doc.listing.originalImageId!, shotIds: ["retouch", "studio"], aspectRatio: "original" });
 
     await deleteListing(doc.listing.id);
 
-    expect(services.queue.activeCount).toBe(0);
+    await vi.waitFor(() => {
+      for (const jobId of gen.jobIds) expect(server.calls.some((c) => c.method === "POST" && c.path === `/api/v1/jobs/${jobId}/cancel`)).toBe(true);
+    });
+    expect(server.calls.some((c) => c.method === "DELETE" && c.path === `/api/v1/listings/${doc.listing.id}`)).toBe(true);
     expect(useListingsStore.getState().current).toBeNull();
-    expect(await storage.getListing(doc.listing.id)).toBeNull();
-    // The cancelled jobs never persisted a result for the deleted listing.
-    await new Promise((r) => setTimeout(r, 50));
-    expect(await storage.readImage(doc.listing.id, "generation", gen.jobIds[0]!)).toBeNull();
-    services.mock.setOptions({ latencyMs: 5, scenario: "success" });
   });
 });

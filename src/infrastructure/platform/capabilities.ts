@@ -70,8 +70,3 @@ export function getPlatform(): PlatformCapabilities {
   };
   return cached;
 }
-
-/** Test hook. */
-export function __resetPlatformCache() {
-  cached = undefined;
-}

@@ -1,151 +1,39 @@
 import { create } from "zustand";
-import { AppError, deriveGenerationStatus, toGenerationError, type AspectRatio, type Generation, type GenerationJob, type ImageSize } from "@aiv/domain/models";
-import type { CategorySelection, ShotSpec } from "@aiv/domain/models";
-import {
-  buildRequestForModel,
-  inputPreparationFor,
-  seedForAttempt,
-  type ImageGenerationRequest,
-  type ImageGenerationResult,
-} from "@aiv/domain/services/image-provider";
-import { prepareForProvider } from "@/infrastructure/image/image-processing";
-import { createId, nowIso } from "@aiv/domain/lib/ids";
-import { softenForSafetyFilter } from "@aiv/domain/services/catalog";
+import { AppError, toGenerationError, type AspectRatio, type Generation } from "@aiv/domain/models";
 import { createLogger } from "@/lib/logger";
 import { errorMessage } from "@/i18n/errors";
-import { toast } from "./toast-store";
-import { ensureModels, modelsSnapshot } from "../query/models";
+import { invalidateCredits } from "../query/credits";
 import { getServices } from "../services";
 import { useListingsStore } from "./listings-store";
-import { invalidateCredits } from "../query/credits";
+import { toast } from "./toast-store";
 
 const log = createLogger("generation");
-import { useSettingsStore } from "./settings-store";
 
 export interface StartGenerationParams {
   sourceImageId: string;
-  prompt: string;
-  providerId: string;
-  modelId: string;
+  /** Catalogue shots of the listing's category (the server plans and prompts them). */
+  shotIds: string[];
   aspectRatio: AspectRatio;
-  imageSize?: ImageSize;
-  variationCount: number;
-  recipeId?: string;
-  providerOptions?: Record<string, string | number | boolean>;
-  /**
-   * Listing pack: one job per shot, each with its own prompt (variationCount is ignored).
-   * `prompt` then only serves as the generation's summary.
-   */
-  shots?: ShotSpec[];
-  category?: CategorySelection;
 }
 
 interface GenerationState {
-  /** Models per provider, refreshed when the provider or credentials change. */
+  /** Starts a photo pack (or some of its shots) on the server; the listing is read again with the new jobs. */
   start(params: StartGenerationParams): Promise<Generation>;
   retryJob(jobId: string): void;
   retryFailed(generationId: string): void;
   /**
-   * Generates one more photo like this job's (same source, prompt, shot, model and options, fresh seed)
-   * as a new job in the same generation; the existing result is kept. Returns the new job's id, or
-   * undefined when the job is not finished or its source photo is gone.
+   * One more photo of this job's shot (same source and format, a fresh seed chosen by the server). The new tile
+   * appears with the listing's next read; returns undefined (there is no local id to reveal).
    */
   regenerateJob(jobId: string): string | undefined;
+  cancelJob(jobId: string): void;
   cancelGeneration(generationId: string): void;
   cancelAll(): void;
 }
 
-/** Cache of prepared source images so N variations share one downscale/encode pass. */
-const preparedCache = new Map<string, Promise<{ blob: Blob; mimeType: "image/png" | "image/jpeg"; width: number; height: number }>>();
-
-/** 31-bit seed so deterministic providers (diffusion) produce a different image per job. */
-function randomSeed(): number {
-  const buf = new Uint32Array(1);
-  crypto.getRandomValues(buf);
-  return (buf[0] ?? 0) % 2_147_483_647;
-}
-
-function preparedKey(listingId: string, assetId: string, spec: { maxDimension: number; multipleOf?: number; cropToAspectRatio?: string; format: string }) {
-  return `${listingId}/${assetId}/${spec.maxDimension}/${spec.multipleOf ?? 0}/${spec.cropToAspectRatio ?? "-"}/${spec.format}`;
-}
-
-export async function buildRequestForJob(job: GenerationJob, _signal: AbortSignal): Promise<ImageGenerationRequest> {
-  const { listings } = getServices();
-  const doc = useListingsStore.getState().current;
-  const asset = doc?.images[job.sourceImageId];
-  if (!doc || doc.listing.id !== job.listingId || !asset) {
-    throw new AppError("INVALID_IMAGE", "The source image is no longer available.", { retryable: false });
-  }
-  const model = modelsSnapshot(job.provider).find((m) => m.id === job.model);
-  if (!model) throw new AppError("MODEL_UNAVAILABLE", "The selected model is not available.", { retryable: false });
-
-  const spec = inputPreparationFor(
-    model,
-    { aspectRatio: job.aspectRatio, ...(job.imageSize ? { imageSize: job.imageSize } : {}) },
-    useSettingsStore.getState().settings.prepareMaxDimension,
-  );
-  const key = preparedKey(job.listingId, job.sourceImageId, spec);
-  let prepared = preparedCache.get(key);
-  if (!prepared) {
-    prepared = (async () => {
-      const blob = await listings.readImage(job.listingId, asset.kind, asset.id);
-      if (!blob) throw new AppError("INVALID_IMAGE", "The source image file is missing.", { retryable: false });
-      const out = await prepareForProvider(blob, asset.mimeType, {
-        maxDimension: spec.maxDimension,
-        ...(spec.multipleOf ? { multipleOf: spec.multipleOf } : {}),
-        ...(spec.cropToAspectRatio ? { cropToAspectRatio: spec.cropToAspectRatio } : {}),
-        ...(model.capabilities.inputImage ? { format: spec.format } : {}),
-      });
-      return { blob: out.blob, mimeType: out.mimeType, width: out.width, height: out.height };
-    })();
-    preparedCache.set(key, prepared);
-    prepared.catch(() => preparedCache.delete(key));
-    // Prepared payloads are transient: drop them shortly after the burst of jobs.
-    setTimeout(() => preparedCache.delete(key), 5 * 60_000);
-  }
-  const source = await prepared;
-  // After a safety-filter rejection the retry drops the "logos and text" clause: close-ups that reproduce a
-  // trademark prominently are what the filter flags (a new seed alone never got through).
-  const prompt = job.attempt > 1 && job.error?.code === "CONTENT_REJECTED" ? softenForSafetyFilter(job.prompt) : job.prompt;
-  if (prompt !== job.prompt) log.info("content filter: retrying with the softened prompt", job.id, job.attempt);
-  return buildRequestForModel(model, {
-    prompt,
-    sourceImage: { blob: source.blob, mimeType: source.mimeType, width: source.width, height: source.height },
-    aspectRatio: job.aspectRatio,
-    ...(job.imageSize ? { imageSize: job.imageSize } : {}),
-    // Automatic retries get a derived seed (see seedForAttempt): same seed = same output = same rejection.
-    ...(job.seed !== undefined ? { seed: seedForAttempt(job.seed, job.attempt) } : {}),
-    ...(job.providerOptions ? { options: job.providerOptions } : {}),
-  });
-}
-
-export async function persistJobResult(job: GenerationJob, result: ImageGenerationResult): Promise<string> {
-  return useListingsStore.getState().addResultImage(job, result.image, result.mimeType);
-}
-
-export function applyJobUpdate(job: GenerationJob): void {
-  const listings = useListingsStore.getState();
-  const doc = listings.current;
-  if (!doc || doc.listing.id !== job.listingId) return;
-  const terminal = job.status === "completed" || job.status === "failed" || job.status === "cancelled";
-  listings.commit(
-    (draft) => {
-      draft.jobs[job.id] = job;
-      const gen = draft.generations[job.generationId];
-      if (!gen) return;
-      const jobs = gen.jobIds.map((id) => draft.jobs[id]).filter((j): j is GenerationJob => !!j);
-      gen.status = deriveGenerationStatus(jobs);
-      if (gen.status !== "active") gen.completedAt = nowIso();
-      // The newest result becomes the listing cover in the sidebar.
-      if (job.status === "completed" && job.resultImageId) draft.listing.coverImageId = job.resultImageId;
-    },
-    { immediate: terminal },
-  );
-}
-
 const SHOT_ID = /^[a-z0-9-]{1,40}$/;
 
-/** API mode: a server request started from a button; its failure becomes a toast. */
+/** A server request started from a button; its failure becomes a toast. */
 function remote(action: Promise<unknown>, what: string): void {
   void action
     .then(() => {
@@ -155,11 +43,11 @@ function remote(action: Promise<unknown>, what: string): void {
     .catch((err: unknown) => {
       const error = toGenerationError(err);
       log.warn(what, error.code);
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, "platform"));
     });
 }
 
-/** API mode: the open listing's jobs that are still queued or running, in `generationId` or all. */
+/** The open listing's jobs that are still queued or running, in `generationId` or all. */
 function activeJobIds(generationId?: string): string[] {
   const doc = useListingsStore.getState().current;
   if (!doc) return [];
@@ -168,144 +56,40 @@ function activeJobIds(generationId?: string): string[] {
     .map((j) => j.id);
 }
 
-/** API mode: the server runs catalogue shots only (a pack, or some of its shots); free prompts stay local for now. */
-async function startRemote(params: StartGenerationParams, listingId: string): Promise<Generation> {
-  const shotIds = (params.shots ?? []).map((s) => s.id).filter((id) => SHOT_ID.test(id));
-  if (shotIds.length === 0) throw new AppError("INVALID_REQUEST", "Only the listing's photo pack can be generated on the platform.", { retryable: false });
-  await useListingsStore.getState().flush();
-  const run = await getServices().runs!.startPhotos(listingId, {
-    sourceImageId: params.sourceImageId,
-    shotIds: shotIds.slice(0, 10),
-    aspectRatio: params.aspectRatio,
-  });
-  invalidateCredits();
-  await useListingsStore.getState().reload();
-  const generation = useListingsStore.getState().current?.generations[run.generationId];
-  if (!generation) throw new AppError("UNKNOWN_ERROR", "The run started but the listing could not be read again.");
-  return generation;
-}
-
 export const useGenerationStore = create<GenerationState>((_set, get) => ({
   async start(params) {
     const listings = useListingsStore.getState();
     const doc = listings.current;
     if (!doc) throw new AppError("INVALID_REQUEST", "No open listing.");
-    if (getServices().runs) return startRemote(params, doc.listing.id);
-    const source = doc.images[params.sourceImageId];
-    if (!source) throw new AppError("INVALID_IMAGE", "Source image not found.");
-    const prompt = params.prompt.trim();
-    const shots = params.shots?.filter((s) => s.prompt.trim().length > 0) ?? [];
-    if (!prompt && shots.length === 0) throw new AppError("INVALID_REQUEST", "Prompt is empty.");
-    const models = await ensureModels(params.providerId);
-    const model = models.find((m) => m.id === params.modelId);
-    if (!model) throw new AppError("MODEL_UNAVAILABLE", "Select an available model.");
-
-    const count = shots.length > 0 ? Math.min(8, shots.length) : Math.max(1, Math.min(8, Math.round(params.variationCount)));
-    const now = nowIso();
-    const generationId = createId("gen");
-    const jobs: GenerationJob[] = Array.from({ length: count }, (_, i) => ({
-      id: createId("job"),
-      listingId: doc.listing.id,
-      generationId,
-      sourceImageId: source.id,
-      index: i + 1,
-      prompt: shots[i]?.prompt.trim() ?? prompt,
-      ...(shots[i] ? { shotId: shots[i]!.id, shotLabel: shots[i]!.label } : {}),
-      provider: params.providerId,
-      model: params.modelId,
-      aspectRatio: params.aspectRatio,
-      ...(params.imageSize && model.capabilities.supportedImageSizes.includes(params.imageSize) ? { imageSize: params.imageSize } : {}),
-      ...(params.providerOptions && Object.keys(params.providerOptions).length > 0 ? { providerOptions: params.providerOptions } : {}),
-      seed: randomSeed(),
-      status: "queued",
-      attempt: 0,
-      createdAt: now,
-    }));
-    const generation: Generation = {
-      id: generationId,
-      listingId: doc.listing.id,
-      sourceImageId: source.id,
-      ...(source.generationId ? { parentGenerationId: source.generationId } : {}),
-      prompt: prompt || (shots[0]?.prompt ?? ""),
-      ...(params.recipeId ? { recipeId: params.recipeId } : {}),
-      ...(params.category ? { category: params.category } : {}),
-      settings: {
-        providerId: params.providerId,
-        modelId: params.modelId,
-        aspectRatio: params.aspectRatio,
-        ...(params.imageSize ? { imageSize: params.imageSize } : {}),
-        ...(params.providerOptions && Object.keys(params.providerOptions).length > 0 ? { providerOptions: params.providerOptions } : {}),
-        variationCount: count,
-      },
-      status: "active",
-      jobIds: jobs.map((j) => j.id),
-      createdAt: now,
-    };
-    listings.commit(
-      (draft) => {
-        draft.generations[generation.id] = generation;
-        for (const job of jobs) draft.jobs[job.id] = job;
-      },
-      { immediate: true },
-    );
-    getServices().queue.enqueue(jobs);
+    const shotIds = params.shotIds.filter((id) => SHOT_ID.test(id)).slice(0, 10);
+    if (shotIds.length === 0) throw new AppError("INVALID_REQUEST", "Choose at least one shot of the pack.", { retryable: false });
+    // The server reads the category, brand and mannequin from the listing: unsaved edits go first.
+    await listings.flush();
+    const run = await getServices().runs.startPhotos(doc.listing.id, { sourceImageId: params.sourceImageId, shotIds, aspectRatio: params.aspectRatio });
+    invalidateCredits();
+    await useListingsStore.getState().reload();
+    const generation = useListingsStore.getState().current?.generations[run.generationId];
+    if (!generation) throw new AppError("UNKNOWN_ERROR", "The run started but the listing could not be read again.");
     return generation;
   },
 
   retryJob(jobId) {
-    const doc = useListingsStore.getState().current;
-    const job = doc?.jobs[jobId];
-    if (!job) return;
-    const { queue, runs } = getServices();
-    if (runs) return remote(runs.retry(jobId), "retry failed");
-    // A fresh seed: a diffusion model returns the same image for the same seed, so retrying with the old one
-    // would reproduce the same output — and the same safety-filter rejection.
-    const patch = job.seed !== undefined ? { seed: randomSeed() } : {};
-    if (queue.getJob(jobId)) queue.retry(jobId, patch);
-    else queue.enqueue([{ ...job, ...patch, attempt: 0, resultImageId: undefined, completedAt: undefined }]);
+    if (!useListingsStore.getState().current?.jobs[jobId]) return;
+    remote(getServices().runs.retry(jobId), "retry failed");
   },
 
   regenerateJob(jobId) {
-    const listings = useListingsStore.getState();
-    const doc = listings.current;
+    const doc = useListingsStore.getState().current;
     const job = doc?.jobs[jobId];
-    const generation = job && doc?.generations[job.generationId];
-    if (!doc || !job || !generation || !doc.images[job.sourceImageId]) return undefined;
+    if (!doc || !job || !doc.images[job.sourceImageId]) return undefined;
     if (job.status === "queued" || job.status === "generating") return undefined;
-    const { runs } = getServices();
-    if (runs) {
-      // The server answers with the new job only after the request: the tile appears with the listing's next read.
-      if (job.shotId && SHOT_ID.test(job.shotId)) {
-        remote(
-          runs.startPhotos(doc.listing.id, { sourceImageId: job.sourceImageId, shotIds: [job.shotId], aspectRatio: job.aspectRatio }),
-          "regenerate failed",
-        );
-      }
-      return undefined;
+    if (job.shotId && SHOT_ID.test(job.shotId)) {
+      remote(
+        getServices().runs.startPhotos(doc.listing.id, { sourceImageId: job.sourceImageId, shotIds: [job.shotId], aspectRatio: job.aspectRatio }),
+        "regenerate failed",
+      );
     }
-    const next: GenerationJob = {
-      ...job,
-      id: createId("job"),
-      index: generation.jobIds.length + 1,
-      ...(job.seed !== undefined ? { seed: randomSeed() } : {}),
-      status: "queued",
-      attempt: 0,
-      createdAt: nowIso(),
-    };
-    delete next.resultImageId;
-    delete next.startedAt;
-    delete next.completedAt;
-    delete next.error;
-    delete next.nextRetryAt;
-    listings.commit(
-      (draft) => {
-        draft.jobs[next.id] = next;
-        draft.generations[generation.id]?.jobIds.push(next.id);
-      },
-      { immediate: true },
-    );
-    getServices().queue.enqueue([next]);
-    return next.id;
+    return undefined;
   },
 
   retryFailed(generationId) {
@@ -318,15 +102,15 @@ export const useGenerationStore = create<GenerationState>((_set, get) => ({
     }
   },
 
+  cancelJob(jobId) {
+    remote(getServices().runs.cancel(jobId), "cancel failed");
+  },
+
   cancelGeneration(generationId) {
-    const { queue, runs } = getServices();
-    if (runs) for (const id of activeJobIds(generationId)) remote(runs.cancel(id), "cancel failed");
-    else queue.cancelGeneration(generationId);
+    for (const id of activeJobIds(generationId)) remote(getServices().runs.cancel(id), "cancel failed");
   },
 
   cancelAll() {
-    const { queue, runs } = getServices();
-    if (runs) for (const id of activeJobIds()) remote(runs.cancel(id), "cancel failed");
-    else queue.cancelAll();
+    for (const id of activeJobIds()) remote(getServices().runs.cancel(id), "cancel failed");
   },
 }));

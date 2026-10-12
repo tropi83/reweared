@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export type Route = { name: "home" } | { name: "listing"; id: string } | { name: "settings"; section?: string } | { name: "recipes" };
+export type Route = { name: "home" } | { name: "listing"; id: string } | { name: "settings"; section?: string };
 
 function parse(hash: string): Route {
   const path = hash.replace(/^#\/?/, "");
@@ -11,8 +11,6 @@ function parse(hash: string): Route {
       return rest[0] ? { name: "listing", id: rest[0] } : { name: "home" };
     case "settings":
       return rest[0] ? { name: "settings", section: rest[0] } : { name: "settings" };
-    case "recipes":
-      return { name: "recipes" };
     default:
       return { name: "home" };
   }
@@ -24,8 +22,6 @@ export function toHash(route: Route): string {
       return `#/listing/${route.id}`;
     case "settings":
       return route.section ? `#/settings/${route.section}` : "#/settings";
-    case "recipes":
-      return "#/recipes";
     default:
       return "#/";
   }

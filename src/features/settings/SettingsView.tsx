@@ -1,6 +1,5 @@
 import { useEffect, type ComponentType } from "react";
 import { Menu } from "lucide-react";
-import { API_MODE } from "@/app/api-mode";
 import { useUiStore } from "@/app/stores/ui-store";
 import { navigate } from "@/app/router";
 import { Button } from "@/components/ui/Button";
@@ -11,39 +10,20 @@ import { CreditsSection } from "@/features/account/CreditsSection";
 import { AboutSection } from "./AboutSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { DiagnosticsSection } from "./DiagnosticsSection";
-import { GenerationSection } from "./GenerationSection";
 import { MannequinSection } from "./MannequinSection";
-import { ModelsSection } from "./ModelsSection";
 import { PrivacySection } from "./PrivacySection";
-import { ProvidersSection } from "./ProvidersSection";
 import { PublishSection } from "./PublishSection";
-import { StorageSection } from "./StorageSection";
-import { UsageSection } from "./UsageSection";
 
-/** `mode`: shown in the API build only, in the local app only, or in both. */
-const ALL_SECTIONS: Array<{ id: string; key: MessageKey; mode?: "api" | "local"; Component: ComponentType }> = [
-  { id: "account", key: "account.section", mode: "api", Component: AccountSection },
-  { id: "credits", key: "credits.title", mode: "api", Component: CreditsSection },
-  // Provider accounts, models, quotas, the local queue and on-device storage belong to the local app: on the API
-  // the platform owns providers and the server stores listings.
-  { id: "providers", key: "settings.section.providers", mode: "local", Component: ProvidersSection },
-  { id: "models", key: "settings.section.models", mode: "local", Component: ModelsSection },
-  { id: "usage", key: "usage.title", mode: "local", Component: UsageSection },
-  { id: "generation", key: "settings.section.generation", mode: "local", Component: GenerationSection },
+export const SECTIONS: Array<{ id: string; key: MessageKey; Component: ComponentType }> = [
+  { id: "account", key: "account.section", Component: AccountSection },
+  { id: "credits", key: "credits.title", Component: CreditsSection },
   { id: "appearance", key: "settings.section.appearance", Component: AppearanceSection },
-  { id: "storage", key: "settings.section.storage", mode: "local", Component: StorageSection },
   { id: "privacy", key: "settings.section.privacy", Component: PrivacySection },
   { id: "publish", key: "settings.section.publish", Component: PublishSection },
   { id: "mannequin", key: "settings.section.mannequin", Component: MannequinSection },
   { id: "diagnostics", key: "settings.section.diagnostics", Component: DiagnosticsSection },
   { id: "about", key: "settings.section.about", Component: AboutSection },
 ];
-
-export function settingsSections(apiMode: boolean) {
-  return ALL_SECTIONS.filter((s) => !s.mode || s.mode === (apiMode ? "api" : "local"));
-}
-
-const SECTIONS = settingsSections(API_MODE);
 
 export function SettingsView({ section }: { section?: string }) {
   const t = useT();

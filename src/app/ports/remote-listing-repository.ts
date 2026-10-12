@@ -131,10 +131,6 @@ export class RemoteListingRepository implements ListingRepository {
     }
   }
 
-  storeGeneratedImage(): Promise<ImageAsset> {
-    return Promise.reject(new AppError("PLATFORM_UNSUPPORTED", "Generated photos are written by the server.", { retryable: false }));
-  }
-
   private async upload(listingId: string, original: NewOriginal): Promise<void> {
     const form = new FormData();
     form.append("file", new File([original.blob], original.fileName ?? `original.${extension(original.mimeType)}`, { type: original.mimeType }));

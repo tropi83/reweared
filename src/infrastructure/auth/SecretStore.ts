@@ -8,17 +8,16 @@ const log = createLogger("secrets");
  * Secret keys are a closed set, mirrored by the Rust command allowlist. Adding a secret means
  * adding it here and in src-tauri/src/secrets.rs.
  */
-/** `session_token`: the API session of the desktop and phone apps (API mode); the web app uses httpOnly cookies instead. */
-export type SecretKey = "gemini_api_key" | "google_oauth" | "cloudflare_api_token" | "cloudflare_worker_secret" | "session_token";
+/** `session_token`: the API session of the desktop and phone apps; the web app uses httpOnly cookies instead. */
+export type SecretKey = "session_token";
 
 /**
- * Where credentials live.
+ * Where the session token lives.
  *
  * - Native desktop: OS credential store (Windows Credential Manager, macOS Keychain, Secret
  *   Service) through the `secret_*` Tauri commands. Never on disk in clear text.
- * - Web: memory by default; localStorage only if the user explicitly opts in ("Remember on this
- *   device") after acknowledging the browser disclaimer.
- * - Mobile (until the keystore integration lands): memory only.
+ * - Phones (until the keystore integration lands): memory only — sign in again after a restart.
+ * - Web: none (httpOnly cookies); the store stays empty.
  */
 export interface SecretStore {
   readonly persistent: boolean;
@@ -38,30 +37,6 @@ export class MemorySecretStore implements SecretStore {
   }
   async delete(key: SecretKey) {
     this.values.delete(key);
-  }
-}
-
-const WEB_PREFIX = "aiv.secret.";
-
-/** Browser localStorage. Explicitly opt-in; the UI shows the disclaimer before enabling it. */
-export class WebLocalSecretStore implements SecretStore {
-  readonly persistent = true;
-  async get(key: SecretKey) {
-    try {
-      return localStorage.getItem(WEB_PREFIX + key);
-    } catch {
-      return null;
-    }
-  }
-  async set(key: SecretKey, value: string) {
-    localStorage.setItem(WEB_PREFIX + key, value);
-  }
-  async delete(key: SecretKey) {
-    try {
-      localStorage.removeItem(WEB_PREFIX + key);
-    } catch {
-      /* ignore */
-    }
   }
 }
 
@@ -128,7 +103,7 @@ export class LayeredSecretStore {
     try {
       await this.persistentStore.set(key, value);
     } catch (err) {
-      throw new AppError("STORAGE_ERROR", "The key works until the app closes, but this device's secure storage refused to keep it.", {
+      throw new AppError("STORAGE_ERROR", "The session works until the app closes, but this device's secure storage refused to keep it.", {
         retryable: false,
         detail: toGenerationError(err).message,
       });
@@ -147,11 +122,31 @@ export class LayeredSecretStore {
 
 export function createSecretStore(): LayeredSecretStore {
   const platform = getPlatform();
-  if (platform.isTauri) {
-    // Desktop: OS keychain. Phones: no keystore integration yet (the Rust command refuses writes), so
-    // memory only — `canPersist` is false and the UI does not offer "Remember".
-    return new LayeredSecretStore(new MemorySecretStore(), platform.secureStorage ? new TauriKeychainSecretStore() : null);
+  // Desktop: OS keychain. Phones: no keystore integration yet (the Rust command refuses writes), so memory only.
+  // Web: nothing to keep (cookies), memory only.
+  return new LayeredSecretStore(new MemorySecretStore(), platform.isTauri && platform.secureStorage ? new TauriKeychainSecretStore() : null);
+}
+
+/** Where the bring-your-own-key releases kept "remembered" keys in a browser. */
+const LEGACY_WEB_PREFIX = "aiv.secret.";
+
+/**
+ * The provider keys and Google tokens the bring-your-own-key releases may have left on this device (OS keychain,
+ * browser storage) are deleted at startup: the account version never reads them, and nothing else would remove them.
+ */
+export async function purgeLegacyCredentials(): Promise<void> {
+  try {
+    for (const key of Object.keys(localStorage)) if (key.startsWith(LEGACY_WEB_PREFIX)) localStorage.removeItem(key);
+  } catch {
+    /* no web storage */
   }
-  const hasLocalStorage = typeof localStorage !== "undefined";
-  return new LayeredSecretStore(new MemorySecretStore(), hasLocalStorage ? new WebLocalSecretStore() : null);
+  const platform = getPlatform();
+  if (!platform.isTauri || !platform.secureStorage) return;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const removed = await invoke<number>("secret_purge_legacy");
+    if (removed > 0) log.info("removed provider credentials of a previous release", removed);
+  } catch (err) {
+    log.warn("old provider credentials not removed", err);
+  }
 }

@@ -4,13 +4,12 @@ import { DEFAULT_SETTINGS } from "@aiv/domain/models";
 import { queryKeys } from "@/app/query/keys";
 import { getQueryClient } from "@/app/query/query-client";
 import { __setServices, createServices } from "@/app/services";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { createApi } from "@/infrastructure/api/createApi";
 import type { FetchLike } from "@/infrastructure/api/ApiClient";
 import { LayeredSecretStore, MemorySecretStore } from "@/infrastructure/auth/SecretStore";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
-import { settingsSections } from "@/features/settings/SettingsView";
+import { SECTIONS } from "@/features/settings/SettingsView";
 import { renderWithQuery, resetQueryClient } from "@/test/render";
 import { CreditsBadge } from "./CreditsBadge";
 import { CreditsSection } from "./CreditsSection";
@@ -28,7 +27,7 @@ async function setup(handler: (method: string, path: string, body: unknown) => R
   __setServices(null);
   const api = createApi("/", new LayeredSecretStore(new MemorySecretStore(), null), { tauri: false, fetch });
   const storage = new IndexedDbStorage("credits-test");
-  createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage, api });
+  createServices({ storage, api });
   await storage.init();
   return calls;
 }
@@ -57,22 +56,8 @@ describe("credits", () => {
     expect(screen.getByText("+60")).toBeInTheDocument();
   });
 
-  it("shows the provider, quota and on-device sections in the local app only", () => {
-    const ids = (api: boolean) => settingsSections(api).map((s) => s.id);
-    expect(ids(true)).toEqual(["account", "credits", "appearance", "privacy", "publish", "mannequin", "diagnostics", "about"]);
-    expect(ids(false)).toEqual([
-      "providers",
-      "models",
-      "usage",
-      "generation",
-      "appearance",
-      "storage",
-      "privacy",
-      "publish",
-      "mannequin",
-      "diagnostics",
-      "about",
-    ]);
+  it("shows the account sections and none of the provider, quota or on-device ones", () => {
+    expect(SECTIONS.map((s) => s.id)).toEqual(["account", "credits", "appearance", "privacy", "publish", "mannequin", "diagnostics", "about"]);
   });
 });
 

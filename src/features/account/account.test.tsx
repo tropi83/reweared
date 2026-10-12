@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { __setServices, createServices } from "@/app/services";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { takeResetPasswordLink, useAccountStore } from "@/app/stores/account-store";
 import { stopLiveUpdates } from "@/app/live-updates";
 import { createApi } from "@/infrastructure/api/createApi";
@@ -42,13 +41,7 @@ function setup(handler: (path: string, body: unknown) => Response, tauri = true)
   const secrets = new LayeredSecretStore(new MemorySecretStore(), keychain);
   __setServices(null);
   const api = createApi("https://api.example.test", secrets, { tauri, fetch });
-  createServices({
-    buildRequest: buildRequestForJob,
-    persistResult: persistJobResult,
-    onJobUpdate: applyJobUpdate,
-    storage: new IndexedDbStorage("account-test"),
-    api,
-  });
+  createServices({ storage: new IndexedDbStorage("account-test"), api });
   api.onUnauthenticated(() => useAccountStore.getState().sessionEnded());
   return { calls, keychain };
 }

@@ -4,7 +4,7 @@
     ".": {
       "entry": ["src/**/*.test.{ts,tsx}", "tools/**/*.test.mjs", "scripts/*.mjs"],
       "project": ["src/**/*.{ts,tsx}", "tools/**/*.{js,mjs}", "scripts/**/*.mjs"],
-      "ignoreDependencies": ["tailwindcss"]
+      "ignoreDependencies": ["tailwindcss", "@tauri-apps/cli"]
     },
     "packages/domain": {
       "entry": ["src/**/*.test.ts"],

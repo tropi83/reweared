@@ -1,21 +1,16 @@
 import { create } from "zustand";
 import { AppError, toGenerationError, type GenerationError, type ListingCopy, type CategorySelection, type ListingDocument } from "@aiv/domain/models";
-import { buildShots, catalogRecipeId } from "@aiv/domain/services/catalog";
+import { buildShots } from "@aiv/domain/services/catalog";
 import { normalizeMannequin } from "@aiv/domain/services/mannequin";
-import { prepareForProvider } from "@/infrastructure/image/image-processing";
-import { MOCK_PROVIDER_ID } from "@/infrastructure/providers/mock/MockImageProvider";
-import { nowIso } from "@aiv/domain/lib/ids";
 import { createLogger } from "@/lib/logger";
 import { listingReadiness } from "../listing-readiness";
+import { eventError, isTerminalStatus, type RunEvent } from "../ports/remote-run-engine";
 import { creditsSnapshot, invalidateCredits, listingRunCost, platformSnapshot } from "../query/credits";
-import { authStatusSnapshot } from "../query/auth-status";
-import { modelsSnapshot } from "../query/models";
 import { getServices } from "../services";
 import { useComposerStore } from "./composer-store";
 import { useGenerationStore } from "./generation-store";
 import { useListingsStore } from "./listings-store";
 import { useSettingsStore } from "./settings-store";
-import { eventError, isTerminalStatus, type RunEvent } from "../ports/remote-run-engine";
 
 /** The listing name derived from a copy title: trimmed, or undefined when there is nothing to name it with. */
 function nameFromTitle(title: string): string | undefined {
@@ -25,26 +20,18 @@ function nameFromTitle(title: string): string | undefined {
 
 const log = createLogger("listing");
 
-/** Vision models cap input resolution anyway; 1024 px keeps the request small and fast. */
-const COPY_IMAGE_MAX_DIMENSION = 1024;
 export const BRAND_MAX_LENGTH = 60;
 
-export type ListingPartOutcome = "done" | "skipped-provider" | { error: GenerationError };
+export type ListingPartOutcome = "done" | { error: GenerationError };
 export interface ListingRunReport {
   photos: ListingPartOutcome;
   text: ListingPartOutcome;
-}
-export interface GenerateListingOptions {
-  /** Per-shot prompt overrides from "Edit prompts" (shot id → prompt). */
-  promptOverrides?: Record<string, string>;
-  /** A custom recipe (one prompt × 4) instead of the listing pack. */
-  customRecipe?: { id: string; prompt: string };
 }
 
 interface ListingState {
   copyBusy: boolean;
   copyError: GenerationError | null;
-  /** A "Create the listing" run is being planned/started. */
+  /** A "Create the listing" run is being started. */
   creating: boolean;
   /** Outcome of the last run, per part (UI summary). */
   lastRun: ListingRunReport | null;
@@ -54,23 +41,21 @@ interface ListingState {
   /** Stores the brand as typed (max 60 chars); blank removes it. */
   setBrand(raw: string): void;
   setUseMannequin(on: boolean): void;
-  /** Generates title/description from the original photo with the copy provider/model chosen in settings. */
+  /** Has the server write the title and description from the original photo; resolves when its job ends. */
   generateCopy(): Promise<ListingCopy | null>;
-  /** The main button: photos and text in parallel, each part skipped when its provider is not usable. */
-  generateListing(options?: GenerateListingOptions): Promise<ListingRunReport | null>;
+  /** The main button: the photo pack and the text, started together on the server. */
+  generateListing(): Promise<ListingRunReport | null>;
   cancelListingRun(): void;
   updateCopy(patch: Partial<Pick<ListingCopy, "title" | "description" | "keywords" | "brand" | "color" | "condition">>): void;
   cancelCopy(): void;
 }
 
-let copyController: AbortController | null = null;
-
-/** API mode: the copy job started by `generateCopy`, settled by its SSE event (`settleRemoteCopy`). */
+/** The copy job started by `generateCopy`, settled by its SSE event (`settleRemoteCopy`). */
 let pendingCopy: { jobId: string; resolve: (copy: ListingCopy | null) => void } | null = null;
 
 /**
- * Live job event (API mode): ends the pending copy run. The server wrote the copy and renamed the listing; the open
- * listing is read again to show them.
+ * Live job event: ends the pending copy run. The server wrote the copy and renamed the listing; the open listing is
+ * read again to show them.
  */
 export async function settleRemoteCopy(event: Extract<RunEvent, { type: "job" }>): Promise<void> {
   const pending = pendingCopy;
@@ -90,109 +75,25 @@ export async function settleRemoteCopy(event: Extract<RunEvent, { type: "job" }>
   pending.resolve(null);
 }
 
-/** API mode: the balance and the run's cost when both are known (the server checks again and answers 402). */
-function remoteCredits(selection: CategorySelection | undefined): { credits?: { balance: number; cost: number } } {
+/** The balance and the run's cost when both are known (the server checks again and answers 402). */
+export function runCredits(selection: CategorySelection | undefined): { credits?: { balance: number; cost: number } } {
   const credits = creditsSnapshot();
   const platform = platformSnapshot();
-  if (!getServices().runs || !credits || !platform || !selection) return {};
+  if (!credits || !platform || !selection) return {};
   const settings = useSettingsStore.getState().settings;
   const doc = useListingsStore.getState().current;
   const mannequin = doc?.listing.useMannequin ? normalizeMannequin(settings.mannequin) : undefined;
   return { credits: { balance: credits.balance, cost: listingRunCost(platform, buildShots(selection, mannequin ? { mannequin } : {}).length) } };
 }
 
-/** API mode: the server writes the copy; this waits for its job to end. */
-async function generateRemoteCopy(listingId: string): Promise<ListingCopy | null> {
-  const runs = getServices().runs!;
-  pendingCopy?.resolve(null);
-  pendingCopy = null;
-  useListingSetupStore.setState({ copyBusy: true, copyError: null });
-  try {
-    // The server reads the brand and category from the listing: unsaved edits go first.
-    await useListingsStore.getState().flush();
-    const run = await runs.startCopy(listingId, useSettingsStore.getState().settings.locale);
-    invalidateCredits();
-    const jobId = run.jobIds[0];
-    if (!jobId) throw new AppError("UNKNOWN_ERROR", "The server started no copy job.");
-    return await new Promise<ListingCopy | null>((resolve) => {
-      pendingCopy = { jobId, resolve };
-    });
-  } catch (err) {
-    const error = toGenerationError(err);
-    log.warn("copy run failed to start", error.code);
-    useListingSetupStore.setState({ copyBusy: false, copyError: error });
-    return null;
-  }
-}
-
-/** API mode: the photo pack is planned and charged by the server from the listing's category and mannequin choice. */
-async function startRemotePhotos(doc: ListingDocument, sourceImageId: string): Promise<ListingPartOutcome> {
+/** The photo pack is planned and charged by the server from the listing's category and mannequin choice. */
+async function startPhotos(doc: ListingDocument, sourceImageId: string): Promise<ListingPartOutcome> {
   try {
     await useListingsStore.getState().flush();
     const { aspectRatio } = useComposerStore.getState();
-    await getServices().runs!.startPhotos(doc.listing.id, { sourceImageId, aspectRatio });
+    await getServices().runs.startPhotos(doc.listing.id, { sourceImageId, aspectRatio });
     invalidateCredits();
     await useListingsStore.getState().reload();
-    return "done";
-  } catch (err) {
-    const error = toGenerationError(err);
-    log.warn("listing photos failed to start", error.code);
-    return { error };
-  }
-}
-
-/** The composer's image provider can run: authenticated (or Mock) with an available model selected. */
-export function photoPartReady(): boolean {
-  // API mode: the platform's provider, always configured (credits are checked by the server).
-  if (getServices().runs) return true;
-  const { providerId, modelId } = useComposerStore.getState();
-  const authOk = providerId === MOCK_PROVIDER_ID || authStatusSnapshot(providerId)?.state === "authenticated";
-  const model = modelsSnapshot(providerId).find((m) => m.id === modelId);
-  return authOk && !!model?.available;
-}
-
-/** The copy provider chosen in settings exists and is authenticated. */
-export function textPartReady(): boolean {
-  if (getServices().runs) return true;
-  const { copyProviderId } = useSettingsStore.getState().settings;
-  return getServices().copyProviders.has(copyProviderId) && authStatusSnapshot(copyProviderId)?.state === "authenticated";
-}
-
-async function startPhotos(
-  doc: ListingDocument,
-  selection: CategorySelection,
-  sourceImageId: string,
-  options: GenerateListingOptions,
-): Promise<ListingPartOutcome> {
-  const composer = useComposerStore.getState();
-  const settings = useSettingsStore.getState().settings;
-  const modelId = composer.modelId;
-  if (!modelId) return "skipped-provider";
-  const mannequin = doc.listing.useMannequin ? normalizeMannequin(settings.mannequin) : undefined;
-  const providerOptions = composer.providerOptions[composer.providerId] ?? {};
-  const common = {
-    sourceImageId,
-    providerId: composer.providerId,
-    modelId,
-    aspectRatio: composer.aspectRatio,
-    ...(composer.imageSize ? { imageSize: composer.imageSize } : {}),
-    ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
-  };
-  try {
-    if (options.customRecipe) {
-      await useGenerationStore.getState().start({ ...common, prompt: options.customRecipe.prompt, variationCount: 4, recipeId: options.customRecipe.id });
-    } else {
-      const shots = buildShots(selection, mannequin ? { mannequin } : {}).map((s) => ({
-        ...s,
-        prompt: options.promptOverrides?.[s.id]?.trim() || s.prompt,
-      }));
-      await useGenerationStore
-        .getState()
-        .start({ ...common, prompt: "", variationCount: shots.length, recipeId: catalogRecipeId(selection), category: selection, shots });
-    }
-    if (settings.lastModelByProvider[composer.providerId] !== modelId) {
-      void useSettingsStore.getState().update({ lastModelByProvider: { ...settings.lastModelByProvider, [composer.providerId]: modelId } });
-    }
     return "done";
   } catch (err) {
     const error = toGenerationError(err);
@@ -231,95 +132,40 @@ export const useListingSetupStore = create<ListingState>((set, get) => ({
   },
 
   async generateCopy() {
-    const listings = useListingsStore.getState();
-    const doc = listings.current;
-    const originalId = doc?.listing.originalImageId;
-    if (!doc || !originalId) return null;
-    if (getServices().runs) return generateRemoteCopy(doc.listing.id);
-    const asset = doc.images[originalId];
-    const { copyProviderId: providerId, copyModelByProvider } = useSettingsStore.getState().settings;
-    const provider = getServices().copyProviders.get(providerId);
-    if (!asset || !provider) {
-      set({ copyError: { code: "PROVIDER_UNAVAILABLE", message: "No vision model for this provider.", retryable: false } });
-      return null;
-    }
-    copyController?.abort();
-    copyController = new AbortController();
-    const { signal } = copyController;
+    const doc = useListingsStore.getState().current;
+    if (!doc?.listing.originalImageId) return null;
+    pendingCopy?.resolve(null);
+    pendingCopy = null;
     set({ copyBusy: true, copyError: null });
     try {
-      const blob = await getServices().listings.readImage(doc.listing.id, asset.kind, asset.id);
-      if (!blob) throw new AppError("INVALID_IMAGE", "The original image file is missing.");
-      const prepared = await prepareForProvider(blob, asset.mimeType, { maxDimension: COPY_IMAGE_MAX_DIMENSION, format: "image/jpeg" });
-      const language = useSettingsStore.getState().settings.locale;
-      // The seller's brand wins over whatever the model reads (or invents) on the photo.
-      const brand = doc.listing.brand?.trim();
-      const result = await provider.describeListing(
-        {
-          image: { blob: prepared.blob, mimeType: prepared.mimeType },
-          ...(doc.listing.category ? { category: doc.listing.category } : {}),
-          language,
-          ...(brand ? { brand } : {}),
-        },
-        { signal, ...(copyModelByProvider[providerId] ? { model: copyModelByProvider[providerId] } : {}) },
-      );
-      if (signal.aborted) return null;
-      const copy: ListingCopy = {
-        ...result.copy,
-        ...(brand ? { brand } : {}),
-        language,
-        generatedAt: nowIso(),
-        provider: providerId,
-        model: String(result.providerMeta?.model ?? ""),
-      };
-      useListingsStore.getState().commit(
-        (draft) => {
-          draft.listing.copy = copy;
-          // The listing is named after its generated title (the file name it was created with says nothing).
-          draft.listing.name = nameFromTitle(copy.title) ?? draft.listing.name;
-        },
-        { immediate: true },
-      );
-      getServices().usage.track({ provider: providerId, model: copy.model || "vision", outcome: "ok" });
-      return copy;
+      // The server reads the brand and category from the listing: unsaved edits go first.
+      await useListingsStore.getState().flush();
+      const run = await getServices().runs.startCopy(doc.listing.id, useSettingsStore.getState().settings.locale);
+      invalidateCredits();
+      const jobId = run.jobIds[0];
+      if (!jobId) throw new AppError("UNKNOWN_ERROR", "The server started no copy job.");
+      return await new Promise<ListingCopy | null>((resolve) => {
+        pendingCopy = { jobId, resolve };
+      });
     } catch (err) {
-      if (signal.aborted) return null;
       const error = toGenerationError(err);
-      log.warn("copy generation failed", error.code);
-      set({ copyError: error });
+      log.warn("copy run failed to start", error.code);
+      set({ copyBusy: false, copyError: error });
       return null;
-    } finally {
-      if (copyController?.signal === signal) copyController = null;
-      set({ copyBusy: false });
     }
   },
 
-  async generateListing(options = {}) {
+  async generateListing() {
     const doc = useListingsStore.getState().current;
     const selection = doc?.listing.category;
     const sourceImageId = useComposerStore.getState().sourceImageId ?? doc?.listing.originalImageId;
-    const readiness = listingReadiness({
-      hasImage: !!doc?.listing.originalImageId && !!sourceImageId,
-      hasSelection: !!selection,
-      photosReady: photoPartReady(),
-      textReady: textPartReady(),
-      ...remoteCredits(selection),
-    });
+    const readiness = listingReadiness({ hasImage: !!doc?.listing.originalImageId && !!sourceImageId, hasSelection: !!selection, ...runCredits(selection) });
     if (!doc || !selection || !sourceImageId || !readiness.canCreate || get().creating) return null;
     set({ creating: true, lastRun: null, lastRunListingId: doc.listing.id });
-    // API mode runs the category's pack: prompt overrides and custom recipes are local-only for now.
-    const photos = readiness.skipped.includes("photos")
-      ? Promise.resolve<ListingPartOutcome>("skipped-provider")
-      : getServices().runs
-        ? startRemotePhotos(doc, sourceImageId)
-        : startPhotos(doc, selection, sourceImageId, options);
-    const text = readiness.skipped.includes("text")
-      ? Promise.resolve<ListingPartOutcome>("skipped-provider")
-      : get()
-          .generateCopy()
-          .then<ListingPartOutcome>((result) =>
-            result ? "done" : { error: get().copyError ?? { code: "CANCELLED", message: "Cancelled.", retryable: false } },
-          );
+    const photos = startPhotos(doc, sourceImageId);
+    const text = get()
+      .generateCopy()
+      .then<ListingPartOutcome>((result) => (result ? "done" : { error: get().copyError ?? { code: "CANCELLED", message: "Cancelled.", retryable: false } }));
     // Independent parts: one failing never cancels or rolls back the other.
     const [p, t] = await Promise.allSettled([photos, text]);
     const settled = (r: PromiseSettledResult<ListingPartOutcome>): ListingPartOutcome =>
@@ -344,13 +190,11 @@ export const useListingSetupStore = create<ListingState>((set, get) => ({
   },
 
   cancelCopy() {
-    copyController?.abort();
-    copyController = null;
     const pending = pendingCopy;
     pendingCopy = null;
     if (pending) {
       void getServices()
-        .runs?.cancel(pending.jobId)
+        .runs.cancel(pending.jobId)
         .catch((err: unknown) => log.warn("copy not cancelled", err));
       pending.resolve(null);
     }

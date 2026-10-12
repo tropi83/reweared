@@ -1,4 +1,3 @@
-import { API_MODE } from "@/app/api-mode";
 import { useMemo } from "react";
 import { Camera, ImagePlus, Images, Menu, Upload } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
@@ -99,9 +98,9 @@ export function HomeView() {
         <div className="flex flex-1 items-center justify-center overflow-y-auto p-6">
           <div className="w-full max-w-xl">
             <h1 className="text-2xl font-semibold tracking-tight">{t("listings.empty.title")}</h1>
-            <p className="mt-1.5 mb-6 text-sm text-fg-muted">{t(API_MODE ? "listings.empty.bodyApi" : "listings.empty.body")}</p>
+            <p className="mt-1.5 mb-6 text-sm text-fg-muted">{t("listings.empty.body")}</p>
             <ImportDropzone />
-            <p className="mt-6 text-center text-xs text-fg-subtle">{t(API_MODE ? "app.taglineApi" : "app.tagline")}</p>
+            <p className="mt-6 text-center text-xs text-fg-subtle">{t("app.tagline")}</p>
           </div>
         </div>
       ) : (

@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Download, ExternalLink, GitBranch, RefreshCw, RotateCw, X } from "lucide-react";
+import { AlertTriangle, Check, Download, GitBranch, RefreshCw, RotateCw, X } from "lucide-react";
 import { useImageUrl } from "@/app/image-urls";
 import { useComposerStore } from "@/app/stores/composer-store";
 import { useGenerationStore } from "@/app/stores/generation-store";
@@ -8,8 +8,6 @@ import { useUiStore } from "@/app/stores/ui-store";
 import { getServices } from "@/app/services";
 import type { GenerationJob, ListingDocument } from "@aiv/domain/models";
 import { exportSingle } from "@/infrastructure/image/export";
-import { GOOGLE_RATE_LIMIT_DASHBOARD } from "@aiv/providers/gemini/GeminiErrors";
-import { openExternal } from "@/lib/open-external";
 import { useLocale, useT } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 import { cn } from "@/lib/cn";
@@ -20,8 +18,6 @@ interface Props {
   job: GenerationJob;
   doc: ListingDocument;
 }
-
-const QUOTA_CODES = new Set(["RATE_LIMITED", "QUOTA_EXCEEDED", "MODEL_NOT_IN_PLAN", "FREE_TIER_NO_ACCESS"]);
 
 export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
   const t = useT();
@@ -34,7 +30,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
   const openLightbox = useUiStore((s) => s.openLightbox);
   const isToPost = !!asset && doc.toPost.includes(asset.id);
   const retryJob = useGenerationStore((s) => s.retryJob);
-  const cancel = () => getServices().queue.cancel(job.id);
+  const cancel = () => useGenerationStore.getState().cancelJob(job.id);
   const reveal = useUiStore((s) => s.revealJobId === job.id);
   const revealJob = useUiStore((s) => s.revealJob);
   const tileRef = useRef<HTMLElement>(null);
@@ -138,7 +134,7 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
             )}
           </span>
           {job.attempt > 1 && <span className="text-[11px] text-fg-subtle">{t("generation.attempt", { attempt: job.attempt })}</span>}
-          {job.error && job.nextRetryAt && <span className="text-[11px] text-warning">{errorMessage(job.error, job.provider)}</span>}
+          {job.error && job.nextRetryAt && <span className="text-[11px] text-warning">{errorMessage(job.error, "platform")}</span>}
         </div>
         <button
           type="button"
@@ -179,15 +175,6 @@ export const VariationTile = memo(function VariationTile({ job, doc }: Props) {
       >
         <RotateCw className="size-3" /> {t("common.retry")}
       </button>
-      {job.provider === "gemini" && job.error && QUOTA_CODES.has(job.error.code) && (
-        <button
-          type="button"
-          onClick={() => void openExternal(GOOGLE_RATE_LIMIT_DASHBOARD)}
-          className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline"
-        >
-          {t("usage.googleDashboard")} <ExternalLink className="size-3" />
-        </button>
-      )}
     </div>
   );
 });

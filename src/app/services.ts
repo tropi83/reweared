@@ -1,73 +1,36 @@
-import { AppError, DEFAULT_SETTINGS } from "@aiv/domain/models";
-import { GenerationQueue } from "@aiv/domain/services/generation-queue";
-import { UsageTracker } from "@aiv/domain/services/usage-tracker";
-import type { ImageProvider } from "@aiv/domain/services/image-provider";
-import { GeminiAuthManager } from "@/infrastructure/auth/GeminiAuthManager";
-import { CloudflareAuth } from "@/infrastructure/providers/cloudflare/CloudflareAuth";
-import { CLOUDFLARE_PROVIDER_ID, CloudflareProvider } from "@aiv/providers/cloudflare/CloudflareProvider";
-import { GEMINI_PROVIDER_ID, GeminiProvider } from "@aiv/providers/gemini/GeminiProvider";
-import { CloudflareListingCopyProvider } from "@aiv/providers/cloudflare/CloudflareListingCopy";
-import { GeminiListingCopyProvider } from "@aiv/providers/gemini/GeminiListingCopy";
-import type { ListingCopyProvider } from "@aiv/domain/services/listing-copy";
 import { createSecretStore, type LayeredSecretStore } from "@/infrastructure/auth/SecretStore";
-import { MOCK_PROVIDER_ID, MockImageProvider } from "@/infrastructure/providers/mock/MockImageProvider";
 import { createStorageProvider, type StorageProvider } from "@/infrastructure/storage";
 import { createPublishBridge } from "@/infrastructure/publish/createPublishBridge";
 import type { PublishBridge } from "@/infrastructure/publish/PublishBridge";
-// Installs the Tauri/browser fetch into the shared provider adapters before any of them runs.
-import "@/infrastructure/http/http-client";
-import { setProviderLoggerFactory } from "@aiv/providers/log";
-import { createLogger } from "@/lib/logger";
 import { createApi, type ApiServices } from "@/infrastructure/api/createApi";
-import { API_ORIGIN } from "./api-mode";
+import { API_ORIGIN } from "./api-origin";
 import type { ListingRepository } from "./ports/listing-repository";
-import { LocalListingRepository } from "./ports/local-listing-repository";
 import { RemoteListingRepository } from "./ports/remote-listing-repository";
 import { RemoteRunEngine } from "./ports/remote-run-engine";
 
-// The shared adapters log through the app's redacting logger (Settings → Diagnostics).
-setProviderLoggerFactory(createLogger);
-
 /**
  * Composition root. Everything stateful and long-lived is created once here and injected
- * into the stores, so tests can build an alternative container with mocks.
+ * into the stores, so tests can build an alternative container with fakes.
  */
 export interface AppServices {
-  storage: StorageProvider;
-  /** Listings and their photos: on this device, or on the API in API mode. */
+  /** The API client, the session token and who to tell when the session ends. */
+  api: ApiServices;
+  /** Listings and their photos, on the server. */
   listings: ListingRepository;
-  /** Photo packs and listing copy run by the platform (API mode); null when they run on this device. */
-  runs: RemoteRunEngine | null;
-  /** Credentials: session memory plus the platform's persistent tier when there is one (`canPersist`). */
+  /** Photo packs and listing copy, run by the platform. */
+  runs: RemoteRunEngine;
+  /**
+   * This device's storage: its settings (theme, language) and, read-only, the listings of the app's previous
+   * local-first version for the one-time import (`LocalImport`).
+   */
+  storage: StorageProvider;
+  /** The session token (OS keychain on desktop, memory on phones; the web app uses cookies). */
   secrets: LayeredSecretStore;
-  auth: GeminiAuthManager;
-  providers: Map<string, ImageProvider>;
-  /** Vision models that write listing copy, keyed by the same provider ids. */
-  copyProviders: Map<string, ListingCopyProvider>;
-  mock: MockImageProvider;
-  gemini: GeminiProvider;
-  cloudflare: CloudflareProvider;
-  cloudflareAuth: CloudflareAuth;
-  queue: GenerationQueue;
-  usage: UsageTracker;
   publish: PublishBridge;
-  /** The API client and session in API mode (`VITE_API_ORIGIN`); null in the local-first app. */
-  api: ApiServices | null;
   appVersion: string;
 }
 
-export const USAGE_META_KEY = "usage";
-
 export const APP_VERSION: string = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "0.1.0";
-
-export const MOCK_ENABLED: boolean = import.meta.env.VITE_ENABLE_MOCK_PROVIDER === "true" || import.meta.env.DEV;
-
-/**
- * Gemini image models have no free tier (pricing checked 2026-09-11), so image generation goes
- * through Cloudflare Workers AI only; Google is kept for listing copy (text models, free tier).
- * Flip this to re-enable Gemini in the composer — the provider is still wired and tested.
- */
-export const GEMINI_IMAGE_GENERATION_ENABLED = false;
 
 let services: AppServices | null = null;
 
@@ -85,68 +48,17 @@ export function __setServices(value: AppServices | null) {
   services = value;
 }
 
-export function createServices(bindings: {
-  buildRequest: ConstructorParameters<typeof GenerationQueue>[0]["buildRequest"];
-  persistResult: ConstructorParameters<typeof GenerationQueue>[0]["persistResult"];
-  onJobUpdate: ConstructorParameters<typeof GenerationQueue>[0]["onJobUpdate"];
-  storage?: StorageProvider;
-  api?: ApiServices | null;
-}): AppServices {
+export function createServices(bindings: { storage?: StorageProvider; api?: ApiServices } = {}): AppServices {
   const storage = bindings.storage ?? createStorageProvider();
   const secrets = createSecretStore();
-  const auth = new GeminiAuthManager(secrets);
-  const usage = new UsageTracker((record) => storage.writeMeta(USAGE_META_KEY, record));
-  const gemini = new GeminiProvider(auth, usage);
-  const cloudflareAuth = new CloudflareAuth(secrets, { read: (k) => storage.readMeta(k), write: (k, v) => storage.writeMeta(k, v) });
-  const cloudflare = new CloudflareProvider(cloudflareAuth, usage);
-  const mock = new MockImageProvider({ usage });
-  // Gemini first: it is the default copy writer (Flash-Lite, free tier).
-  const copyProviders = new Map<string, ListingCopyProvider>([
-    [GEMINI_PROVIDER_ID, new GeminiListingCopyProvider(auth)],
-    [CLOUDFLARE_PROVIDER_ID, new CloudflareListingCopyProvider(cloudflareAuth)],
-  ]);
-  // Cloudflare is the image path (10,000 free neurons/day); Gemini only if explicitly re-enabled.
-  const providers = new Map<string, ImageProvider>([[CLOUDFLARE_PROVIDER_ID, cloudflare]]);
-  if (GEMINI_IMAGE_GENERATION_ENABLED) providers.set(GEMINI_PROVIDER_ID, gemini);
-  if (MOCK_ENABLED) providers.set(MOCK_PROVIDER_ID, mock);
-  const publish = createPublishBridge();
-  const api = bindings.api !== undefined ? bindings.api : API_ORIGIN ? createApi(API_ORIGIN, secrets) : null;
-  const listings: ListingRepository = api ? new RemoteListingRepository(api.client) : new LocalListingRepository(storage, APP_VERSION);
-
-  const queue = new GenerationQueue(
-    {
-      getProvider: async (id) => {
-        const provider = providers.get(id);
-        if (!provider) throw new AppError("PROVIDER_UNAVAILABLE", `Unknown provider "${id}".`, { retryable: false });
-        return provider;
-      },
-      buildRequest: bindings.buildRequest,
-      persistResult: bindings.persistResult,
-      onJobUpdate: bindings.onJobUpdate,
-    },
-    {
-      concurrency: DEFAULT_SETTINGS.maxConcurrentJobs,
-      maxAttempts: DEFAULT_SETTINGS.maxAttempts,
-      timeoutMs: DEFAULT_SETTINGS.jobTimeoutMs,
-    },
-  );
-
+  const api = bindings.api ?? createApi(API_ORIGIN, secrets);
   services = {
+    api,
+    listings: new RemoteListingRepository(api.client),
+    runs: new RemoteRunEngine(api.client),
     storage,
     secrets,
-    auth,
-    providers,
-    copyProviders,
-    mock,
-    gemini,
-    cloudflare,
-    cloudflareAuth,
-    queue,
-    usage,
-    publish,
-    api,
-    listings,
-    runs: api ? new RemoteRunEngine(api.client) : null,
+    publish: createPublishBridge(),
     appVersion: APP_VERSION,
   };
   return services;

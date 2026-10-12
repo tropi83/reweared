@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { __setFetchOverride } from "@/infrastructure/http/http-client";
-import { LayeredSecretStore, MemorySecretStore, WebLocalSecretStore } from "@/infrastructure/auth/SecretStore";
-import { CloudflareAuth } from "./CloudflareAuth";
-import { CloudflareListingCopyProvider } from "@aiv/providers/cloudflare/CloudflareListingCopy";
+import { __setFetchOverride } from "../http";
+import { CloudflareListingCopyProvider } from "./CloudflareListingCopy";
+import { CLOUDFLARE_API_BASE } from "./credentials";
+
+const ACCOUNT = "0123456789abcdef0123456789abcdef";
 
 const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const image = { blob: new Blob([JPEG], { type: "image/jpeg" }), mimeType: "image/jpeg" as const };
@@ -11,12 +12,16 @@ afterEach(() => __setFetchOverride(undefined));
 
 describe("CloudflareListingCopyProvider", () => {
   it("sends OpenAI-style messages with a data-URI image and a JSON schema, and reads result.response", async () => {
-    const auth = new CloudflareAuth(new LayeredSecretStore(new MemorySecretStore(), new WebLocalSecretStore()), {
-      read: async () => null,
-      write: async () => undefined,
-    });
-    Object.defineProperty(auth, "directSupported", { get: () => true });
-    await auth.saveDirect({ accountId: "0123456789abcdef0123456789abcdef", apiToken: "cf_token_1234567890abcdef", remember: false });
+    // The worker's credentials (direct mode, from Docker secrets).
+    const auth = {
+      getConfig: async () => ({ mode: "direct" as const, accountId: ACCOUNT }),
+      getStatus: async () => ({ state: "authenticated" as const, kind: "api_key" as const }),
+      resolveEndpoint: async (modelId: string) => ({
+        url: `${CLOUDFLARE_API_BASE}/accounts/${ACCOUNT}/ai/run/${modelId}`,
+        headers: { Authorization: "Bearer cf_token_1234567890abcdef" },
+      }),
+      markRejected: () => undefined,
+    };
     const calls: Array<{ url: string; body: string }> = [];
     __setFetchOverride(async (url, init) => {
       calls.push({ url, body: String(init?.body) });

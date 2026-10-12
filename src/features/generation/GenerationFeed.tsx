@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Copy, GitBranch, Pencil, RefreshCw, RotateCw, Sparkles, Square, Trash2 } from "lucide-react";
-import { useComposerStore } from "@/app/stores/composer-store";
+import { Copy, GitBranch, RefreshCw, RotateCw, Sparkles, Square, Trash2 } from "lucide-react";
 import { useGenerationStore } from "@/app/stores/generation-store";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { toast } from "@/app/stores/toast-store";
@@ -8,8 +7,9 @@ import { useUiStore } from "@/app/stores/ui-store";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Badge, EmptyState } from "@/components/ui/Misc";
-import type { Generation, GenerationJob, ListingDocument } from "@aiv/domain/models";
+import { toGenerationError, type Generation, type GenerationJob, type ListingDocument } from "@aiv/domain/models";
 import { useLocale, useT } from "@/i18n";
+import { errorMessage } from "@/i18n/errors";
 import { findSubcategory } from "@aiv/domain/services/catalog";
 import { CategoryIcon } from "../catalog/category-icons";
 import { formatRelative } from "@/lib/format";
@@ -68,7 +68,6 @@ function GenerationCard({ generation, doc, toPostOnly }: { generation: Generatio
     ) : (
       generation.prompt
     );
-  const composer = useComposerStore();
   const { retryFailed, cancelGeneration, start } = useGenerationStore.getState();
   const deleteGeneration = useListingsStore((s) => s.deleteGeneration);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -86,44 +85,14 @@ function GenerationCard({ generation, doc, toPostOnly }: { generation: Generatio
   const parent = generation.parentGenerationId ? doc.generations[generation.parentGenerationId] : undefined;
   const parentJob = source?.jobId ? doc.jobs[source.jobId] : undefined;
 
+  // The same shots again, from the same photo and in the same format; the server picks new seeds.
   const regenerate = async () => {
-    // Listing packs re-run the same shots (prompts live on the jobs), free prompts re-run as before.
-    const packShots = generation.category
-      ? generation.jobIds
-          .map((id) => doc.jobs[id])
-          .filter((j): j is GenerationJob => !!j)
-          .map((j) => ({ id: j.shotId ?? String(j.index), label: j.shotLabel ?? { en: `Shot ${j.index}`, fr: `Prise ${j.index}` }, prompt: j.prompt }))
-      : undefined;
+    const shotIds = jobs.map((j) => j.shotId).filter((id): id is string => !!id);
     try {
-      await start({
-        sourceImageId: generation.sourceImageId,
-        prompt: generation.prompt,
-        ...(packShots ? { shots: packShots, category: generation.category } : {}),
-        providerId: generation.settings.providerId,
-        modelId: generation.settings.modelId,
-        aspectRatio: generation.settings.aspectRatio,
-        ...(generation.settings.imageSize ? { imageSize: generation.settings.imageSize } : {}),
-        ...(generation.settings.providerOptions ? { providerOptions: generation.settings.providerOptions } : {}),
-        variationCount: generation.settings.variationCount,
-      });
-    } catch {
-      toast.error(t("error.UNKNOWN_ERROR"));
+      await start({ sourceImageId: generation.sourceImageId, shotIds: [...new Set(shotIds)], aspectRatio: generation.settings.aspectRatio });
+    } catch (err) {
+      toast.error(errorMessage(toGenerationError(err), "platform"));
     }
-  };
-
-  const editPrompt = () => {
-    composer.loadFromGeneration({
-      prompt: generation.prompt,
-      sourceImageId: fromOriginal ? null : generation.sourceImageId,
-      aspectRatio: generation.settings.aspectRatio,
-      imageSize: generation.settings.imageSize,
-      variationCount: generation.settings.variationCount,
-      providerId: generation.settings.providerId,
-      modelId: generation.settings.modelId,
-      generationId: generation.id,
-      ...(generation.settings.providerOptions ? { providerOptions: generation.settings.providerOptions } : {}),
-    });
-    document.getElementById("prompt")?.focus();
   };
 
   return (
@@ -184,11 +153,6 @@ function GenerationCard({ generation, doc, toPostOnly }: { generation: Generatio
               >
                 <span className="hidden sm:inline">{t("generation.regenerate")}</span>
               </Button>
-              {!generation.category && (
-                <Button variant="ghost" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={editPrompt} title={t("generation.editPrompt")}>
-                  <span className="hidden sm:inline">{t("generation.editPrompt")}</span>
-                </Button>
-              )}
               <Button
                 variant="ghost"
                 size="icon-sm"

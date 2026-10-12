@@ -12,7 +12,7 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
 });
 
 import { __setServices, createServices } from "@/app/services";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
+import { createFakeApi } from "@/test/fake-api";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { renderWithQuery, resetQueryClient } from "@/test/render";
@@ -24,7 +24,7 @@ describe("ListingCopyPanel", () => {
   const storage = new IndexedDbStorage("copy-panel-test");
   beforeAll(async () => {
     __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
+    createServices({ storage, api: createFakeApi().api });
     await storage.init();
   });
   beforeEach(async () => {

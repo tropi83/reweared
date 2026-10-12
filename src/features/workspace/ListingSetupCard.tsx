@@ -1,16 +1,10 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, Sparkles, Square, UserRound, WandSparkles } from "lucide-react";
-import { API_MODE } from "@/app/api-mode";
+import { Sparkles, Square, UserRound, WandSparkles } from "lucide-react";
 import { listingReadiness, type ListingReadiness } from "@/app/listing-readiness";
 import { listingRunCost, useCredits, usePlatform } from "@/app/query/credits";
 import { navigate } from "@/app/router";
-import { getServices } from "@/app/services";
-import { useProviderStatuses } from "@/app/query/auth-status";
-import { useModels } from "@/app/query/models";
-import { useComposerStore } from "@/app/stores/composer-store";
-import { BRAND_MAX_LENGTH, photoPartReady, textPartReady, useListingSetupStore, type ListingRunReport } from "@/app/stores/listing-setup-store";
+import { BRAND_MAX_LENGTH, useListingSetupStore, type ListingRunReport } from "@/app/stores/listing-setup-store";
 import { useListingsStore } from "@/app/stores/listings-store";
-import { useRecipesStore } from "@/app/stores/recipes-store";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
@@ -20,15 +14,12 @@ import type { CategoryId } from "@aiv/domain/models";
 import { buildShots, CATEGORIES } from "@aiv/domain/services/catalog";
 import { mannequinApplies, normalizeMannequin } from "@aiv/domain/services/mannequin";
 import { CATEGORY_ICONS, SUBCATEGORY_ICONS } from "../catalog/category-icons";
-import { interpolate } from "@aiv/domain/services/recipes";
 import { useLocale, useT } from "@/i18n";
 import { errorMessage } from "@/i18n/errors";
 import { cn } from "@/lib/cn";
 import { MannequinDialog, MannequinSummary } from "../mannequin/MannequinDialog";
-import { AdvancedOptions } from "./AdvancedOptions";
-import { useComposerDefaults } from "./useComposerDefaults";
 
-/** The listing setup: brand, taxonomy, mannequin, advanced options and the single "Create the listing" button. */
+/** The listing setup: brand, taxonomy, mannequin and the single "Create the listing" button. */
 export function ListingSetupCard() {
   const t = useT();
   const locale = useLocale();
@@ -37,18 +28,8 @@ export function ListingSetupCard() {
   const copyBusy = useListingSetupStore((s) => s.copyBusy);
   const lastRun = useListingSetupStore((s) => (s.lastRunListingId === doc?.listing.id ? s.lastRun : null));
   const settings = useSettingsStore((s) => s.settings);
-  const composerProviderId = useComposerStore((s) => s.providerId);
-  // Subscriptions that change readiness (photoPartReady/textPartReady read the query snapshots and the composer).
-  useProviderStatuses();
-  useModels(composerProviderId);
-  useComposerStore((s) => s.modelId);
-  const customRecipes = useRecipesStore((s) => s.custom);
-  useComposerDefaults();
-  const { credits } = useCredits(API_MODE);
-  const platform = usePlatform(API_MODE);
-  const [promptOverrides, setPromptOverrides] = useState<Record<string, string>>({});
-  const [customRecipeId, setCustomRecipeId] = useState("");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const { credits } = useCredits();
+  const platform = usePlatform();
   const [mannequinOpen, setMannequinOpen] = useState(false);
   const [enableAfterSave, setEnableAfterSave] = useState(false);
   const [confirmRecreate, setConfirmRecreate] = useState(false);
@@ -61,15 +42,12 @@ export function ListingSetupCard() {
   const applies = !selection || mannequinApplies(selection.categoryId);
   const mannequinOn = !!doc.listing.useMannequin && applies && !!mannequin;
   const shots = selection ? buildShots(selection, mannequinOn && mannequin ? { mannequin } : {}) : [];
-  const customRecipe = customRecipes.find((r) => r.id === customRecipeId);
-  const photoCount = customRecipe ? 4 : shots.length;
-  // API mode: what the run costs at the platform's prices, checked against the balance before the server does.
-  const cost = API_MODE && platform && selection ? listingRunCost(platform, photoCount) : undefined;
+  const photoCount = shots.length;
+  // What the run costs at the platform's prices, checked against the balance before the server does.
+  const cost = platform && selection ? listingRunCost(platform, photoCount) : undefined;
   const readiness = listingReadiness({
     hasImage: true,
     hasSelection: !!selection,
-    photosReady: photoPartReady(),
-    textReady: textPartReady(),
     ...(cost !== undefined && credits ? { credits: { balance: credits.balance, cost } } : {}),
   });
   const alreadyCreated = !!doc.listing.copy || Object.keys(doc.generations).length > 0;
@@ -77,24 +55,12 @@ export function ListingSetupCard() {
   const activeGeneration = activeJobs[0] ? doc.generations[activeJobs[0].generationId] : undefined;
   const activeDone = activeGeneration ? activeGeneration.jobIds.filter((id) => doc.jobs[id]?.status === "completed").length : 0;
   const running = creating || copyBusy || activeJobs.length > 0;
-  // The label says what will actually run: a part whose provider is not usable is skipped; a blocked button promises nothing.
+  // The label says what will run and what it costs; a blocked button promises nothing.
   const action =
-    !selection || readiness.blocker
-      ? t("listing.createPlain")
-      : alreadyCreated
-        ? t("listing.recreate")
-        : readiness.skipped.includes("text")
-          ? t("listing.createPhotos", { count: photoCount })
-          : readiness.skipped.includes("photos")
-            ? t("listing.createText")
-            : t("listing.create", { count: photoCount });
+    !selection || readiness.blocker ? t("listing.createPlain") : alreadyCreated ? t("listing.recreate") : t("listing.create", { count: photoCount });
   const label = cost !== undefined && !readiness.blocker ? `${action} · ${t("credits.cost", { count: cost })}` : action;
 
-  const run = () =>
-    void generateListing({
-      promptOverrides,
-      ...(customRecipe ? { customRecipe: { id: customRecipe.id, prompt: interpolate(customRecipe.promptTemplate, {}) } } : {}),
-    });
+  const run = () => void generateListing();
 
   const toggleMannequin = (on: boolean) => {
     if (on && !mannequin) {
@@ -124,7 +90,6 @@ export function ListingSetupCard() {
             };
           })}
           onChange={(id) => {
-            setPromptOverrides({});
             if (!id) return setCategory(undefined);
             const first = CATEGORIES.find((c) => c.id === id)?.subcategories[0];
             if (first) setCategory({ categoryId: id, subcategoryId: first.id });
@@ -144,7 +109,6 @@ export function ListingSetupCard() {
                   role="radio"
                   aria-checked={selection?.subcategoryId === s.id}
                   onClick={() => {
-                    setPromptOverrides({});
                     setCategory({ categoryId: category.id, subcategoryId: s.id });
                   }}
                   className={cn(
@@ -201,32 +165,6 @@ export function ListingSetupCard() {
         }}
       />
 
-      {/* API mode runs the category's pack only: prompt overrides and custom recipes are local for now. */}
-      {!API_MODE && (
-        <div className="rounded-lg border border-border">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-fg-muted hover:text-fg"
-            aria-expanded={advancedOpen}
-            onClick={() => setAdvancedOpen((v) => !v)}
-          >
-            {t("listing.advanced")}
-            <ChevronDown className={cn("size-3.5 transition-transform", advancedOpen && "rotate-180")} />
-          </button>
-          {advancedOpen && (
-            <div className="border-t border-border p-3">
-              <AdvancedOptions
-                shots={shots}
-                promptOverrides={promptOverrides}
-                onPromptOverridesChange={setPromptOverrides}
-                customRecipeId={customRecipeId}
-                onCustomRecipeChange={setCustomRecipeId}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="space-y-2">
         {running ? (
           <div className="flex items-center gap-2">
@@ -257,12 +195,7 @@ export function ListingSetupCard() {
             {label}
           </Button>
         )}
-        <ListingHints
-          readiness={readiness}
-          lastRun={lastRun}
-          providerId={API_MODE ? PLATFORM_ERRORS : composerProviderId}
-          copyProviderId={settings.copyProviderId}
-        />
+        <ListingHints readiness={readiness} lastRun={lastRun} />
       </div>
       <ConfirmDialog
         open={confirmRecreate}
@@ -279,42 +212,24 @@ export function ListingSetupCard() {
   );
 }
 
-/** API mode: run errors read as the platform's (credits, daily limit), not as a provider account's. */
-const PLATFORM_ERRORS = "platform";
-
-/** One line per blocker / skipped part / start failure, under the button. Text errors live in the copy panel. */
-function ListingHints({
-  readiness,
-  lastRun,
-  providerId,
-  copyProviderId,
-}: {
-  readiness: ListingReadiness;
-  lastRun: ListingRunReport | null;
-  providerId: string;
-  copyProviderId: string;
-}) {
+/** One line per blocker or start failure, under the button. Text errors live in the copy panel. */
+function ListingHints({ readiness, lastRun }: { readiness: ListingReadiness; lastRun: ListingRunReport | null }) {
   const t = useT();
-  const link = (text: string, section = "providers") => (
+  const toCredits = (
     <button
       type="button"
       className="inline-flex items-center gap-1 text-left text-accent hover:underline"
-      onClick={() => navigate({ name: "settings", section })}
+      onClick={() => navigate({ name: "settings", section: "credits" })}
     >
-      <Sparkles className="size-3 shrink-0" /> {text}
+      <Sparkles className="size-3 shrink-0" /> {t("listing.needCredits")}
     </button>
   );
   const lines: ReactNode[] = [];
-  if (readiness.blocker === "listing.needProviders") lines.push(link(t(readiness.blocker)));
-  else if (readiness.blocker === "listing.needCredits") lines.push(link(t(readiness.blocker), "credits"));
+  if (readiness.blocker === "listing.needCredits") lines.push(toCredits);
   else if (readiness.blocker) lines.push(t(readiness.blocker));
-  else {
-    if (readiness.skipped.includes("photos")) lines.push(link(t("listing.skipPhotos")));
-    if (readiness.skipped.includes("text"))
-      lines.push(link(t("listing.skipText", { provider: getServices().copyProviders.get(copyProviderId)?.displayName ?? copyProviderId })));
-    if (lines.length === 0) lines.push(t("listing.packHint"));
-  }
-  if (lastRun && typeof lastRun.photos === "object") lines.push(<span className="text-danger">{errorMessage(lastRun.photos.error, providerId)}</span>);
+  else lines.push(t("listing.packHint"));
+  // Run errors read as the platform's (credits, daily limit), not as a provider account's.
+  if (lastRun && typeof lastRun.photos === "object") lines.push(<span className="text-danger">{errorMessage(lastRun.photos.error, "platform")}</span>);
   return (
     <div className="space-y-0.5 text-xs text-fg-subtle">
       {lines.map((line, i) => (

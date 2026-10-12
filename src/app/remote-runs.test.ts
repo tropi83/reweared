@@ -7,7 +7,7 @@ import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { onEvent, stopLiveUpdates } from "./live-updates";
 import { RemoteRunEngine, type RunEvent } from "./ports/remote-run-engine";
 import { __setServices, createServices } from "./services";
-import { applyJobUpdate, buildRequestForJob, persistJobResult, useGenerationStore } from "./stores/generation-store";
+import { useGenerationStore } from "./stores/generation-store";
 import { useListingSetupStore } from "./stores/listing-setup-store";
 import { useListingsStore } from "./stores/listings-store";
 
@@ -109,13 +109,7 @@ function setup(): Server {
   };
   __setServices(null);
   const api = createApi("/", new LayeredSecretStore(new MemorySecretStore(), null), { tauri: false, fetch });
-  createServices({
-    buildRequest: buildRequestForJob,
-    persistResult: persistJobResult,
-    onJobUpdate: applyJobUpdate,
-    storage: new IndexedDbStorage("runs-test"),
-    api,
-  });
+  createServices({ storage: new IndexedDbStorage("runs-test"), api });
   return server;
 }
 

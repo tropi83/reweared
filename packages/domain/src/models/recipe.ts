@@ -2,8 +2,6 @@ import type { CategorySelection, ShotSpec } from "./catalog";
 
 export type RecipeCategory = "listing" | "product" | "portrait" | "advertising" | "background" | "interior" | "social" | "ecommerce" | "custom";
 
-export const RECIPE_CATEGORIES: RecipeCategory[] = ["listing", "product", "portrait", "advertising", "background", "interior", "social", "ecommerce", "custom"];
-
 export interface Recipe {
   id: string;
   name: string;
