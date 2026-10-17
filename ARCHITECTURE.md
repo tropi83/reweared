@@ -1,191 +1,120 @@
 # Architecture
 
-> This document describes the **current release** (local-first client). The product is moving to user accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)); the target is summarized in [Target architecture (planned)](#target-architecture-planned) at the end and specified in [the backend design](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). Principles 1–2 hold until phase 3 ships.
+> The app runs on accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md), binding design [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md)). The earlier local-first, bring-your-own-key release is kept unchanged on the **`byok` branch**; its architecture is described there.
 
 ## Principles
 
-1. **No proprietary backend** _(until phase 3)_. The only network calls are from the user's device to the providers: Cloudflare (`api.cloudflare.com` or the user's own Worker on `*.workers.dev`) and Google (`generativelanguage.googleapis.com`, OAuth endpoints, Cloud Resource Manager for project listing). See `src/infrastructure/http/http-client.ts` for the host allowlist.
-2. **Local-first** _(until phase 3)_. Metadata is JSON, images are files. Everything is recoverable without the app.
-3. **Shared TypeScript core.** Rust is only used for capabilities the webview cannot provide safely (OS keychain, loopback OAuth listener). Product logic lives in `src/`.
-4. **Provider abstraction.** The domain never sees HTTP details.
+1. **The server owns the data and the provider keys.** Listings, photos, texts, credits and generations live in Postgres and a private S3 bucket; the platform's provider keys exist only in the worker. The apps hold a session, never a provider credential.
+2. **One shared TypeScript core.** `@aiv/domain` (models, catalogue, shot plans, errors, retry) and `@aiv/contracts` (zod schemas of the API) are imported by the server and the apps; `@aiv/providers` (Cloudflare, Gemini adapters) by the worker.
+3. **Rust only where the webview cannot do it safely**: the OS keychain (session token) and the Vinted window/screens.
+4. **The Vinted pre-fill stays on the device** and never clicks Vinted's submit button.
+
+## Overview
+
+```
+web app (Caddy, same origin) ─┐
+desktop / phone apps (Tauri) ─┴─HTTPS─► caddy ──► api (Fastify: Better Auth, REST, SSE, uploads)
+                                                    │  SQL        │ S3          │ BullMQ add / Redis streams
+                                                    ▼             ▼             ▼
+                                                 postgres    seaweedfs        redis ◄── worker × N ──► Cloudflare / Gemini
+                                                                                          (holds the platform's provider keys)
+```
 
 ## Layers
 
 ```
-packages/domain/src/ @aiv/domain — pure models + services + lib, shared with the planned server (no React, no I/O, no DOM)
-    models/          Listing, ImageAsset, Generation, GenerationJob, Recipe, ModelInfo, AppSettings, catalog, mannequin, errors
-    services/        GenerationQueue (job state machine), ImageProvider contract, catalog + shot plans, listing copy, mannequin, publish, recipes, usage tracker
-    lib/             ids (createId, assertSafeId), retry (backoff, sleep, timeouts)
-src/
-  infrastructure/    I/O implementations
-    storage/         StorageProvider: IndexedDbStorage (web), TauriFsStorage (native), migrations
-    providers/       cloudflare/ (Workers AI: direct REST or the user's Worker), gemini/ (Interactions API: copy, image adapter disabled), mock/
-    auth/            CredentialProvider: ApiKey, GoogleOAuth (PKCE + loopback), SecretStore, GeminiAuthManager
-    image/           validation (magic bytes), decode (EXIF-upright), thumbnails, provider preparation, export/ZIP
-    http/            single fetch entry point with host allowlist (browser fetch or Tauri http plugin)
-    platform/        PlatformCapabilities
-    publish/         PublishBridge: TauriVintedBridge (desktop), MobileVintedBridge (phones), UnsupportedBridge (web); vinted/ = script injected into vinted.com
-  app/               composition root (services), stores (zustand), query/ (TanStack Query), router, bootstrap, theme, image URL cache
-  features/          React UI by feature: listings, workspace, generation, gallery, catalog, mannequin, recipes, settings, publish
-  components/ui/     Button, Input/Textarea/Select/Switch, Dialog, Badge, Segmented, Toaster
-  i18n/              en.ts (source), fr.ts (overrides)
+packages/domain/      @aiv/domain — pure models + services + lib (no React, no I/O, no DOM): Listing, ImageAsset, Generation,
+                      GenerationJob, catalogue + shot plans, mannequin, listing-copy contract, publish rules, credits, errors, ids, retry
+packages/contracts/   @aiv/contracts — zod schemas of every API body, response and SSE payload
+packages/providers/   @aiv/providers — Cloudflare Workers AI and Gemini adapters, the host allowlist (`http.ts`); used by the worker
+apps/server/          api.ts, worker.ts, migrate.ts (entrypoints); auth/, listings/, images/, generations/, queue/, worker/,
+                      credits/, events/, maintenance/, settings/, recipes/, platform/, db/ (drizzle), storage/ (S3) — see DEVELOPMENT.md → Server
+src/                  the app (web bundle + Tauri webview)
+  infrastructure/
+    api/              ApiClient (one origin, /api/ paths, cookies on the web, bearer in Tauri), session token, SSE over fetch, errors
+    auth/             SecretStore (session_token only; OS keychain on desktop) and the startup purge of BYOK-era credentials
+    storage/          StorageProvider (IndexedDB on the web, files under $APPDATA in Tauri): the device's settings, and the old
+                      local listings read once by the import
+    image/            validation (magic bytes), decoding, re-encoding non-web formats, export / ZIP
+    platform/         PlatformCapabilities
+    publish/          PublishBridge: TauriVintedBridge (desktop), MobileVintedBridge (phones), UnsupportedBridge (web); vinted/ = the script
+  app/                composition root (services.ts), ports/ (ListingRepository → RemoteListingRepository, RemoteRunEngine), stores
+                      (zustand), query/ (TanStack Query: credits, platform), live-updates (SSE), router, bootstrap, import-local
+  features/           React UI: account, listings, workspace, generation, gallery, catalog, mannequin, settings, publish
+  components/ui/      Button, Input/Textarea/Select/Switch, Dialog, Badge, Segmented, Toaster
+  i18n/               en.ts (source), fr.ts (overrides)
 src-tauri/
-  src/secrets.rs     OS keychain commands (closed key set)
-  src/oauth.rs       loopback redirect receiver for the installed-app OAuth flow
-  src/vinted.rs      isolated Vinted window (status bar + vinted.com webviews): open, navigate, pre-fill (script injection), poll, status, close, clear session
-  scripts/           vinted-prefill.js, generated by `pnpm build:prefill` and compiled in with include_str!
-  capabilities/      minimum permissions (fs scoped to $APPDATA, http scoped to Google and Cloudflare hosts; mobile.json for the phone plugin)
+  src/secrets.rs      OS keychain commands (key set: session_token; a purge command for the BYOK-era keys)
+  src/vinted.rs       isolated Vinted window (status bar + vinted.com webviews)
+  capabilities/       default.json (fs scoped to $APPDATA, dialogs), mobile.json (Vinted screen), api.json (generated: HTTP to the API only)
   plugins/vinted-webview/  shared Vinted policy (Rust) + native screens (Kotlin, Swift) for phones
-cloudflare-worker/   Worker template users deploy in their own Cloudflare account (web build)
+scripts/tauri.mjs     `pnpm tauri …`: generates the API permission and CSP (tauri-api-config.mjs) before dev/build
+deploy/, compose*.yaml  Dockerfile (server, web), Caddyfile, the stack
 ```
 
-Dependency direction: `features → app → infrastructure → @aiv/domain`. The domain imports nothing from the other layers. It is a pnpm workspace package (`packages/domain`, subpath imports `@aiv/domain/models`, `@aiv/domain/services/<file>`, `@aiv/domain/lib/<file>`) so the server of ADR 0001 can import it: it is typechecked without the DOM lib, its tests run in a Node Vitest project (`domain`), and an ESLint boundary forbids app, React, Tauri, storage imports and browser globals.
+Dependency direction in the app: `features → app → infrastructure → @aiv/domain / @aiv/contracts`. The domain imports nothing from the other layers; it is typechecked without the DOM lib and tested in a Node Vitest project, with an ESLint boundary.
 
 ## Domain model
 
 ```
 Listing ─┬─ ImageAsset (kind: original | generation)
-         ├─ Generation (sourceImageId, parentGenerationId, prompt, settings, jobIds, status)
-         └─ GenerationJob (generationId, sourceImageId, index, status, attempt, resultImageId, error)
+         ├─ Generation (sourceImageId, parentGenerationId, category, settings, jobIds, status)
+         └─ GenerationJob (generationId, sourceImageId, index, shotId, status, attempt, resultImageId, error)
 ```
 
-A `ListingDocument` (`listing.json`) holds all of a listing's records plus `schemaVersion`/`appVersion`. The aggregate was called _project_ until 2026-09-13 (schema v3 renames it; `#/project/:id` hashes still open). `Generation.parentGenerationId` is the generation that produced `sourceImageId`; this is enough to rebuild the branch tree.
-
-## Generation job system (`packages/domain/src/services/generation-queue.ts`)
-
-- `enqueue(jobs)` → `queued`; the pump starts up to `concurrency` jobs.
-- A running job gets an `AbortController`; each attempt is wrapped in a timeout signal.
-- Errors are normalized (`GenerationError`). Retryable codes (`RATE_LIMITED`, `NETWORK_ERROR`, `TIMEOUT`, `PROVIDER_UNAVAILABLE`) are retried with exponential backoff + full jitter, honouring `retryAfterMs`, up to `maxAttempts`. Non-retryable codes fail immediately.
-- Cancellation aborts the request and the backoff sleep; a cancelled job never persists a result.
-- Every transition is emitted through `onJobUpdate`; the app layer writes it into the project document (`applyJobUpdate`) and derives `Generation.status` (`active | completed | partial | failed | cancelled`).
-- On project open, jobs left in `queued`/`generating` by a crash are marked failed (`Interrupted when the app closed`) — no ghost jobs.
-
-The queue is pure TypeScript with injectable `sleep`/`random`, covered by `generation-queue.test.ts`.
+The API returns a listing as a `ListingDocument` (the shape the app always used): the listing, its images, its photo packs and their jobs, and the photos marked "to post". Copy runs are jobs too but are not part of the document; their result is `Listing.copy`.
 
 ## Listing catalogue and packs
 
-`packages/domain/src/services/catalog.ts` holds the marketplace taxonomy (10 categories → 56 subcategories) and, per `ProductKind` (40 kinds: garment, footwear, bag, jewelry, phone, trading-card, pet-carrier…), a plan of `ShotSpec`s: four base shots, plus a mirror-selfie shot for wearable kinds (garment, footwear, bag, accessory, jewelry, watch, leather goods) that `buildListingShots` drops for the kids category (`excludeCategories`). Every prompt shares a fidelity preamble (keep shape, colours, pattern, logos, text) and a quality suffix; `{{subject}}` and `{{wearer}}` are interpolated from the subcategory and the category (a woman / a man / a child, face not visible / an athlete…). `domain/models/mannequin.ts` + `packages/domain/src/services/mannequin.ts` describe the seller's mannequin (build S/M/L, pose, skin tone; one per device in `Settings.mannequin`, toggled per project with `Listing.useMannequin`): `buildShots(selection, { mannequin })` rewrites `{{wearer}}` with it and fills the `{{pose|default}}` slot (or appends the pose as its own sentence when a template with a person has no slot — never two poses), only for the shots that show a person and never for the kids and pets categories (`mannequinApplies`). The brand is never put in an image prompt. Built-in recipes are generated from the catalogue (`listingRecipeId`). `GenerationQueue` is unchanged: a pack is a `Generation` with `listing` set and one job per shot, each job carrying its own `prompt`, `shotId`, `shotLabel` and seed.
+`packages/domain/src/services/catalog.ts` holds the marketplace taxonomy (10 categories → 56 subcategories) and, per product kind, a plan of shots: four base shots plus a mirror selfie for wearable kinds (not for kids). Every prompt shares a fidelity preamble and a quality suffix; `{{subject}}` and `{{wearer}}` come from the subcategory and the category. The seller's mannequin (build, pose, skin tone — a setting of the account) rewrites the wearer of the shots that show a person, never for kids and pets. The brand is never put in an image prompt. **The server plans the packs** (`apps/server/src/generations/plan.ts`) from the listing's category, its mannequin choice and the account's settings; the app only says which shots (the whole pack by default, one shot for "generate this photo again").
 
-`packages/domain/src/services/listing-copy.ts` defines `ListingCopyProvider` (photo → `{ title, description, condition, brand, color, keywords }`), the shared prompt, a JSON schema for constrained output and a defensive parser. Implementations: `CloudflareListingCopyProvider` (Llama 4 Scout, `response_format: json_schema`, fallback Llama 3.2 Vision) and `GeminiListingCopyProvider` (Flash text models, Interactions API with an image part). The result is stored on `Project.copy`. `ListingCopyRequest.brand` carries the brand typed by the seller (`Listing.brand`, ≤ 60 chars): the prompt then imposes it verbatim in the title and the description instead of letting the model read (or invent) one.
+`packages/domain/src/services/listing-copy.ts` defines the listing-copy contract (photo → title, description, condition, brand, colour, keywords), its prompt and parser; the worker runs it with the platform's text model and imposes the seller's brand verbatim.
 
-`app/stores/listing-setup-store.ts` orchestrates one run: `generateListing()` starts the photo pack and the copy in parallel (`Promise.allSettled`), skips a part whose provider is not usable (`skipped-provider`) and reports both outcomes (`ListingRunReport`, stamped with the project id); `app/listing-readiness.ts` is the pure helper behind the button (`canCreate`, first `blocker`, `skipped` parts) so the label only promises what will run. The UI is `features/workspace/ListingSetupCard.tsx` (+ `AdvancedOptions.tsx` for per-run choices, `useComposerDefaults.ts`) and `features/mannequin/MannequinDialog.tsx`, also mounted in Settings → Mannequin. The image provider/model and the text provider/model are chosen in `features/settings/ModelsSection.tsx` (persisted in `AppSettings.activeProviderId`, `lastModelByProvider`, `copyProviderId`, `copyModelByProvider`); `UsageSection.tsx` shows local counters per provider (`UsageTracker`), with the gauge of the model in use (`UsageGauge.tsx`).
+## Runs (server)
 
-## Providers
+A run is one Postgres transaction: listing locked, generation + one job per shot inserted `queued`, credits reserved through the ledger (402 writes nothing). After the commit a per-user dispatcher feeds BullMQ (one queue per provider, rate-limited) with at most `MAX_ACTIVE_JOBS_PER_USER` jobs; a reconciler closes the gap between commit and dispatch. The worker prepares the source with sharp (crop/resize per the model's capabilities, new seed per attempt), calls the provider, re-encodes the result like an upload and completes the job with `WHERE status = 'active'` — a cancelled or deleted job keeps nothing. Retryable errors back off; final failures and cancellations are refunded exactly once (`refund:<jobId>`). Every transition is published on the user's Redis stream and served as SSE. Deleting a pack (`DELETE /api/v1/generations/:id`) refunds and stops its unfinished jobs and removes its photos. Details: the design spec §4 and the `backend` skill.
 
-```ts
-interface ImageProvider {
-  info: ProviderInfo;
-  getModels(): Promise<ModelInfo[]>;
-  validateCredentials(): Promise<AuthStatus>;
-  generate(request, { signal }): Promise<ImageGenerationResult>;
-}
-```
+## The app
 
-`ModelInfo.capabilities` (aspect ratios, image sizes, editing) is the single source of truth; `buildRequestForModel` strips unsupported parameters so nothing unsupported is ever sent. The UI only offers what the selected model supports.
+| Piece        | Where                                                                                 | What it does                                                                                                                                                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API origin   | `app/api-origin.ts`                                                                   | `VITE_API_ORIGIN`: `/` (default; the web bundle on the API's origin, `pnpm dev` through the Vite proxy) or the public https origin (desktop and phone builds)                                                                           |
+| `ApiClient`  | `infrastructure/api/`                                                                 | `/api/` paths on one origin; cookies on the web, `Authorization: Bearer` in Tauri (token from `set-auth-token`, kept in the keychain as `session_token`); responses parsed with `@aiv/contracts`; errors → `AppError`; 401 → signed out |
+| Accounts     | `stores/account-store.ts`, `features/account/*`                                       | sign-up (verification email), sign-in, password reset (`/?token=…#/reset-password`), sign-out, deletion by emailed link; `AuthGate` shows the auth screens until a session exists                                                       |
+| Listings     | `ports/listing-repository.ts` → `RemoteListingRepository`, `stores/listings-store.ts` | the open listing and the sidebar; edits are debounced and saved as PATCHes of the changed fields; photos through `/api/v1/images/:id?variant=thumb\|full` (object-URL LRU in `image-urls.ts`)                                           |
+| Runs         | `ports/remote-run-engine.ts`, `generation-store`, `listing-setup-store`               | "Create the listing" saves pending edits, then starts the pack and the copy together; retry, cancel, regenerate one shot, delete a pack                                                                                                 |
+| Live updates | `live-updates.ts`                                                                     | SSE over `fetch` with `Last-Event-ID` resume; an event about the open listing, or a reconnection, re-reads its document (no field patching); terminal job events refresh the sidebar and the balance                                    |
+| Credits      | `query/credits.ts`, `CreditsBadge`, `CreditsSection`                                  | TanStack Query (`credits` with `staleTime: 0`, `platform`); the run's cost on the button, the `listing.needCredits` blocker                                                                                                             |
+| Settings     | `stores/settings-store.ts`                                                            | the device keeps its copy (theme, language); the account's settings (`locale`, `theme`, `mannequin`, `vintedAutomationAcknowledged`, `defaultAspectRatio`) are read at sign-in and saved with `PUT`                                     |
+| Import       | `import-local.ts`, `ImportLocalDialog`                                                | one-time, resumable copy of the listings a local-first release left on the device (original photo and details; generated photos are not copied)                                                                                         |
+| Tauri        | `scripts/tauri.mjs`, `scripts/tauri-api-config.mjs`                                   | the generated `api` capability (`http:default` on `<origin>/api/*`) and CSP patch, required for every dev/build                                                                                                                         |
 
-### Gemini (`packages/providers/src/gemini`)
-
-- Endpoint: `POST https://generativelanguage.googleapis.com/v1beta/interactions` with `{ model, input: [text, image], response_format: { type: "image", mime_type, aspect_ratio?, image_size? }, store: false }` (docs verified 2026-09-11).
-- Result: first `type: "image"` content in a `model_output` step. No image → `NO_IMAGE_RETURNED` / `CONTENT_REJECTED`.
-- Models catalogue in `GeminiModels.ts`; availability is refined from `GET /v1beta/models` when reachable.
-- Auth headers come from `GeminiAuthManager` (`x-goog-api-key` or `Authorization: Bearer` + `x-goog-user-project`).
-- Error normalization in `GeminiErrors.ts` (HTTP status + message → code, `Retry-After` → `retryAfterMs`).
-
-### Quotas and usage
-
-Google returns the same "You exceeded your current quota" sentence for throttling, daily exhaustion and models outside the plan; `GeminiErrors.parseQuotaInfo` reads the structured `google.rpc.QuotaFailure` / `RetryInfo` details to classify (`RATE_LIMITED` retryable with Google's delay · `QUOTA_EXCEEDED` · `MODEL_NOT_IN_PLAN` when `quotaValue` is 0). `packages/domain/src/services/usage-tracker.ts` counts requests locally per provider/model (rolling minute, Pacific day), learns limits from those details (`quotaValue`) unless the user set manual ones, and persists through `StorageProvider.readMeta/writeMeta` (`metadata/usage.json` on desktop). Only requests from this device are counted; the UI states it.
-
-### Cloudflare Workers AI (`packages/providers/src/cloudflare`, credentials in the app: `infrastructure/providers/cloudflare/CloudflareAuth.ts`)
-
-- `CloudflareAuth` resolves the endpoint: direct REST (`/accounts/{id}/ai/run/{model}`, bearer token; desktop only because the API has no CORS) or the user's Worker (`{workerUrl}/run/{model}`, optional bearer secret). Config in `metadata/cloudflare-config.json`, secrets in the SecretStore.
-- `CloudflareMapper` builds the JSON body (`prompt`, `image_b64`, `width/height`, `num_steps`, `strength`, `guidance`, `negative_prompt`, `seed`) with options normalized into the documented ranges; the response is raw PNG bytes, a JSON body on 200 is treated as an envelope error.
-- Diffusion models cannot change the aspect ratio and are deterministic: `ModelCapabilities.inputImage` makes `buildRequestForJob` crop/resize the source (multiples of 64) via `computeGeometry`, and each job carries a random `seed`. `ModelCapabilities.options` drives the composer's Advanced panel generically.
-- `cloudflare-worker/` is the Worker template users deploy in their own account (AI binding, CORS, secret, input validation).
-
-### Mock
-
-Renders a tinted, labelled copy of the source on a canvas; scenarios: `success | slow | flaky | rate_limited | timeout | error | no_image`.
-
-## Storage
-
-```
-<app data>/
-  listings/<listingId>/
-    listing.json
-    original/<assetId>.<ext>
-    generations/<assetId>.<ext>
-    thumbnails/<assetId>.webp
-  recipes/<recipeId>.json
-  settings.json
-```
-
-Web uses the same logical layout inside IndexedDB (`listings`, `images`, `recipes`, `settings` stores; database v2). `StorageProvider` is the only interface the app uses; SQLite can be added as another implementation. `migrations.ts` upgrades documents by `schemaVersion` (`CURRENT_SCHEMA_VERSION = 3`: v2 renamed favourites to `toPost`, v3 renamed the aggregate from project to listing); newer documents are refused rather than silently rewritten.
-
-Image bytes are never put in the JSON. Thumbnails (WebP, 512px) drive the gallery; full images are only loaded for fullscreen/export. Object URLs are cached in a bounded LRU (`app/image-urls.ts`).
+`listing-readiness.ts` is the pure helper behind "Create the listing" (`canCreate` and the first blocker: no photo, no category, not enough credits). Zustand holds what the user edits (open listing, setup, composer, settings, UI, Vinted session, toasts); TanStack Query holds fetched account data (credits, platform info) — see `.claude/skills/tanstack-query`.
 
 ## Image pipeline
 
-`validateImageFile` (size cap, magic-byte MIME sniffing) → `decodeImage` (`createImageBitmap` with `imageOrientation: "from-image"`) → thumbnail → stored original (GIF/BMP/AVIF are re-encoded to PNG, PNG/JPEG/WebP kept as-is) → `prepareForProvider` (downscale to `prepareMaxDimension`, PNG/JPEG) at generation time, cached per source for the burst of N jobs. Originals are never modified.
+In the app: `validateImageFile` (size cap, magic-byte sniffing) → GIF/BMP/AVIF re-encoded to PNG → upload. On the server: magic-byte sniffing again, sharp re-encode (upright, **EXIF/GPS stripped**), WebP thumbnail (512 px), private bucket under `u/<user>/l/<listing>/…`, bytes streamed by the api (no public or presigned URL). Generated photos go through the same re-encode. Originals are never modified after upload.
 
 ## Publishing on Vinted (desktop and phones)
 
-`packages/domain/src/services/publish.ts` (pure) decides what can be posted (`canPost`: photos marked “To post” + title/description + desktop), the posting order (original first, then generations by creation time, at most 20) and maps Vinted URLs to stages. `app/publish-payload.ts` re-encodes the marked photos (JPEG ≤ 2048 px, ≤ 4 MiB each) and caps the copy at Vinted's limits. `app/stores/publish-store.ts` drives the session `closed → login | browsing → form → filled`, fed by `vinted:page` events and by a 500 ms poll of the window's location (Vinted is a single-page app: its own “Sell” entry reaches the form without a page-load event). Arriving on the form — or a replaced document — runs `fill()` by itself: it hands the payload to the bridge and polls the script's report every 300 ms (20 s timeout); the panel's button runs it again by hand. A session is bound to its project and to an epoch, so a late result never leaks into another project or session.
+`packages/domain/src/services/publish.ts` (pure) decides what can be posted (photos marked "To post" + title/description + a platform with a Vinted window), the order (original first, then generations by creation time, at most 20) and maps Vinted URLs to stages. `app/publish-payload.ts` downloads and re-encodes the marked photos (JPEG ≤ 2048 px, ≤ 4 MiB) and caps the copy at Vinted's limits. `app/stores/publish-store.ts` drives the session `closed → login | browsing → form → filled`, fed by page events and a 500 ms poll (Vinted is a single-page app); arriving on the form runs the fill by itself. A session is bound to its listing and to an epoch.
 
-`infrastructure/publish/PublishBridge.ts` abstracts the platform with two modes: **windowed** (desktop, `TauriVintedBridge` calls the `vinted_*` commands step by step) and **delegated** (phones, `MobileVintedBridge` hands the whole payload to the `vinted-webview` plugin's native screen in one `run` call and gets the report back when it closes — the app's WebView is paused underneath, so it cannot drive anything); `UnsupportedBridge` (web) throws `PLATFORM_UNSUPPORTED`. `src-tauri/plugins/vinted-webview` owns the shared policy (`policy.rs`: hosts, paths, payload limits, the injected script) used by both the desktop window and the native screens (Kotlin `VintedActivity`, Swift `VintedViewController`). In Rust (`src-tauri/src/vinted.rs`) the Vinted `WebviewWindow` has its own profile, a navigation allow-list, and receives the pre-fill script (built from `infrastructure/publish/vinted/`) through `eval`; results come back through `eval_with_callback`. The page never gets IPC and the app never clicks Vinted's submit button. The script attaches the photos and mounts paste icons next to the title and the description: the text goes in on the user's tap, never automatically.
-
-## State
-
-Zustand stores in `app/stores`: `listings` (current `ListingDocument` + debounced atomic saves), `listing-setup` (category, brand, mannequin, the generation run), `generation` (models, start/retry/cancel), `composer`, `auth`, `settings`, `recipes`, `ui` (selection, lightbox, filter), `publish` (Vinted session), `toast`. `app/services.ts` is the composition root; tests build it with an in-memory IndexedDB.
-
-Provider metadata fetched from the network — the model list per provider and the auth status per provider — lives in **TanStack Query** (`app/query/`: `query-client.ts`, `keys.ts`, `models.ts`, `auth-status.ts`). Components use `useModels` / `useAuthStatus`; stores use the imperative accessors (`ensureModels`, `modelsSnapshot`, `authStatusSnapshot`). `auth-store.refresh()` invalidates both families after a credential change. No refetch on focus or reconnect (local-first). Everything else stays in zustand — see `.claude/skills/tanstack-query`.
+`infrastructure/publish/PublishBridge.ts` has two modes: **windowed** (desktop, `TauriVintedBridge` → `vinted_*` commands) and **delegated** (phones, `MobileVintedBridge` → the `vinted-webview` plugin's native screen, one `run` call); `UnsupportedBridge` (web) throws `PLATFORM_UNSUPPORTED`. The Vinted webview has its own profile and a navigation allow-list, never gets IPC, and receives the pre-fill script (built from `infrastructure/publish/vinted/`) through `eval`. The script attaches the photos and mounts paste icons next to the title and the description: text goes in on the user's tap.
 
 ## Routing
 
-A tiny hash router (`app/router.ts`): `#/`, `#/listing/:id` (legacy `#/project/:id` accepted), `#/recipes`, `#/settings/:section`.
+A tiny hash router (`app/router.ts`): `#/`, `#/listing/:id` (legacy `#/project/:id` accepted), `#/settings/:section`; `#/reset-password` is read once from the password-reset link.
 
 ## Platform capabilities
 
-`getPlatform()` reports `filesystem`, `secureStorage`, `oauthBrowserFlow`, `nativeShare`, `camera`, `nativeDialogs`. Features check capabilities instead of sniffing user agents.
+`getPlatform()` reports `filesystem`, `secureStorage`, `nativeShare`, `camera`, `nativeDialogs`, `isMobile`. Features check capabilities instead of sniffing user agents.
 
 ## Ads / entitlements
 
 `Entitlement { adsEnabled, tier }` exists in the settings model; no ad SDK is integrated. An `AdProvider` implementation must never receive images or prompts.
 
-## Target architecture (planned)
+## Phases
 
-Decided in [ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md) (2026-10-11); binding design: [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). **Phases 1 and 2 are implemented** (accounts, listings, uploads, object storage, credits, BullMQ queues with per-user dispatch, the worker, SSE, nightly maintenance, compose stack — see DEVELOPMENT.md → Server); the client switch (phase 3) is not. The clients still run local-first.
+0 docs, workspace, domain package · 1 compose stack and api · 2 worker, queue, credits, SSE · 3 the apps on the API, import of local listings, removal of the local mode (all done; plans in `docs/superpowers/plans/`) · 4 production (plan: [`2026-10-12-backend-phase-4.md`](docs/superpowers/plans/2026-10-12-backend-phase-4.md)).
 
-```
-clients (web, Tauri desktop/phones) ──HTTPS──► caddy ──► api (Fastify: auth, REST, SSE, uploads)
-                                                         │  SQL        │ S3          │ BullMQ add / pub-sub
-                                                         ▼             ▼             ▼
-                                                      postgres    seaweedfs        redis ◄── worker × N ──► Cloudflare / Gemini
-                                                                                              (holds the platform's provider keys)
-```
-
-- **API (phase 1, `apps/server`)**: Fastify 5 with zod contracts (`@aiv/contracts`); `/api/auth/*` is Better Auth (email + password with mandatory verification, sessions as cookies or bearer tokens, optional Google, deletion confirmed by email); `/api/v1/listings`, `/api/v1/images`, `/api/v1/me/settings`, `/api/v1/recipes` are scoped by the session user (another user's ids answer 404). Uploads are re-encoded by sharp (upright, no EXIF/GPS) with a WebP thumbnail; bytes live in the S3 store under `u/<user>/l/<listing>/…` and are streamed by the api. drizzle owns the schema and forward-only migrations.
-- **Accounts** (Better Auth, Resend for email) own listings, images and generations; Postgres + an S3-compatible store (SeaweedFS) are the source of truth; image bytes are streamed to clients by the api.
-- **Queue**: the api enqueues in one Postgres transaction (jobs + credit reservation); a dispatcher feeds BullMQ with at most N active jobs per user; one queue per provider with a rate limiter; a reconciler closes the gap between commit and dispatch; the worker reuses `GenerationQueue`'s retry semantics (`GenerationError`, `computeBackoffMs`, new seed per attempt) and refunds failures once.
-- **Shared code**: `packages/domain` (`@aiv/domain`, extracted in phase 0 — done) holds the models, catalogue, shot plans, listing-copy contract, errors and retry helpers used by both the client and the server.
-- **Clients (phase 3, done — behind `VITE_API_ORIGIN`)**: see [API mode](#api-mode-phase-3). The Vinted pre-fill stays on the device.
-
-Phases: 0 docs + workspace + domain package (done) · 1 compose stack + api (done) · 2 worker, queue, credits, SSE (done) · 3 client switch (done, behind a build switch; removing the local mode waits for the owner) · 4 production.
-
-### API mode (phase 3)
-
-A build with `VITE_API_ORIGIN` set (`/` for the web bundle Caddy serves, the public `https://` origin for Tauri builds) runs on the API; without it the local-first app above is unchanged. Plan and decisions: [`docs/superpowers/plans/2026-10-12-backend-phase-3.md`](docs/superpowers/plans/2026-10-12-backend-phase-3.md).
-
-| Piece        | Where                                                                                | What it does                                                                                                                                                                                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Mode switch  | `src/app/api-mode.ts`, `services.ts`                                                 | `API_MODE`; `services.api` (client + session), `services.listings`, `services.runs` chosen once                                                                                                                                                                                |
-| `ApiClient`  | `src/infrastructure/api/`                                                            | one origin, `/api/` paths only; cookies on the web, `Authorization: Bearer` in Tauri (token from `set-auth-token`, kept in the OS keychain as `session_token`); responses parsed with `@aiv/contracts`; errors → `ApiError` → `AppError` (`to-app-error.ts`); 401 → signed out |
-| Accounts     | `account-store`, `features/account/*`                                                | sign-up (verification email), sign-in, reset password (`/?token=…#/reset-password`), sign-out, deletion by emailed link; `AuthGate` shows the auth screens until a session exists                                                                                              |
-| Listings     | `ports/listing-repository.ts` → `LocalListingRepository` / `RemoteListingRepository` | the listings store and every image reader go through the port; remote saves are PATCHes of the changed fields; photos through `/api/v1/images/:id?variant=`                                                                                                                    |
-| Runs         | `ports/remote-run-engine.ts`, `generation-store`, `listing-setup-store`              | packs, copy, retry, cancel on the server; the local `GenerationQueue` path is untouched in local builds                                                                                                                                                                        |
-| Live updates | `live-updates.ts`                                                                    | SSE over `fetch` (web and Tauri) with `Last-Event-ID` resume; an event about the open listing, or a reconnection, re-reads its document (no field patching); terminal job events refresh the sidebar and the balance                                                           |
-| Credits      | `query/credits.ts`, `CreditsBadge`, `CreditsSection`                                 | TanStack Query (`credits`, `platform`); cost on "Create the listing", `listing.needCredits` blocker                                                                                                                                                                            |
-| Settings     | `settings-store`                                                                     | the account's settings (`locale`, `theme`, `mannequin`, `vintedAutomationAcknowledged`, `defaultAspectRatio`) read at sign-in, `PUT` on change; Providers/Models/Usage/Generation/Storage hidden                                                                               |
-| Import       | `import-local.ts`, `ImportLocalDialog`                                               | one-time copy of the device's listings (originals + details) into the account, resumable                                                                                                                                                                                       |
-| Tauri        | `scripts/tauri-api-config.mjs`                                                       | generated `api` capability (`http:default` on `<origin>/api/*`) and CSP patch                                                                                                                                                                                                  |
-
-Not on the API yet: recipes (stay on the device), free prompts / prompt overrides / custom recipes (the API runs catalogue shots). This document's sections above are rewritten as each phase ships.
+Not on the API yet: custom recipes and free prompts (the server's `/api/v1/recipes` exists; the app only runs the catalogue's packs).

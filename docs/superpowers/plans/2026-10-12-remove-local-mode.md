@@ -27,4 +27,9 @@
 
 ## Progress
 
-_Nothing done yet._
+- [x] Tasks 1–2 — `e822176` (one mode in the app, client providers and credentials removed).
+- [x] Task 3 — `4e9d8a6` (Tauri: OAuth, scopes, CSP, `session_token` only).
+- [x] Task 4 — `cloudflare-worker/` and its CI job gone, `.env.example` cleaned.
+- [x] Task 5 — no unused EN/FR key left (checked 2026-10-17: 348 keys, all referenced); `pnpm check` green (68 files, 360 tests).
+- [~] Task 6 — README, ARCHITECTURE, SECURITY, PRIVACY, DEVELOPMENT, BUILDING, CONTRIBUTING, CHANGELOG done (uncommitted). **Left: `CLAUDE.md` and the skills** (`project-context`, `release`, `security-review`, `testing`, `tanstack-query`, `backend`) still describe the local mode.
+- [ ] Before the PR: `pnpm rust:check`, `pnpm test:integration` (Docker), compose smoke, browser walk.

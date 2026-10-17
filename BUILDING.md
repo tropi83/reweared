@@ -74,7 +74,7 @@ pnpm check                  # typecheck, lint, format, tests
 pnpm tauri info             # Tauri's own report of the toolchain it can see
 ```
 
-`.env` only holds public build configuration (the desktop Google OAuth client, the Mock provider switch). Never put credentials or signing material in it.
+`.env` only holds public build configuration (`VITE_API_ORIGIN`, the server stack's public settings — see `.env.example`). Tauri builds (`pnpm tauri:api:*`) need an absolute `VITE_API_ORIGIN`. Never put credentials or signing material in it.
 
 ## 2. Desktop
 
@@ -314,8 +314,8 @@ xcrun altool --upload-app --type ios --file "src-tauri/gen/apple/build/arm64/<ap
 ## 5. Signing material and secrets
 
 - Never commit keystores, certificates, provisioning profiles, API keys or their passwords. The root `.gitignore` excludes `*.jks`, `*.keystore`, `keystore.properties`, `*.p12`, `*.p8`, `*.pem` and `*.mobileprovision`; `src-tauri/gen/android/.gitignore` also excludes `key.properties`.
-- In CI, pass signing material as GitHub **secrets** mapped to the environment variables listed above; public values (such as the desktop OAuth client ID) as **variables**.
-- Release builds must not enable the Mock provider (`VITE_ENABLE_MOCK_PROVIDER` unset) — see the `release` skill.
+- In CI, pass signing material as GitHub **secrets** mapped to the environment variables listed above; public values (such as `VITE_API_ORIGIN`) as **variables**.
+- Release builds point `VITE_API_ORIGIN` at the production https origin, never at the dev stack (`http://localhost:8080`) — see the `release` skill.
 
 ## 6. Known warning: identifier ends with `.app`
 
