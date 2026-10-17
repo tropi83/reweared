@@ -58,12 +58,25 @@ services:
       COPY_MODEL: mock-copy
       ENABLE_MOCK_PROVIDER: "true"
 
+  # CI and local drills: the "off-site" storage is a directory in a volume (rclone local backend).
+  backup:
+    build: { context: ., dockerfile: deploy/Dockerfile, target: backup }
+    image: aiv-backup:local
+    user: root # the local "off-site" volume is root-owned
+    environment:
+      BACKUP_TARGET: offsite:/offsite
+      RCLONE_CONFIG_OFFSITE_TYPE: local
+    volumes: [offsite:/offsite]
+
   caddy:
     build: { context: ., dockerfile: deploy/Dockerfile, target: web }
     image: aiv-web:local
     environment:
       CADDY_SITE: ":80"
     ports: !override ["127.0.0.1:8080:80"]
+
+volumes:
+  offsite: {}
 
 networks:
   # Published ports need a non-internal network; dev only.

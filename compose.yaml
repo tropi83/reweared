@@ -172,6 +172,42 @@ services:
       redis: { condition: service_healthy }
       seaweedfs: { condition: service_healthy }
 
+  # Nightly backup and restore (docs: OPERATIONS.md). Not started by `up`: a host timer runs
+  #   docker compose --profile backup run --rm backup
+  # and a restore is `... run --rm -v <age identity>:/run/secrets/backup_age_identity:ro backup restore.sh`.
+  # The database dump is encrypted with the public age key (BACKUP_AGE_RECIPIENT; the private key stays offline) and the
+  # photos with rclone crypt, before anything leaves the host. Redis is not backed up: jobs and credits live in Postgres
+  # and the reconciler re-offers what BullMQ lost.
+  backup:
+    <<: *hardening
+    restart: "no"
+    profiles: [backup]
+    image: ghcr.io/tropi83/aiv-backup:${AIV_VERSION:?set AIV_VERSION to the released version}
+    mem_limit: 512m
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    environment:
+      BACKUP_TARGET: ${BACKUP_TARGET:-}
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      BACKUP_PING_URL: ${BACKUP_PING_URL:-}
+      S3_ENDPOINT: http://seaweedfs:8333
+      S3_BUCKET: aiv-images
+      # The off-site remote "offsite" is an rclone remote described by variables (rclone.org/docs, "Environment
+      # variables"); its credentials are secret files.
+      RCLONE_CONFIG_OFFSITE_TYPE: ${RCLONE_CONFIG_OFFSITE_TYPE:-s3}
+      RCLONE_CONFIG_OFFSITE_PROVIDER: ${RCLONE_CONFIG_OFFSITE_PROVIDER:-Other}
+      RCLONE_CONFIG_OFFSITE_ENDPOINT: ${RCLONE_CONFIG_OFFSITE_ENDPOINT:-}
+      RCLONE_CONFIG_OFFSITE_REGION: ${RCLONE_CONFIG_OFFSITE_REGION:-}
+      RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID_FILE: /run/secrets/backup_offsite_access_key_id
+      RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY_FILE: /run/secrets/backup_offsite_secret_access_key
+    secrets: [postgres_password, s3_access_key_id, s3_secret_access_key, backup_crypt_password, backup_offsite_access_key_id, backup_offsite_secret_access_key]
+    # internal: Postgres and SeaweedFS; edge: the way out to the off-site storage.
+    networks: [internal, edge]
+    depends_on:
+      postgres: { condition: service_healthy }
+      seaweedfs: { condition: service_healthy }
+
   caddy:
     <<: *hardening
     image: ghcr.io/tropi83/aiv-web:${AIV_VERSION:?set AIV_VERSION to the released version}
@@ -212,3 +248,6 @@ secrets:
   resend_api_key: { file: ./secrets/resend_api_key }
   cloudflare_api_token: { file: ./secrets/cloudflare_api_token }
   gemini_api_key: { file: ./secrets/gemini_api_key }
+  backup_crypt_password: { file: ./secrets/backup_crypt_password }
+  backup_offsite_access_key_id: { file: ./secrets/backup_offsite_access_key_id }
+  backup_offsite_secret_access_key: { file: ./secrets/backup_offsite_secret_access_key }

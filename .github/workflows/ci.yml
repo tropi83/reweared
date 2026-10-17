@@ -86,9 +86,11 @@ jobs:
           node-version: 22
       - run: node scripts/dev-secrets.mjs
       - name: Provider keys reach the worker only
-        run: AIV_VERSION=0.0.0-ci docker compose -f compose.yaml config --format json | node scripts/check-compose.mjs
+        run: AIV_VERSION=0.0.0-ci docker compose --profile backup -f compose.yaml config --format json | node scripts/check-compose.mjs
       - run: docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml up -d --build --wait --wait-timeout 300
       - run: node scripts/server-smoke.mjs http://localhost:8080 http://localhost:8025
+      - name: Backup, wipe, restore (round trip)
+        run: scripts/backup-roundtrip.sh
       - name: Compose logs
         if: always()
         run: docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml logs --no-color > compose.log
