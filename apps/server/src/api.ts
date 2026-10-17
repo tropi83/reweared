@@ -12,6 +12,7 @@ import { connectRedis } from "./redis";
 import { NeuronBudget } from "./queue/budget";
 import { Dispatcher } from "./queue/dispatcher";
 import { QueueSet, createQueueConnection } from "./queue/queues";
+import { assertWorkerAlive } from "./worker/liveness";
 import { assertPlatformCopyModel, platformImageModel } from "./providers/catalogue";
 import { S3ObjectStore } from "./storage/s3-object-store";
 
@@ -71,6 +72,8 @@ async function main(): Promise<void> {
       { name: "database", check: async () => void (await database.db.execute(sql`select 1`)) },
       { name: "redis", check: async () => void (await redis.ping()) },
       { name: "storage", check: () => store.ping() },
+      // The api never runs jobs: without a live worker the queue silently fills, which only this check shows from outside.
+      { name: "worker", check: () => assertWorkerAlive(redis, Date.now()) },
     ],
     accounts: {
       auth,

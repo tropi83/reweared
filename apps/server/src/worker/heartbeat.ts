@@ -9,6 +9,8 @@ export interface HeartbeatDeps {
   /** Redis answers: the worker can receive jobs. */
   ping(): Promise<unknown>;
   write(content: string): Promise<void>;
+  /** Tells the api the worker is alive (readiness); a failure counts like a failed ping. */
+  publish?(now: number): Promise<unknown>;
   now(): number;
   onError(error: unknown): void;
 }
@@ -31,6 +33,7 @@ export function startHeartbeat(deps: HeartbeatDeps, intervalMs = HEARTBEAT_INTER
         clearTimeout(timer);
       }
       await deps.write(String(deps.now()));
+      await deps.publish?.(deps.now());
       failing = false;
     } catch (error) {
       // One log line per outage, not one per beat.

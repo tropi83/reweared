@@ -1,12 +1,19 @@
 # AI Image Variations — server stack (ADR 0001). Production baseline; compose.dev.yaml adds dev ports and Mailpit.
 #   node scripts/dev-secrets.mjs                                  # once: random secrets in ./secrets (git-ignored)
-#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+#   pnpm stack:up   (docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml up -d --build --wait)
 # Only Caddy publishes ports. Postgres, Redis and SeaweedFS live on the internal network (no route out).
 # Image versions checked on Docker Hub / GitHub releases on 2026-10-12.
 
 x-hardening: &hardening
   security_opt: ["no-new-privileges:true"]
   restart: unless-stopped
+  logging: &logging
+    driver: json-file
+    options: { max-size: 10m, max-file: "5" }
+
+# The server images come from the registry at the release's version (AIV_VERSION, e.g. 0.2.0); compose.dev.yaml
+# builds them locally instead. Memory limits are sized for a 4 vCPU / 8 GB host (OPERATIONS.md).
+x-server-image: &server-image ghcr.io/tropi83/aiv-server:${AIV_VERSION:?set AIV_VERSION to the released version}
 
 # The platform's providers and models: the api plans and reserves with them, the worker runs them. Same values
 # for both; only the worker gets the provider keys.
@@ -36,6 +43,10 @@ services:
   postgres:
     <<: *hardening
     image: postgres:17.11-alpine3.24
+    # Minimal tuning for 1 GB; pg_stat_statements stays off (not preloaded).
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "work_mem=8MB", "-c", "max_connections=60"]
+    shm_size: 256m
+    mem_limit: 1g
     environment:
       POSTGRES_USER: aiv
       POSTGRES_DB: aiv
@@ -52,8 +63,10 @@ services:
   redis:
     <<: *hardening
     image: redis:7.4.11-alpine3.21
+    mem_limit: 512m
     # AOF persistence; noeviction because BullMQ (phase 2) must never lose keys. The password comes from a secret.
-    command: ["sh", "-c", 'exec redis-server --appendonly yes --maxmemory-policy noeviction --requirepass "$$(cat /run/secrets/redis_password)"']
+    command:
+      ["sh", "-c", 'exec redis-server --appendonly yes --maxmemory 400mb --maxmemory-policy noeviction --requirepass "$$(cat /run/secrets/redis_password)"']
     secrets: [redis_password]
     volumes: [redis-data:/data]
     networks: [internal]
@@ -67,6 +80,7 @@ services:
     <<: *hardening
     # S3-compatible store (MinIO's Community Edition is unmaintained since 2025). Release 4.48, 2026-09-28.
     image: chrislusf/seaweedfs:4.48
+    mem_limit: 1g
     # Listen on every network of the container (it binds to the first detected address otherwise).
     command: ["server", "-ip=seaweedfs", "-ip.bind=0.0.0.0", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/run/secrets/seaweedfs_s3"]
     secrets: [seaweedfs_s3]
@@ -80,11 +94,12 @@ services:
       retries: 30
 
   migrate:
-    build: { context: ., dockerfile: deploy/Dockerfile, target: server }
-    image: aiv-server:local
+    image: *server-image
     command: ["node", "dist/migrate.js"]
     restart: "no"
     security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    mem_limit: 256m
     read_only: true
     cap_drop: [ALL]
     environment: *server-env
@@ -95,7 +110,8 @@ services:
 
   api:
     <<: *hardening
-    image: aiv-server:local
+    image: *server-image
+    mem_limit: 1g
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -124,7 +140,9 @@ services:
   # endpoint (it serves nothing); scale with `docker compose up -d --scale worker=N`.
   worker:
     <<: *hardening
-    image: aiv-server:local
+    image: *server-image
+    # sharp decodes and re-encodes images in memory, hence the larger share.
+    mem_limit: 1536m
     command: ["node", "dist/worker.js"]
     # The worker serves nothing: it writes /tmp/worker-alive every 10 s while Redis answers (worker/heartbeat.ts),
     # and is healthy while that file is less than a minute old.
@@ -156,8 +174,8 @@ services:
 
   caddy:
     <<: *hardening
-    build: { context: ., dockerfile: deploy/Dockerfile, target: web }
-    image: aiv-web:local
+    image: ghcr.io/tropi83/aiv-web:${AIV_VERSION:?set AIV_VERSION to the released version}
+    mem_limit: 256m
     read_only: true
     cap_drop: [ALL]
     cap_add: [NET_BIND_SERVICE]

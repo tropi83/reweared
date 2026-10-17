@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
+import { hostname } from "node:os";
 import { pino } from "pino";
 import { ConfigError } from "./config";
 import { connectDatabase } from "./db/client";
@@ -12,6 +13,7 @@ import { QueueSet, createQueueConnection } from "./queue/queues";
 import { S3ObjectStore } from "./storage/s3-object-store";
 import { loadWorkerConfig } from "./worker/config";
 import { HEARTBEAT_FILE, startHeartbeat } from "./worker/heartbeat";
+import { publishWorkerHeartbeat } from "./worker/liveness";
 import { buildProviders } from "./worker/registry";
 import { startWorkers } from "./worker/workers";
 
@@ -63,6 +65,7 @@ async function main(): Promise<void> {
   const stopHeartbeat = startHeartbeat({
     ping: () => connection.ping(),
     write: (content) => writeFile(HEARTBEAT_FILE, content),
+    publish: (now) => publishWorkerHeartbeat(connection, hostname(), now),
     now: () => Date.now(),
     onError: (error) => log.error({ err: error }, "worker heartbeat failing: Redis does not answer"),
   });

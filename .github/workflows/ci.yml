@@ -86,12 +86,12 @@ jobs:
           node-version: 22
       - run: node scripts/dev-secrets.mjs
       - name: Provider keys reach the worker only
-        run: docker compose -f compose.yaml config --format json | node scripts/check-compose.mjs
-      - run: docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait --wait-timeout 300
+        run: AIV_VERSION=0.0.0-ci docker compose -f compose.yaml config --format json | node scripts/check-compose.mjs
+      - run: docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml up -d --build --wait --wait-timeout 300
       - run: node scripts/server-smoke.mjs http://localhost:8080 http://localhost:8025
       - name: Compose logs
         if: always()
-        run: docker compose -f compose.yaml -f compose.dev.yaml logs --no-color > compose.log
+        run: docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml logs --no-color > compose.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -99,7 +99,7 @@ jobs:
           path: compose.log
           retention-days: 7
       - if: always()
-        run: docker compose -f compose.yaml -f compose.dev.yaml down -v
+        run: docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml down -v
 
   secrets-scan:
     name: Secrets · no credentials in the tree

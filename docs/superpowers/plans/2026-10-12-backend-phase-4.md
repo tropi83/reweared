@@ -113,4 +113,5 @@
 
 Update this section after each task: task number, commit hash, deviations.
 
-_Nothing done yet._
+- [x] **Task 1** — production compose (registry images via `AIV_VERSION`, log rotation, memory limits, Postgres/Redis tuning), worker liveness in `/ready` (Redis sorted set `worker:heartbeats` rather than per-host keys with TTL: one cheap `ZCOUNT`), `check-compose` assertions with unit tests. Dev/CI use `--env-file deploy/dev.env` (note: the project `.env` is therefore not read by the dev stack). Verified: `pnpm check` (70 files, 369 tests), `pnpm test:integration` (80), `pnpm smoke:server`, and by hand: stopping the worker turns `/ready` into 503 `worker` after 60 s, restarting it restores 200. Not done: the registry images do not exist until task 2.
+- [ ] Tasks 2–10 — see above; tasks 3, 7 and 10 need the owner (VPS, DNS, keys).
