@@ -11,8 +11,9 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
   };
 });
 
+import { saveFile } from "@/infrastructure/image/export";
 import { json, useFakeServices, type FakeServer } from "@/test/fake-api";
-import { deleteListing } from "./listing-actions";
+import { deleteListing, exportListing } from "./listing-actions";
 import { currentRoute, navigate } from "./router";
 import { getServices } from "./services";
 import { useGenerationStore } from "./stores/generation-store";
@@ -21,6 +22,8 @@ import { usePublishStore } from "./stores/publish-store";
 import { useToastStore } from "./stores/toast-store";
 
 const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])], { type: "image/png" });
+
+vi.mock("@/infrastructure/image/export", () => ({ saveFile: vi.fn(async () => true) }));
 
 let server: FakeServer;
 
@@ -90,5 +93,41 @@ describe("deleteListing", () => {
     });
     expect(server.calls.some((c) => c.method === "DELETE" && c.path === `/api/v1/listings/${doc.listing.id}`)).toBe(true);
     expect(useListingsStore.getState().current).toBeNull();
+  });
+});
+
+describe("exportListing", () => {
+  beforeEach(async () => {
+    ({ server } = await useFakeServices());
+    useToastStore.setState({ toasts: [] });
+    vi.mocked(saveFile).mockClear();
+  });
+
+  it("downloads the server's ZIP and saves it under the listing's id", async () => {
+    const doc = await useListingsStore.getState().createFromFile(PNG, "chemise.png");
+    const id = doc.listing.id;
+    server.override = (method, path) =>
+      method === "GET" && path === `/api/v1/listings/${id}/export`
+        ? new Response(Uint8Array.from([0x50, 0x4b, 3, 4]), {
+            status: 200,
+            headers: { "content-type": "application/zip" },
+          })
+        : undefined;
+
+    await exportListing(id);
+
+    expect(saveFile).toHaveBeenCalledTimes(1);
+    const [blob, fileName] = vi.mocked(saveFile).mock.calls[0] ?? [];
+    expect(fileName).toBe(`listing-${id}.zip`);
+    expect((blob as Blob).size).toBe(4);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe("Listing exported");
+  });
+
+  it("shows an error toast and saves nothing when the server refuses", async () => {
+    const doc = await useListingsStore.getState().createFromFile(PNG, "chemise.png");
+    server.override = (_method, path) => (path.endsWith("/export") ? json(404, { code: "NOT_FOUND", message: "Listing not found." }) : undefined);
+    await exportListing(doc.listing.id);
+    expect(saveFile).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts.at(-1)?.kind).toBe("error");
   });
 });

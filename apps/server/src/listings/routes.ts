@@ -8,6 +8,7 @@ import { sessionUser } from "../http/auth-guard";
 import { HttpError } from "../http/errors";
 import type { ObjectStore } from "../storage/object-store";
 import { listingPrefix } from "../storage/keys";
+import { streamListingExport } from "./export";
 import { createListing, deleteListing, getDocument, listSummaries, patchListing } from "./repository";
 
 export interface ListingRouteDeps {
@@ -32,6 +33,18 @@ export function registerListingRoutes(app: FastifyInstance, { db, store, guard, 
   api.get("/api/v1/listings/:id", { onRequest: guard, schema: { params: idParams, response: { 200: listingDocumentDto } } }, async (req) =>
     getDocument(db, sessionUser(req).id, req.params.id),
   );
+
+  /** Data portability: the listing, its texts and its photos as one ZIP (scoped to the owner; another user's id is a 404). */
+  api.get("/api/v1/listings/:id/export", { onRequest: guard, schema: { params: idParams } }, async (req, reply) => {
+    const userId = sessionUser(req).id;
+    const document = await getDocument(db, userId, req.params.id);
+    return reply
+      .type("application/zip")
+      .header("content-disposition", `attachment; filename="listing-${document.listing.id}.zip"`)
+      .header("cache-control", "no-store")
+      .header("x-content-type-options", "nosniff")
+      .send(streamListingExport({ db, store, log }, userId, document));
+  });
 
   api.patch(
     "/api/v1/listings/:id",

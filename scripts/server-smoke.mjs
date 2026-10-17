@@ -171,6 +171,10 @@ const resultId = generated.jobs[run.jobIds[0]]?.resultImageId;
 if (!resultId) fail("read the generations", "no result image");
 const result = await call("download a generated photo", `/api/v1/images/${resultId}`);
 if (!["image/png", "image/jpeg", "image/webp"].includes(result.headers.get("content-type"))) fail("download a generated photo", "not an image");
+const archive = await call("export the listing (ZIP)", `/api/v1/listings/${listing.listing.id}/export`);
+if (archive.headers.get("content-type") !== "application/zip") fail("export the listing (ZIP)", `content-type ${archive.headers.get("content-type")}`);
+const zipBytes = Buffer.from(await archive.arrayBuffer());
+if (zipBytes.subarray(0, 2).toString("latin1") !== "PK" || zipBytes.length < 200) fail("export the listing (ZIP)", "not a ZIP archive");
 const after = await (await call("credits after the run", "/api/v1/credits")).json();
 if (after.balance !== credits.balance - 2) fail("credits after the run", `expected ${credits.balance - 2}, got ${after.balance}`);
 
