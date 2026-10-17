@@ -9,9 +9,9 @@ How the account version runs on one VPS, and what to do when something is wrong.
 1. Host from zero — _to come (task 3)_
 2. [Configuration and secrets](#2-configuration-and-secrets)
 3. [Backups and restore](#3-backups-and-restore)
-4. Monitoring and alerts — _to come (task 5)_
+4. [Monitoring and alerts](#4-monitoring-and-alerts)
 5. Deploy and roll back — _to come (task 6)_
-6. Incidents — _to come (task 5)_
+6. [Incidents](#6-incidents)
 7. Launch checklist and restore drill — _to come (task 10)_
 
 ## 2. Configuration and secrets
@@ -59,3 +59,34 @@ docker compose up -d --wait                                 # migrate runs, then
 `restore.sh` refuses a database that already has tables (`--i-know` overwrites it: only for a deliberate rollback, after the owner says so), prints the elapsed seconds and tells you the next step. After a restore, sessions created after the backup are gone (users sign in again) and credits/jobs are as of the backup.
 
 **Proof.** `scripts/backup-roundtrip.sh` (run by CI on every push) creates an account with a listing, photos and a generation, backs up to a local directory, deletes the database, queue and photo volumes, restores, and checks through the API that the listing and its photos are back — and that a second restore refuses to overwrite live data.
+
+## 4. Monitoring and alerts
+
+Nothing here receives user data, emails, prompts or images.
+
+- **Outside uptime check** (healthchecks.io or a self-hosted Uptime Kuma on another machine — decision D4): `GET https://<domain>/api/v1/ready` every minute, alert after 3 failures. `ready` answers **503** and names what fails (`database`, `redis`, `storage`, `worker`), so a dead worker is caught from outside. Also watch the TLS certificate's expiry (Caddy renews it; the check alerts if it does not).
+- **Backup dead-man's switch**: the backup pings `BACKUP_PING_URL` only after both parts succeed (and `…/fail` on failure); the service alerts when the ping is missing for 26 hours.
+- **Host watch** (`deploy/watch.sh`, `deploy/systemd/aiv-watch.timer`, every 5 minutes): disk > 80 %, a container restarted more than 3 times, `ready` failing locally, no worker heartbeat, more than 10 failed jobs in an hour, more than 200 jobs waiting, the nightly credit check logging a difference. Each problem is mailed to `ALERT_EMAIL` once per 6 hours per problem, through the api's mailer; a message names the problem, never a user. If the api itself is down, the outside check is what alerts.
+- **Counters for the owner**: `docker compose exec api node dist/stats.js` prints queue depth, jobs by status (24 h), failed jobs (1 h), verified sign-ups per day (7 days), credits granted / spent / refunded (7 days) and the number of live workers. There is no admin web page at launch.
+- **Install the timers** (as root, once; paths assume the checkout is `/srv/aiv`): copy `deploy/systemd/aiv-*.{service,timer}` to `/etc/systemd/system/`, then `systemctl enable --now aiv-backup.timer aiv-watch.timer`.
+- CI proves the watch: it forces one alert, checks the mail arrives once and that the second run is rate-limited.
+
+## 6. Incidents
+
+Logs are `docker compose logs --no-color <service>` (rotated: 5 × 10 MB per service). Every API log line carries a request id (`reqId`) and jobs carry `jobId`; user ids appear, emails, prompts, images, tokens and links never do.
+
+```bash
+docker compose ps                                          # who is up, healthy, restarting
+docker compose logs --since 30m --no-color api | grep reqId_you_have
+docker compose logs --since 1h --no-color worker | grep job_you_have
+curl -s localhost/api/v1/ready                             # 503 names the failing dependency
+docker compose exec api node dist/stats.js                 # queue depth, failures, sign-ups, credits
+```
+
+| Symptom                                         | First look                                                                                                                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ready` 503 `worker`                            | `docker compose logs worker`: Redis unreachable? crash loop? `docker compose restart worker`. Queued jobs are not lost; the reconciler re-offers them. |
+| Jobs failing in bulk                            | Provider outage or budget: worker logs (error codes only), Cloudflare/Google status pages; the nightly neuron budget pauses image jobs by design.      |
+| Credit check mail (balances differ from ledger) | Do **not** correct by hand. Find the user's ledger rows (`credit_ledger`), compare with `credit_balance`; an `adjust` entry is the only way to fix.    |
+| Disk > 80 %                                     | `docker system df`; photos live in the `seaweedfs-data` volume — grow the disk before deleting anything.                                               |
+| A user deleted by mistake                       | Restore from backup onto a **separate** machine, export the user's rows and photos; never restore over the live database.                              |

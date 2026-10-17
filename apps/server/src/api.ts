@@ -3,8 +3,8 @@ import { sql } from "drizzle-orm";
 import { pino, type Logger } from "pino";
 import { buildApp } from "./app";
 import { createAuth } from "./auth/auth";
-import { MemoryMailer, ResendMailer, SmtpMailer, type Mailer } from "./auth/mailer";
-import { ConfigError, loadConfig, type ServerConfig } from "./config";
+import { createMailer } from "./auth/create-mailer";
+import { ConfigError, loadConfig } from "./config";
 import { connectDatabase } from "./db/client";
 import { describeError, loggerOptions } from "./log";
 import { deleteUserObjects } from "./me/account-cleanup";
@@ -15,12 +15,6 @@ import { QueueSet, createQueueConnection } from "./queue/queues";
 import { assertWorkerAlive } from "./worker/liveness";
 import { assertPlatformCopyModel, platformImageModel } from "./providers/catalogue";
 import { S3ObjectStore } from "./storage/s3-object-store";
-
-function createMailer(config: ServerConfig): Mailer {
-  if (config.MAIL_MODE === "resend") return new ResendMailer(config.RESEND_API_KEY ?? "", config.MAIL_FROM);
-  if (config.MAIL_MODE === "smtp") return new SmtpMailer(config.SMTP_URL ?? "", config.MAIL_FROM);
-  return new MemoryMailer();
-}
 
 /** First start of a self-hosted store: create the bucket (idempotent). The store may still be starting, so retry. */
 async function ensureBucketWithRetry(store: S3ObjectStore, log: Logger): Promise<void> {

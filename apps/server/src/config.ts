@@ -30,6 +30,8 @@ const configSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32, "must be at least 32 characters"),
   MAIL_MODE: z.enum(["resend", "smtp", "memory"]).default("resend"),
   MAIL_FROM: z.string().min(3),
+  // Where `watch` mails its alerts (the owner); alerts are only logged when unset.
+  ALERT_EMAIL: z.string().min(3).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   SMTP_URL: z.string().min(1).optional(),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),

@@ -1,0 +1,10 @@
+[Unit]
+Description=AI Image Variations host watch (disk, containers, readiness, jobs)
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+WorkingDirectory=/srv/aiv
+ExecStart=/srv/aiv/deploy/watch.sh

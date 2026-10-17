@@ -124,6 +124,7 @@ services:
       BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
       MAIL_MODE: ${MAIL_MODE:-resend}
       MAIL_FROM: ${MAIL_FROM:-}
+      ALERT_EMAIL: ${ALERT_EMAIL:-}
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
       SMTP_URL: ${SMTP_URL:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}

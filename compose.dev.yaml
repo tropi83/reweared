@@ -37,6 +37,7 @@ services:
       MAIL_MODE: smtp
       SMTP_URL: smtp://mailpit:1025
       MAIL_FROM: AI Image Variations <no-reply@localhost>
+      ALERT_EMAIL: owner@example.test
       LOG_LEVEL: debug
       IMAGE_PROVIDER: mock
       IMAGE_MODEL: mock-image
