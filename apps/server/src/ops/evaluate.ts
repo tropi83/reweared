@@ -14,6 +14,8 @@ export interface WatchFacts {
   workersAlive: number;
   /** Jobs waiting (queued + dispatched). */
   queued: number;
+  /** Set by deploy.sh when a deployment failed (already sanitised by `sanitizeNote`). */
+  deployFailed?: string;
 }
 
 export interface WatchThresholds {
@@ -41,6 +43,7 @@ export function evaluate(facts: WatchFacts, thresholds: WatchThresholds = DEFAUL
   if (facts.failedLastHour > thresholds.failedLastHour) {
     alerts.push({ id: "failed-jobs", message: `${facts.failedLastHour} jobs failed in the last hour (limit ${thresholds.failedLastHour}).` });
   }
+  if (facts.deployFailed) alerts.push({ id: `deploy:${facts.deployFailed}`, message: `Deployment: ${facts.deployFailed}.` });
   if (facts.queued > thresholds.queued) alerts.push({ id: "queue", message: `${facts.queued} jobs are waiting (limit ${thresholds.queued}).` });
   return alerts;
 }
@@ -50,4 +53,14 @@ export async function selectToSend(alerts: Alert[], claim: (id: string) => Promi
   const send: Alert[] = [];
   for (const alert of alerts) if (await claim(alert.id)) send.push(alert);
   return send;
+}
+
+/** The host's free text is only ever shown as plain words, versions and punctuation. */
+export function sanitizeNote(text: unknown): string | undefined {
+  if (typeof text !== "string") return undefined;
+  const clean = text
+    .replace(/[^A-Za-z0-9 .,:+_-]/g, "")
+    .slice(0, 200)
+    .trim();
+  return clean === "" ? undefined : clean;
 }

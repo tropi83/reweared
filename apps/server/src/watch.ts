@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createMailer } from "./auth/create-mailer";
 import { loadConfig } from "./config";
 import { connectDatabase } from "./db/client";
-import { DEFAULT_THRESHOLDS, evaluate, selectToSend, type WatchFacts } from "./ops/evaluate";
+import { DEFAULT_THRESHOLDS, evaluate, sanitizeNote, selectToSend, type WatchFacts } from "./ops/evaluate";
 import { collectStats } from "./ops/stats";
 import { connectRedis } from "./redis";
 
@@ -17,7 +17,9 @@ const WINDOW_SECONDS = 6 * 3600;
 async function main(): Promise<void> {
   const config = loadConfig(process.env, (path) => readFileSync(path, "utf8"));
   const input = readFileSync(0, "utf8");
-  const host = JSON.parse(input || "{}") as Partial<Pick<WatchFacts, "diskPercent" | "restartingContainers" | "readyStatus" | "creditDriftLogged">>;
+  const host = JSON.parse(input || "{}") as Partial<Pick<WatchFacts, "diskPercent" | "restartingContainers" | "readyStatus" | "creditDriftLogged">> & {
+    deployFailed?: unknown;
+  };
   const database = connectDatabase(config.DATABASE_URL);
   const redis = connectRedis(config.REDIS_URL);
   try {
@@ -25,7 +27,8 @@ async function main(): Promise<void> {
     const facts: WatchFacts = {
       diskPercent: host.diskPercent ?? 0,
       restartingContainers: host.restartingContainers ?? [],
-      readyStatus: host.readyStatus ?? 0,
+      readyStatus: host.deployFailed !== undefined ? 200 : (host.readyStatus ?? 0),
+      deployFailed: sanitizeNote(host.deployFailed),
       creditDriftLogged: host.creditDriftLogged ?? false,
       failedLastHour: stats.failedLastHour,
       workersAlive: stats.workersAlive,

@@ -10,7 +10,7 @@ How the account version runs on one VPS, and what to do when something is wrong.
 2. [Configuration and secrets](#2-configuration-and-secrets)
 3. [Backups and restore](#3-backups-and-restore)
 4. [Monitoring and alerts](#4-monitoring-and-alerts)
-5. Deploy and roll back — _to come (task 6)_
+5. [Deploy and roll back](#5-deploy-and-roll-back)
 6. [Incidents](#6-incidents)
 7. Launch checklist and restore drill — _to come (task 10)_
 
@@ -70,6 +70,20 @@ Nothing here receives user data, emails, prompts or images.
 - **Counters for the owner**: `docker compose exec api node dist/stats.js` prints queue depth, jobs by status (24 h), failed jobs (1 h), verified sign-ups per day (7 days), credits granted / spent / refunded (7 days) and the number of live workers. There is no admin web page at launch.
 - **Install the timers** (as root, once; paths assume the checkout is `/srv/aiv`): copy `deploy/systemd/aiv-*.{service,timer}` to `/etc/systemd/system/`, then `systemctl enable --now aiv-backup.timer aiv-watch.timer`.
 - CI proves the watch: it forces one alert, checks the mail arrives once and that the second run is rate-limited.
+
+## 5. Deploy and roll back
+
+```bash
+cd /srv/aiv && deploy/deploy.sh 0.2.0        # as the deploy user; the version is a tag already published by CI
+```
+
+The script refuses to start unless `.env` has `PUBLIC_ORIGIN`, `MAIL_FROM` and `CADDY_SITE`, every secret file exists and `./secrets` is mode 700. Then: a **backup** (and it waits for it; skipped on the very first deploy), `docker compose pull`, `up -d --wait` (the `migrate` service runs first), and a check of the **live origin** — `/api/v1/ready` is 200, the web page is 200, an unauthenticated `/api/v1/me` is 401. The deployed version is written to `.aiv-version`.
+
+**If any step after the pull fails**, the script goes back to the version in `.aiv-version`, checks it again and mails the owner (`ALERT_EMAIL`). The database is **not** restored: every migration is _expand/contract_ — a release never drops or renames what the previous release still reads — so the previous image works on the new schema. A migration that cannot be undone that way must say so in its pull request and comes with a restore plan; deploying it is then a decision of the owner, with a fresh backup.
+
+**Manual rollback**: `deploy/deploy.sh <previous version>` (it takes a backup first like any deploy; set `SKIP_BACKUP=1` only in an emergency). To deploy from CI later (decision D5), use a GitHub environment with a required approval and an SSH key restricted to `deploy/deploy.sh`; not set up at launch.
+
+CI rehearses it on every push (`scripts/deploy-drill.sh`): deploy 1.0.0, upgrade to 1.0.1, try a release whose containers die, and check the site is back on 1.0.1.
 
 ## 6. Incidents
 

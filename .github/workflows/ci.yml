@@ -105,6 +105,8 @@ jobs:
           curl -s 'http://localhost:8025/api/v1/search?query=subject:alert' | grep -q '"messages_count":1'
       - name: Backup, wipe, restore (round trip)
         run: scripts/backup-roundtrip.sh
+      - name: Deploy, upgrade, failed upgrade, rollback (drill)
+        run: scripts/deploy-drill.sh
       - name: Compose logs
         if: always()
         run: docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml logs --no-color > compose.log
