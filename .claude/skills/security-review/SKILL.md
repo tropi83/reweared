@@ -1,17 +1,17 @@
 ---
 name: security-review
-description: Use before and after touching credentials, storage, network, Tauri permissions, CSP, file import/export, Rust commands, or anything of the planned backend (accounts, sessions, provider keys on the server, uploads, credits, Docker) — the threat-model checklists for the current client (BYOK, local-first, Tauri) and for the server (ADR 0001), and the verification commands to run.
+description: Use before and after touching credentials, storage, network, Tauri permissions, CSP, file import/export, Rust commands, or anything of the backend (accounts, sessions, provider keys on the server, uploads, credits, Docker) — the threat-model checklists for the client (API-only, Tauri) and for the server (ADR 0001), and the verification commands to run.
 ---
 
 # Security review
 
-Two threat models coexist until phase 3 of the backend pivot ([ADR 0001](../../../docs/adr/0001-backend-accounts-platform-keys.md)): the **client** rules below bind `src/` and `src-tauri/` today; the **server** rules bind `apps/server`, `packages/*` and the Docker stack from phase 1. `SECURITY.md` describes the shipped release plus a _planned_ section for the server.
+Two threat models ([ADR 0001](../../../docs/adr/0001-backend-accounts-platform-keys.md)): the **client** rules below bind `src/` and `src-tauri/` (the app talks to our API only; the local BYOK mode lives on the `byok` branch); the **server** rules bind `apps/server`, `packages/*` and the Docker stack. `SECURITY.md` describes both.
 
 ## Client — golden rules
 
-1. Credentials never appear in: logs, diagnostics, toasts, error `detail`, test fixtures, screenshots, commits, URLs.
-2. Desktop secrets go through `secret_set/get/delete` (OS keychain, closed key list in `secrets.rs` mirrored by `SecretStore.ts`). Web: memory by default; localStorage only after the disclaimer (`settings.webCredentialDisclaimerAccepted`).
-3. Outbound hosts = `ALLOWED_HOSTS` (http-client.ts) ∩ Tauri `http` scope ∩ CSP `connect-src`. Adding one means updating all three **and** SECURITY.md.
+1. Credentials never appear in: logs, diagnostics, toasts, error `detail`, test fixtures, screenshots, commits, URLs. The client holds no provider key at all.
+2. Desktop: the session token goes through `secret_set/get/delete` (OS keychain, closed key list = `session_token` only, in `secrets.rs` mirrored by `SecretStore.ts`). Web: httpOnly cookie, nothing in web storage (`SecretStore` purges legacy keys).
+3. The only outbound host is the API origin (`ApiClient`, `/api/` paths) = Tauri `http` scope (generated patch) ∩ CSP `connect-src`. Adding another one means updating both **and** SECURITY.md.
 4. The webview cannot name arbitrary files: ids pass `assertSafeId`, the fs scope is `$APPDATA/**`; dialog-picked paths are the only exception.
 5. Imported files: size cap (`MAX_IMPORT_BYTES`), magic-byte sniffing (`sniffMimeType`), decoding via `createImageBitmap` only.
 6. New Rust command ⇒ minimal surface, `Result<_, String>`, allowlisted inputs, registered in `generate_handler!`, documented in SECURITY.md.
@@ -33,12 +33,11 @@ Two threat models coexist until phase 3 of the backend pivot ([ADR 0001](../../.
 ## Checklist for a change
 
 - [ ] New network destination? (client rule 3 / server rule 6)
-- [ ] Stores anything new? Where? Is it a secret? (rule 2)
+- [ ] Stores anything new on the device? Where? Is it a secret? (rule 2)
 - [ ] Can user input reach a path, a URL, a shell, or `innerHTML`? (`dangerouslySetInnerHTML` is banned in this repo)
 - [ ] Errors mapped to `GenerationErrorCode` with a user-safe message?
 - [ ] Cancelled/failed jobs guaranteed not to persist partial results?
 - [ ] Temporary payloads (base64, prepared blobs) dropped after use?
-- [ ] OAuth still PKCE S256 + `state` check + loopback on 127.0.0.1 only?
 - [ ] Server: route scoped by the session user? rate-limited? body validated with zod? credits through the ledger? secret reachable from the api container?
 
 ## Verify
