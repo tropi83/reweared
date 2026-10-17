@@ -42,3 +42,8 @@ ensure("resend_api_key", () => "re_placeholder_not_a_real_key");
 // The platform's provider keys (worker only). Dev and CI run the Mock providers; write the real ones in production.
 ensure("cloudflare_api_token", () => "placeholder-not-a-real-token");
 ensure("gemini_api_key", () => "placeholder-not-a-real-key");
+// Backups: the photos' crypt password; the off-site credentials are placeholders (CI and dev use a local directory as
+// "off-site"). Production: write real ones, and keep the age private key offline (only the public key is configured).
+ensure("backup_crypt_password", () => random(32));
+ensure("backup_offsite_access_key_id", () => "placeholder");
+ensure("backup_offsite_secret_access_key", () => "placeholder");

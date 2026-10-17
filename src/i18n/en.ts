@@ -48,6 +48,8 @@ export const en = {
   "listings.imageCount": "{count} images",
   "listings.updated": "Updated {when}",
   "listings.deleted": "Listing deleted",
+  "listings.export": "Export (ZIP)",
+  "listings.exported": "Listing exported",
   "listings.actions": "Listing actions",
   "listings.count": "{count} listings",
 

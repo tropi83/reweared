@@ -6,7 +6,7 @@ import { computeBackoffMs } from "@aiv/domain/lib/retry";
 import type { QueueJobData, QueueSet } from "../queue/queues";
 import { queueName } from "../queue/queues";
 import { reconcile } from "../queue/reconciler";
-import { checkCreditDrift, sweepOrphans } from "../maintenance/maintenance";
+import { checkCreditDrift, purgeUnverifiedAccounts, sweepOrphans } from "../maintenance/maintenance";
 import { RetryLater, runJob, type RunJobDeps } from "./run-job";
 
 export interface WorkerOptions {
@@ -54,11 +54,14 @@ export async function startWorkers(deps: RunJobDeps, options: WorkerOptions): Pr
   // Nightly, UTC: orphaned image objects older than a day, then the balance/ledger check.
   await maintenanceQueue.upsertJobScheduler("sweep", { pattern: "0 3 * * *", tz: "UTC" }, { name: "sweep" });
   await maintenanceQueue.upsertJobScheduler("drift", { pattern: "30 3 * * *", tz: "UTC" }, { name: "drift" });
+  // Accounts that never verified their email are removed after 7 days (PRIVACY.md → retention).
+  await maintenanceQueue.upsertJobScheduler("purge-unverified", { pattern: "45 3 * * *", tz: "UTC" }, { name: "purge-unverified" });
   const maintenance = new Worker(
     MAINTENANCE_QUEUE,
     async (job) => {
       if (job.name === "sweep") return void (await sweepOrphans(deps.db, deps.store, deps.log, { minAgeMs: 24 * 3600 * 1000 }));
       if (job.name === "drift") return void (await checkCreditDrift(deps.db, deps.log));
+      if (job.name === "purge-unverified") return void (await purgeUnverifiedAccounts(deps.db, deps.store, deps.log, { olderThanMs: 7 * 24 * 3600 * 1000 }));
       const report = await reconcile({ db: deps.db, queues: options.queues, dispatcher: deps.dispatcher, log: deps.log }, { staleAfterMs: deps.timeoutMs * 2 });
       if (report.readded + report.revived > 0) deps.log.warn(report, "reconciler repaired jobs");
     },

@@ -1,0 +1,12 @@
+[Unit]
+Description=AI Image Variations nightly backup (database + photos, encrypted, off-site)
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# The deploy user's checkout holding compose.yaml, .env and ./secrets (OPERATIONS.md).
+User=deploy
+WorkingDirectory=/srv/aiv
+ExecStart=/usr/bin/docker compose --profile backup run --rm backup
+TimeoutStartSec=2h

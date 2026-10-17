@@ -54,3 +54,29 @@ describe("worker heartbeat", () => {
     stop();
   });
 });
+
+describe("worker heartbeat publication", () => {
+  it("publishes after each successful write and not while Redis is down", async () => {
+    vi.useFakeTimers();
+    let redisUp = true;
+    const published: number[] = [];
+    const stop = startHeartbeat(
+      {
+        ping: async () => {
+          if (!redisUp) throw new Error("connection lost");
+        },
+        write: async () => undefined,
+        publish: async (now) => void published.push(now),
+        now: () => 5,
+        onError: () => undefined,
+      },
+      10,
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(published).toEqual([5]);
+    redisUp = false;
+    await vi.advanceTimersByTimeAsync(30);
+    expect(published).toEqual([5]);
+    stop();
+  });
+});

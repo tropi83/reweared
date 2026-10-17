@@ -1,0 +1,17 @@
+# Dev stack on the REAL Cloudflare Workers AI instead of the Mock providers (photos with FLUX.2 [klein] 4B, title and
+# description with Llama 4 Scout). No Google account needed. It uses your Cloudflare free allowance (10,000 neurons a
+# day; one 1K photo is about 110) — the worker pauses image jobs at CLOUDFLARE_DAILY_NEURON_BUDGET (default 9000).
+#   1. CLOUDFLARE_ACCOUNT_ID=<32 hex characters> in .env (it is an identifier, not a secret)
+#   2. your API token (Workers AI permission only) in ./secrets/cloudflare_api_token
+#   3. pnpm stack:up:cloudflare
+# The api and the worker must share the platform values (the api plans and reserves with them).
+services:
+  api:
+    environment: &platform
+      IMAGE_PROVIDER: cloudflare
+      IMAGE_MODEL: "@cf/black-forest-labs/flux-2-klein-4b"
+      COPY_PROVIDER: cloudflare
+      COPY_MODEL: "@cf/meta/llama-4-scout-17b-16e-instruct"
+      ENABLE_MOCK_PROVIDER: "false"
+  worker:
+    environment: *platform

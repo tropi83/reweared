@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
-# Two images from the repository root (docker compose builds both):
+# Three images from the repository root (docker compose builds them):
 #   --target server  → the api (and, from phase 2, the worker): node dist/api.js / node dist/migrate.js
+#   --target backup  → pg_dump + age + rclone for the nightly backup and the restore (profile "backup")
 #   --target web     → Caddy serving the web bundle and proxying /api to the api
 # Base images pinned on 2026-10-12 (Docker Hub): node 22.23.3-alpine3.24, caddy 2.11.7-alpine.
 
@@ -35,6 +36,17 @@ USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 CMD wget -qO- http://127.0.0.1:3000/api/v1/health >/dev/null || exit 1
 CMD ["node", "dist/api.js"]
+
+# Nightly backup and restore tools (compose profile "backup"): pg_dump 17 (matches postgres 17), age, rclone, and node for
+# the retention rules. Alpine package versions are whatever the pinned base ships.
+FROM node:22.23.3-alpine3.24 AS backup
+RUN apk add --no-cache postgresql17-client age rclone
+COPY deploy/backup/common.sh /usr/local/lib/backup/common.sh
+COPY scripts/backup/retention.mjs /usr/local/lib/backup/retention.mjs
+COPY deploy/backup/backup.sh deploy/backup/restore.sh /usr/local/bin/
+RUN chmod 755 /usr/local/bin/backup.sh /usr/local/bin/restore.sh
+USER node
+CMD ["backup.sh"]
 
 FROM caddy:2.11.7-alpine AS web
 COPY deploy/Caddyfile /etc/caddy/Caddyfile

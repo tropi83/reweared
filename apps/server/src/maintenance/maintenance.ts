@@ -1,7 +1,9 @@
-import { inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
+import { user } from "../db/auth-schema";
 import type { Db } from "../db/client";
 import { imageAsset } from "../db/schema";
+import { userPrefix } from "../storage/keys";
 import type { ObjectStore } from "../storage/object-store";
 
 /** `u/<user>/l/<listing>/<bucket>/<asset>.<ext>` → the asset id, or undefined for anything else. */
@@ -76,4 +78,32 @@ export async function checkCreditDrift(db: Db, log: Pick<FastifyBaseLogger, "inf
   if (drifting.length > 0) log.error({ drifting }, "credit balances differ from their ledger");
   else log.info({ checked: rows.rows.length }, "credit balances match their ledger");
   return { checked: rows.rows.length, drifting };
+}
+
+export interface PurgeReport {
+  deleted: number;
+}
+
+/**
+ * Deletes accounts whose email was never verified once they are older than `olderThanMs` (7 days at launch): their rows
+ * cascade, then their objects. Nothing else is ever deleted automatically. Only ids are logged.
+ */
+export async function purgeUnverifiedAccounts(
+  db: Db,
+  store: ObjectStore,
+  log: Pick<FastifyBaseLogger, "info" | "error">,
+  options: { olderThanMs: number; now?: Date },
+): Promise<PurgeReport> {
+  const cutoff = new Date((options.now ?? new Date()).getTime() - options.olderThanMs);
+  const doomed = await db
+    .delete(user)
+    .where(and(eq(user.emailVerified, false), lt(user.createdAt, cutoff)))
+    .returning({ id: user.id });
+  for (const { id } of doomed) {
+    await store
+      .deletePrefix(userPrefix(id))
+      .catch((error: unknown) => log.error({ err: error, userId: id }, "purged account objects not deleted; left for the orphan sweep"));
+  }
+  log.info({ deleted: doomed.length }, "unverified accounts purged");
+  return { deleted: doomed.length };
 }

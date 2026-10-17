@@ -26,8 +26,9 @@
     "ios:doctor": "node scripts/mobile-doctor.mjs ios",
     "ios:dev": "node scripts/mobile-doctor.mjs ios && node scripts/tauri.mjs ios dev",
     "test:integration": "vitest run --config apps/server/vitest.integration.config.ts",
-    "stack:up": "node scripts/dev-secrets.mjs && docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait",
-    "stack:down": "docker compose -f compose.yaml -f compose.dev.yaml down",
+    "stack:up": "node scripts/dev-secrets.mjs && docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml up -d --build --wait",
+    "stack:up:cloudflare": "node scripts/dev-secrets.mjs && node scripts/check-cloudflare-env.mjs && docker compose --env-file deploy/dev.env --env-file .env -f compose.yaml -f compose.dev.yaml -f compose.cloudflare.yaml up -d --build --wait",
+    "stack:down": "docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml down",
     "smoke:server": "node scripts/server-smoke.mjs"
   },
   "dependencies": {

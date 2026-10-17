@@ -1,8 +1,13 @@
 # Development and CI overrides: the site on http://localhost:8080, emails caught by Mailpit
 # (http://localhost:8025), Postgres/Redis/SeaweedFS reachable from the host for debugging.
-#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+#   pnpm stack:up   (docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml up -d --build --wait)
 
 services:
+  # Local builds replace the registry images (AIV_VERSION is not needed in dev).
+  migrate:
+    build: { context: ., dockerfile: deploy/Dockerfile, target: server }
+    image: aiv-server:local
+
   postgres:
     ports: ["127.0.0.1:5432:5432"]
     networks: [internal, devhost]
@@ -23,6 +28,7 @@ services:
     networks: [internal, devhost]
 
   api:
+    image: aiv-server:local
     environment:
       NODE_ENV: development
       PUBLIC_ORIGIN: http://localhost:8080
@@ -31,6 +37,7 @@ services:
       MAIL_MODE: smtp
       SMTP_URL: smtp://mailpit:1025
       MAIL_FROM: AI Image Variations <no-reply@localhost>
+      ALERT_EMAIL: owner@example.test
       LOG_LEVEL: debug
       IMAGE_PROVIDER: mock
       IMAGE_MODEL: mock-image
@@ -42,6 +49,7 @@ services:
 
   # The Mock providers in dev and CI: no provider account, no real key needed.
   worker:
+    image: aiv-server:local
     environment:
       NODE_ENV: development
       LOG_LEVEL: debug
@@ -51,10 +59,25 @@ services:
       COPY_MODEL: mock-copy
       ENABLE_MOCK_PROVIDER: "true"
 
+  # CI and local drills: the "off-site" storage is a directory in a volume (rclone local backend).
+  backup:
+    build: { context: ., dockerfile: deploy/Dockerfile, target: backup }
+    image: aiv-backup:local
+    user: root # the local "off-site" volume is root-owned
+    environment:
+      BACKUP_TARGET: offsite:/offsite
+      RCLONE_CONFIG_OFFSITE_TYPE: local
+    volumes: [offsite:/offsite]
+
   caddy:
+    build: { context: ., dockerfile: deploy/Dockerfile, target: web }
+    image: aiv-web:local
     environment:
       CADDY_SITE: ":80"
     ports: !override ["127.0.0.1:8080:80"]
+
+volumes:
+  offsite: {}
 
 networks:
   # Published ports need a non-internal network; dev only.

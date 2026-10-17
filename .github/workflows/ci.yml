@@ -86,12 +86,30 @@ jobs:
           node-version: 22
       - run: node scripts/dev-secrets.mjs
       - name: Provider keys reach the worker only
-        run: docker compose -f compose.yaml config --format json | node scripts/check-compose.mjs
-      - run: docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait --wait-timeout 300
+        run: AIV_VERSION=0.0.0-ci docker compose --profile backup -f compose.yaml config --format json | node scripts/check-compose.mjs
+      - run: docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml up -d --build --wait --wait-timeout 300
       - run: node scripts/server-smoke.mjs http://localhost:8080 http://localhost:8025
+      - name: Host watch raises one alert, once
+        env:
+          COMPOSE_PATH_SEPARATOR: ":"
+          COMPOSE_FILE: compose.yaml:compose.dev.yaml
+          COMPOSE_ENV_FILES: deploy/dev.env
+          AIV_DIR: .
+          DATA_DIR: .
+        run: |
+          sh deploy/watch.sh >/dev/null 2>&1 || true # healthy host: no alert
+          READY_URL=http://127.0.0.1:9/api/v1/ready sh deploy/watch.sh | tee first.json
+          READY_URL=http://127.0.0.1:9/api/v1/ready sh deploy/watch.sh | tee second.json
+          grep -q '"mailed":["ready"]' first.json
+          grep -q '"mailed":[]' second.json
+          curl -s 'http://localhost:8025/api/v1/search?query=subject:alert' | grep -q '"messages_count":1'
+      - name: Backup, wipe, restore (round trip)
+        run: scripts/backup-roundtrip.sh
+      - name: Deploy, upgrade, failed upgrade, rollback (drill)
+        run: scripts/deploy-drill.sh
       - name: Compose logs
         if: always()
-        run: docker compose -f compose.yaml -f compose.dev.yaml logs --no-color > compose.log
+        run: docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml logs --no-color > compose.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -99,7 +117,7 @@ jobs:
           path: compose.log
           retention-days: 7
       - if: always()
-        run: docker compose -f compose.yaml -f compose.dev.yaml down -v
+        run: docker compose --env-file deploy/dev.env -f compose.yaml -f compose.dev.yaml down -v
 
   secrets-scan:
     name: Secrets · no credentials in the tree

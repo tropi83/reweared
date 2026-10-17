@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, inject, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { createId } from "@aiv/domain/lib/ids";
 import { creditBalance, creditLedger, imageAsset, listing, user } from "../src/db/schema";
-import { checkCreditDrift, sweepOrphans } from "../src/maintenance/maintenance";
+import { checkCreditDrift, purgeUnverifiedAccounts, sweepOrphans } from "../src/maintenance/maintenance";
 import { objectKey } from "../src/storage/keys";
 import { S3ObjectStore } from "../src/storage/s3-object-store";
 import { openTestDatabase, truncateAll } from "./db-harness";
@@ -72,5 +72,29 @@ describe("credit drift check", () => {
     const report = await checkCreditDrift(db, quiet);
     expect(report).toEqual({ checked: 2, drifting: [{ userId: "u_bad", balance: 75, ledger: 60 }] });
     expect((await db.select().from(creditBalance)).find((b) => b.userId === "u_bad")?.balance).toBe(75);
+  });
+});
+
+describe("retention of unverified accounts", () => {
+  it("deletes only accounts never verified and older than the limit, with their data", async () => {
+    const day = 24 * 3600 * 1000;
+    const now = new Date();
+    await db.insert(user).values([
+      { id: "u_old_unverified", name: "A", email: "a@example.test", emailVerified: false, createdAt: new Date(now.getTime() - 8 * day) },
+      { id: "u_new_unverified", name: "B", email: "b@example.test", emailVerified: false, createdAt: new Date(now.getTime() - 2 * day) },
+      { id: "u_old_verified", name: "C", email: "c@example.test", emailVerified: true, createdAt: new Date(now.getTime() - 400 * day) },
+    ]);
+    const listingId = createId("lst");
+    await db.insert(listing).values({ id: listingId, userId: "u_old_unverified", name: "L" });
+    const key = objectKey("u_old_unverified", listingId, "original", createId("img"), "jpg");
+    await store.put(key, Buffer.from("x"), "image/jpeg");
+
+    expect(await purgeUnverifiedAccounts(db, store, quiet, { olderThanMs: 7 * day, now })).toEqual({ deleted: 1 });
+    const left = (await db.select({ id: user.id }).from(user)).map((u) => u.id).sort();
+    expect(left).toEqual(["u_new_unverified", "u_old_verified"]);
+    expect((await db.select().from(listing)).length).toBe(0);
+    expect(await store.get(key)).toBeNull();
+    // A second run has nothing to do.
+    expect(await purgeUnverifiedAccounts(db, store, quiet, { olderThanMs: 7 * day, now })).toEqual({ deleted: 0 });
   });
 });

@@ -2,12 +2,18 @@
 // create a listing, upload a photo, read its thumbnail, then delete the account through the emailed link.
 // Usage: node scripts/server-smoke.mjs [baseUrl=http://localhost:8080] [mailpitUrl=http://localhost:8025]
 // Prints each step; exits non-zero on the first failure. Nothing secret is printed.
+//
+// Backup round trip (scripts/backup-roundtrip.sh): SMOKE_KEEP_STATE=<file> stops after the generation steps and
+// writes the throwaway account's details to <file> instead of deleting it; SMOKE_VERIFY_STATE=<file> then signs in
+// as that account on the restored stack, checks the listing, its photo and a generated photo are back, and deletes it.
+import { readFileSync, writeFileSync } from "node:fs";
 import { crc32, deflateSync } from "node:zlib";
 
 const base = process.argv[2] ?? "http://localhost:8080";
 const mailpit = process.argv[3] ?? "http://localhost:8025";
-const email = `smoke+${Date.now().toString(36)}@example.test`;
-const password = "smoke test password 1";
+const verifyState = process.env.SMOKE_VERIFY_STATE ? JSON.parse(readFileSync(process.env.SMOKE_VERIFY_STATE, "utf8")) : undefined;
+const email = verifyState?.email ?? `smoke+${Date.now().toString(36)}@example.test`;
+const password = verifyState?.password ?? "smoke test password 1";
 const jar = new Map();
 
 function fail(step, detail) {
@@ -87,6 +93,17 @@ function png() {
 }
 
 await call("api ready", "/api/v1/ready");
+if (verifyState) {
+  await call("sign in to the restored account", "/api/auth/sign-in/email", { method: "POST", json: { email, password } });
+  const restored = await (await call("read the restored listing", `/api/v1/listings/${verifyState.listingId}`)).json();
+  if (restored.listing.originalImageId !== verifyState.imageId) fail("read the restored listing", "the original photo is not the same");
+  const thumbAgain = await call("read the restored thumbnail", `/api/v1/images/${verifyState.imageId}?variant=thumb`);
+  if (thumbAgain.headers.get("content-type") !== "image/webp") fail("read the restored thumbnail", "not a webp");
+  await call("download the restored generated photo", `/api/v1/images/${verifyState.resultId}`);
+  await deleteAccount();
+  console.log("restore verified");
+  process.exit(0);
+}
 await call("sign up", "/api/auth/sign-up/email", { method: "POST", json: { email, password, name: "Smoke" } });
 await call("verify email from the mailed link", await mailedLink("verification email", "/verify-email"), { expect: [200, 302] });
 await call("sign in", "/api/auth/sign-in/email", { method: "POST", json: { email, password } });
@@ -154,6 +171,10 @@ const resultId = generated.jobs[run.jobIds[0]]?.resultImageId;
 if (!resultId) fail("read the generations", "no result image");
 const result = await call("download a generated photo", `/api/v1/images/${resultId}`);
 if (!["image/png", "image/jpeg", "image/webp"].includes(result.headers.get("content-type"))) fail("download a generated photo", "not an image");
+const archive = await call("export the listing (ZIP)", `/api/v1/listings/${listing.listing.id}/export`);
+if (archive.headers.get("content-type") !== "application/zip") fail("export the listing (ZIP)", `content-type ${archive.headers.get("content-type")}`);
+const zipBytes = Buffer.from(await archive.arrayBuffer());
+if (zipBytes.subarray(0, 2).toString("latin1") !== "PK" || zipBytes.length < 200) fail("export the listing (ZIP)", "not a ZIP archive");
 const after = await (await call("credits after the run", "/api/v1/credits")).json();
 if (after.balance !== credits.balance - 2) fail("credits after the run", `expected ${credits.balance - 2}, got ${after.balance}`);
 
@@ -169,8 +190,18 @@ for (let i = 0; i < 60 && !named; i++) {
 if (!named) fail("title written and listing renamed", "no copy after 30 s");
 console.log("✓ title written and listing renamed");
 
-await call("ask to delete the account", "/api/auth/delete-user", { method: "POST", json: {} });
-await call("confirm deletion from the mailed link", await mailedLink("deletion email", "/delete-user/callback"), { expect: [200, 302] });
-jar.clear();
-await call("account gone", "/api/auth/sign-in/email", { method: "POST", json: { email, password }, expect: 401 });
+if (process.env.SMOKE_KEEP_STATE) {
+  writeFileSync(process.env.SMOKE_KEEP_STATE, JSON.stringify({ email, password, listingId: listing.listing.id, imageId: image.id, resultId }), { mode: 0o600 });
+  console.log("account kept for the backup round trip");
+  process.exit(0);
+}
+
+await deleteAccount();
 console.log("smoke test passed");
+
+async function deleteAccount() {
+  await call("ask to delete the account", "/api/auth/delete-user", { method: "POST", json: {} });
+  await call("confirm deletion from the mailed link", await mailedLink("deletion email", "/delete-user/callback"), { expect: [200, 302] });
+  jar.clear();
+  await call("account gone", "/api/auth/sign-in/email", { method: "POST", json: { email, password }, expect: 401 });
+}

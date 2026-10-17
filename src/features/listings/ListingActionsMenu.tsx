@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Copy, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { deleteListing } from "@/app/listing-actions";
+import { Copy, Download, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { deleteListing, exportListing } from "@/app/listing-actions";
 import { navigate } from "@/app/router";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { Button } from "@/components/ui/Button";
@@ -20,7 +20,7 @@ import { cn } from "@/lib/cn";
  * open at a time.
  */
 const MENU_WIDTH = 176;
-const MENU_HEIGHT_ESTIMATE = 132;
+const MENU_HEIGHT_ESTIMATE = 168;
 let closeOpenMenu: (() => void) | null = null;
 
 export function ListingActionsMenu({
@@ -132,6 +132,14 @@ export function ListingActionsMenu({
                   setOpen(false);
                   const copy = await duplicate(listing.id);
                   if (copy) navigate({ name: "listing", id: copy.listing.id });
+                }}
+              />
+              <MenuItem
+                icon={<Download className="size-3.5" />}
+                label={t("listings.export")}
+                onClick={() => {
+                  setOpen(false);
+                  void exportListing(listing.id);
                 }}
               />
               <MenuItem

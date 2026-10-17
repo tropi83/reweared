@@ -39,6 +39,23 @@ export default tseslint.config(
     },
   },
   {
+    // The server may use fflate (pure JS, runs in Node) to stream the listing export; the shared packages may not.
+    files: ["apps/server/src/**/*.ts", "apps/server/test/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/*", "react", "react-*", "@tauri-apps/*", "zustand", "idb", "@tanstack/*", "lucide-react"],
+              message: "Shared packages and the server run in Node: no app, UI, Tauri or client storage imports.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["tools/**/*.{js,mjs}", "scripts/**/*.{js,mjs}", "apps/*/*.mjs"],
     // Node scripts: the handful of globals they use, without pulling the `globals` package in.
     languageOptions: {

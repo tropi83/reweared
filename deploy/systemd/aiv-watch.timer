@@ -1,0 +1,9 @@
+[Unit]
+Description=Every 5 minutes: AI Image Variations host watch
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
