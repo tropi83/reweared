@@ -34,6 +34,15 @@
 - Maintenance: orphaned image objects older than a day are deleted nightly; keys outside the storage layout are only reported.
 - Deleting a photo pack refunds its unfinished jobs once (same idempotency key as the worker's refund), stops them, and removes its photos and the listing's references to them; another user's pack and copy runs answer 404 (tested, including a run with the user scope removed).
 
+**Operations (phase 4)**
+
+- Backups: nightly, by a one-shot `backup` container (no published port, read-only root, no capabilities) on the internal network plus the edge network for **one new outbound destination, the off-site backup storage** (another provider than the VPS, EU; listed in PRIVACY.md as a sub-processor). The database dump is encrypted with `age` to a **public** key before it leaves the host (the private key is kept offline by the owner, so a compromised server cannot read old backups); photos go through `rclone crypt` (names and contents). The restore refuses a non-empty database, and the round trip is rehearsed in CI. Redis is not backed up.
+- Liveness: `/api/v1/ready` names failing dependencies (`database`, `redis`, `storage`, `worker`) and nothing else — no versions, hosts or credentials in the answer or in the logs of a failure.
+- Alerts: `deploy/watch.sh` and `dist/watch.js` mail the owner counters and problem names only (the host's note is sanitised, no user data); the dead-man's switch receives a bare ping.
+- Deployment: `deploy/deploy.sh` refuses an incomplete `.env`, a missing secret or `./secrets` that is not mode 700, backs up first and rolls back on a failed check; images are pinned to a released version, built and scanned (Trivy, fails on fixable critical issues) by CI, with SBOM and provenance attestations; CI holds the registry token only.
+- Export: `GET /api/v1/listings/:id/export` is owner-scoped (another account: 404), `no-store`, and streams one object at a time; entry names are built from checked ids only.
+- Retention: accounts never verified are deleted after 7 days by a nightly job; nothing else is deleted automatically.
+
 ## The apps
 
 - **Session.** The web app never sees its session (httpOnly cookie). The desktop app keeps the bearer token returned at sign-in in the OS keychain (`keyring` crate → Windows Credential Manager / macOS Keychain / Secret Service); the Rust commands `secret_get/set/delete` accept only `session_token` (`ALLOWED_KEYS` in `secrets.rs`). Phones keep it in memory until the keystore integration lands (sign in again after a restart). Signing out deletes it.
