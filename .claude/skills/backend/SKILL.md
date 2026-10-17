@@ -5,7 +5,7 @@ description: Use for anything server-side of the backend pivot (ADR 0001) — ap
 
 # Backend (target architecture — ADR 0001)
 
-**Status (2026-10-12): phases 0, 1 and 2 done** — `apps/server` serves accounts, listings, images, settings, recipes, credits, generation/copy runs and SSE; the worker generates with the platform's keys; the compose stack runs with Mock providers in dev (`pnpm stack:up`); phase 3 done: the web and Tauri clients use the API when built with `VITE_API_ORIGIN` (ARCHITECTURE.md → API mode). How to run, layout and configuration: DEVELOPMENT.md → Server. The binding design is
+**Status (2026-10-17): phases 0–3 done** — `apps/server` serves accounts, listings, images, settings, recipes, credits, generation/copy runs and SSE; the worker generates with the platform's keys; the compose stack runs with Mock providers in dev (`pnpm stack:up`); phase 3 done: the web and Tauri clients run on the API only (`VITE_API_ORIGIN` picks the origin; the local BYOK mode was removed 2026-10-12 and lives on the `byok` branch). Phase 4 (production) remains. How to run, layout and configuration: DEVELOPMENT.md → Server. The binding design is
 `docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`; each phase has its plan in
 `docs/superpowers/plans/`. If this skill and the design disagree, the design wins — then fix this skill.
 
@@ -22,7 +22,7 @@ description: Use for anything server-side of the backend pivot (ADR 0001) — ap
 ## Invariants (each one has a test)
 
 1. **Provider keys only in the worker**, read from `/run/secrets/*`. The api has no provider key and never calls a
-   provider. Egress allowlist in the worker (today's `ALLOWED_HOSTS` logic).
+   provider. Egress allowlist in the worker.
 2. **User scoping**: repositories take the session user, never a user id from the request. Another user's id → 404.
 3. **Enqueue is one transaction**: lock the balance row, insert generation + jobs, ledger `reserve`, update the
    balance; insufficient credits → 402 and nothing written. BullMQ is fed **after** the commit.

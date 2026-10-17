@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
@@ -11,12 +11,9 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
   };
 });
 
-import { __setServices, createServices, getServices } from "@/app/services";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
 import { useListingsStore } from "@/app/stores/listings-store";
-import { useUiStore } from "@/app/stores/ui-store";
 import type { Generation } from "@aiv/domain/models";
-import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
+import { useFakeServices, type FakeServer } from "@/test/fake-api";
 import { GenerationFeed } from "./GenerationFeed";
 
 const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])], { type: "image/png" });
@@ -29,7 +26,7 @@ function addGeneration(id: string, category?: Generation["category"]): void {
       sourceImageId: d.listing.originalImageId!,
       prompt: `prompt ${id}`,
       ...(category ? { category } : {}),
-      settings: { providerId: "mock", modelId: "mock-fast", aspectRatio: "original", variationCount: 1 },
+      settings: { providerId: "mock", modelId: "mock-image", aspectRatio: "original", variationCount: 1 },
       status: "active",
       jobIds: [],
       createdAt: new Date().toISOString(),
@@ -39,20 +36,18 @@ function addGeneration(id: string, category?: Generation["category"]): void {
 }
 
 describe("GenerationFeed › regenerate one photo", () => {
-  const storage = new IndexedDbStorage("feed-regenerate-test");
-  const scrollIntoView = vi.fn();
-  beforeAll(async () => {
-    __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
-    await storage.init();
-    Element.prototype.scrollIntoView = scrollIntoView;
+  let server: FakeServer;
+  beforeEach(async () => {
+    ({ server } = await useFakeServices());
+    Element.prototype.scrollIntoView = vi.fn();
   });
   afterEach(() => cleanup());
 
-  it("offers 'Generate this photo again' on a finished tile and appends a queued job with the same shot", async () => {
+  it("offers 'Generate this photo again' on a finished tile and asks the server for that shot again", async () => {
     const doc = await useListingsStore.getState().createFromFile(PNG, "item.png");
     const originalId = doc.listing.originalImageId!;
     act(() => {
+      useListingsStore.getState().commit((d) => void (d.listing.category = { categoryId: "women", subcategoryId: "clothing" }), { immediate: true });
       addGeneration("gen_done");
       useListingsStore.getState().commit((d) => {
         // The original stands in for the result image: the tile only needs an asset to show.
@@ -62,13 +57,12 @@ describe("GenerationFeed › regenerate one photo", () => {
           generationId: "gen_done",
           sourceImageId: originalId,
           index: 1,
-          prompt: "the shoes worn",
+          prompt: "the shirt worn",
           shotId: "worn",
-          shotLabel: { en: "Worn", fr: "Portées" },
+          shotLabel: { en: "Worn", fr: "Porté" },
           provider: "mock",
-          model: "mock-fast",
+          model: "mock-image",
           aspectRatio: "original",
-          seed: 7,
           status: "completed",
           attempt: 1,
           resultImageId: originalId,
@@ -81,33 +75,16 @@ describe("GenerationFeed › regenerate one photo", () => {
     render(<GenerationFeed />);
     expect(screen.queryByRole("button", { name: "Generate more like this" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Generate this photo again" }));
-    const current = useListingsStore.getState().current!;
-    const ids = current.generations.gen_done!.jobIds;
-    expect(ids).toHaveLength(2);
-    const added = current.jobs[ids[1]!]!;
-    expect(added).toMatchObject({ prompt: "the shoes worn", shotId: "worn", index: 2, sourceImageId: originalId });
-    expect(added.seed).not.toBe(7);
-    expect(added.resultImageId).toBeUndefined();
-    // The new tile (queued, aria-busy) is brought on screen, once.
-    const tile = document.querySelector("[aria-busy]")!;
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(scrollIntoView.mock.instances[0]).toBe(tile);
-    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
-    expect(useUiStore.getState().revealJobId).toBeNull();
-    getServices().queue.cancelAll();
+    await vi.waitFor(() => expect(server.calls.some((c) => c.path.endsWith("/generations"))).toBe(true));
+    expect(server.calls.find((c) => c.path.endsWith("/generations"))?.body).toEqual({ sourceImageId: originalId, shotIds: ["worn"], aspectRatio: "original" });
   });
 });
 
 describe("GenerationFeed › scroll to a new run", () => {
-  const storage = new IndexedDbStorage("feed-test");
   const scrollIntoView = vi.fn();
-  beforeAll(async () => {
-    __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
-    await storage.init();
-    Element.prototype.scrollIntoView = scrollIntoView;
-  });
   beforeEach(async () => {
+    await useFakeServices();
+    Element.prototype.scrollIntoView = scrollIntoView;
     scrollIntoView.mockClear();
     await useListingsStore.getState().createFromFile(PNG, "item.png");
   });

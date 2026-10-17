@@ -26,7 +26,7 @@ import type { FillReport, PublishPayload } from "@aiv/domain/services/publish";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { __setServices, createServices, getServices } from "./services";
 import { buildPublishPayload } from "./publish-payload";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "./stores/generation-store";
+import { createFakeApi } from "@/test/fake-api";
 import { useListingsStore } from "./stores/listings-store";
 import { useSettingsStore } from "./stores/settings-store";
 import { usePublishStore } from "./stores/publish-store";
@@ -120,7 +120,7 @@ describe("publish-store", () => {
 
   beforeAll(async () => {
     __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
+    createServices({ storage, api: createFakeApi().api });
     await storage.init();
   });
 
@@ -357,7 +357,7 @@ describe("publish-store on phones (delegated bridge)", () => {
 
   beforeAll(async () => {
     __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
+    createServices({ storage, api: createFakeApi().api });
     await storage.init();
   });
   beforeEach(() => {
@@ -401,7 +401,7 @@ describe("buildPublishPayload", () => {
 
   beforeAll(async () => {
     __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
+    createServices({ storage, api: createFakeApi().api });
     await storage.init();
   });
 
@@ -416,7 +416,7 @@ describe("buildPublishPayload", () => {
     const reads: string[] = [];
     const payload = await buildPublishPayload(current, async (asset) => {
       reads.push(asset.id);
-      return storage.readImage(current.listing.id, asset.kind, asset.id);
+      return new Blob([Uint8Array.from(PNG_HEADER)], { type: "image/png" });
     });
     expect(payload.title).toBe("T".repeat(100));
     expect(payload.description).toBe("Blanche");

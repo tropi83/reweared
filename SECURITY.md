@@ -1,45 +1,58 @@
 # Security
 
-> **Planned change ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)):** the app is moving to user accounts and a server that runs generations with the platform's provider keys. This document describes the **current, local-first release**; the server's threat model is summarized in [Planned: server](#planned-server-adr-0001) and will replace the client sections as the phases ship.
+> The app runs on accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md), design §7 in [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md)). The earlier local-first, bring-your-own-key release and its security model are kept on the `byok` branch.
 
 ## Threat model
 
-| Asset                                                           | Threats considered                                                      | Mitigations                                                                                                                                                                       |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gemini API key / OAuth tokens, Cloudflare token / Worker secret | extraction from disk, logs, crash reports, clipboard, devtools, backups | OS credential store on desktop; memory-only by default on web; redacting logger; never in diagnostics; never sent anywhere but the provider it belongs to                         |
-| Images / prompts                                                | exfiltration, upload without consent                                    | only sent when the user launches a generation, directly to the configured provider; no analytics, no ad SDK                                                                       |
-| Local files                                                     | path traversal, malformed/huge/spoofed files                            | ids validated by `assertSafeId` before any path is built; Tauri fs scope limited to `$APPDATA/**`; magic-byte MIME sniffing; 40 MB cap; decoding delegated to the browser decoder |
-| Webview                                                         | XSS, injection, over-privileged IPC                                     | strict CSP, no `dangerouslySetInnerHTML`, closed set of Rust commands, capabilities with minimum permissions                                                                      |
-| Network                                                         | contacting unexpected hosts                                             | allowlist in `http-client.ts` + Tauri `http` scope + CSP `connect-src`                                                                                                            |
+| Asset                                       | Threats considered                                                         | Mitigations                                                                                                                                                                                                         |
+| ------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform provider keys (Cloudflare, Gemini) | theft from the database, env dumps, images, logs, a compromised api or app | Docker secrets mounted in the **worker only**; the api and the apps never call a provider; egress allowlist in the worker; rotation by replacing the secret file                                                    |
+| Accounts and sessions                       | credential stuffing, session theft, CSRF                                   | Better Auth hashing (scrypt), rate limits, mandatory email verification; httpOnly `Secure` `SameSite=Lax` cookies + Origin check on cookie writes (web); bearer token in the OS keychain (desktop), memory (phones) |
+| Listings, photos, texts, generations        | cross-user access, location metadata, public buckets                       | every query scoped by the session user (404 otherwise, tested); private bucket, bytes streamed by the api (no public or presigned URL); EXIF/GPS stripped at upload                                                 |
+| Credits / provider budget                   | double spending, refund replay, free-credit abuse                          | ledger with idempotency keys and `CHECK (balance >= 0)`; reservation in the enqueue transaction; per-user cap on active jobs; daily provider budget                                                                 |
+| The apps (webview)                          | XSS, injection, over-privileged IPC, contacting unexpected hosts           | strict CSP, no `dangerouslySetInnerHTML`, closed set of Rust commands, minimum capabilities; one API origin (`ApiClient` builds `/api/` URLs only), the Tauri HTTP scope limited to `<origin>/api/*`                |
+| Infrastructure                              | exposed databases, container escape, data loss                             | only Caddy publishes ports; non-root, read-only containers; no Docker socket; nightly off-site backups with restore drills (phase 4)                                                                                |
 
-## Credentials
+## Server
 
-- **Cloudflare:** the API token (direct mode) and the Worker shared secret live in the SecretStore like the Gemini key (OS keychain on desktop, memory or opt-in localStorage on web). Account ID and Worker URL are configuration, not secrets. Worker URLs must be `https`, without credentials or query strings; `allowHost()` refuses localhost/loopback. The Worker template validates every input against the model schema, caps bodies at 12 MB, only runs allowlisted models and compares the shared secret in constant time.
+**Accounts and sessions**
 
-- **Desktop (Windows/macOS/Linux):** `keyring` crate → Windows Credential Manager / macOS Keychain / Secret Service. Rust commands `secret_get/set/delete` accept only `gemini_api_key`, `google_oauth`, `cloudflare_api_token` and `cloudflare_worker_secret` (`ALLOWED_KEYS` in `secrets.rs`).
-- **Web:** memory by default. _Remember on this device_ writes to `localStorage` **only after the user acknowledges** the browser disclaimer. The UI never claims browser storage is secure.
-- **Mobile:** secure storage is not integrated yet; credentials are session-only (the Rust command reports unsupported and the frontend degrades). Tracked for Phase 6.
-- The API key is never displayed after saving (only its last 4 characters).
-- OAuth: Authorization Code + PKCE (S256), `state` verification, loopback redirect on `127.0.0.1:<random port>` (Google's installed-app guidance). The Desktop OAuth client's "secret" is public build configuration per Google's model ("installed apps cannot keep secrets") and is never treated as a security boundary. Refresh tokens are stored only in the OS credential store.
-- Tokens are revoked at Google on disconnect.
+- Accounts: Better Auth 1.7, password hashing by its default scrypt, sign-in refused until the email is verified, rate limits stored in Redis (sign-in 5/min, sign-up 5/h, reset and verification 3/h, per client IP resolved by Fastify behind Caddy; a client-supplied IP header is always overwritten). Telemetry is off in the config and the api refuses to start when `BETTER_AUTH_TELEMETRY` is truthy (it enables telemetry on its own). Stored Google tokens are encrypted; `/get-access-token` and `/refresh-token` are disabled.
+- Sessions: httpOnly, `SameSite=Lax` cookies (`Secure` and `__Secure-` on https) or bearer tokens; the session guard runs before the request body is read; a cookie-authenticated mutation from another `Origin` is refused.
+- Account deletion only from a link emailed to the account and opened in the signed-in session (Better Auth would otherwise accept any session younger than a day); the user's rows cascade and their objects are deleted.
+- Data: every query filters on the session user; another user's listing, image or recipe is a 404 on every route (tested route by route).
+- Uploads: session checked before the body is read, magic-byte sniffing, 40 MB cap (45 MB at Caddy), 50 MP decode limit, sharp re-encode without EXIF/GPS/XMP/IPTC/ICC, object keys built from checked ids only. Images are streamed from a private bucket (no public or presigned storage URL) with `nosniff`.
+- Logs: pino JSON, requests as method + path + IP (query strings dropped — verification links carry tokens), shared redaction of keys, tokens, cookies and passwords, masked email addresses.
+- Containers: only Caddy publishes ports; Postgres, Redis (password) and SeaweedFS on an internal network without a route out; secrets as Docker secret files (`./secrets`, git-ignored; the directory is `0700` for its owner and the files `0644`, because Compose mounts `file:` secrets with the host permissions and several container users read them); read-only root filesystems, `no-new-privileges`, dropped capabilities for the api; the api runs as a non-root user. Caddy sets HSTS, CSP, `nosniff`, `no-referrer`.
 
-## Logging
+**Runs, credits and events**
 
-All logging goes through `lib/logger.ts`, which redacts Google API keys, `ya29.` access tokens, `1//` refresh tokens, bearer headers and `key=/token=/authorization` patterns. Images and prompts are never logged. Diagnostics (Settings → Diagnostics) contain version, platform, provider/model ids, job counts and redacted events only.
+- Provider keys: Docker secrets mounted in the `worker` service only; the api's configuration has no provider variable (tested), and `scripts/check-compose.mjs` fails CI if any other service receives one. The worker reaches providers through the shared host allowlist.
+- Jobs: BullMQ data is the job id only — prompts stay in Postgres, images in the private bucket, emails never leave the account tables. Credits are reserved in the transaction that creates the jobs (402 writes nothing), refunded once per failed or cancelled job (idempotency keys, row lock; concurrency-tested), and a nightly check reports any balance that differs from its ledger.
+- Cancellation never persists a result; a duplicate delivery stores one result; a cancelled or failed job frees the user's slot. Per-user cap on active jobs (fairness) and a daily Cloudflare neuron budget (503 before anything is reserved).
+- SSE: session checked before the stream opens, the user's own Redis stream only (tested), at most 3 streams per user, events carry ids and statuses — never a prompt or an image.
+- Maintenance: orphaned image objects older than a day are deleted nightly; keys outside the storage layout are only reported.
+- Deleting a photo pack refunds its unfinished jobs once (same idempotency key as the worker's refund), stops them, and removes its photos and the listing's references to them; another user's pack and copy runs answer 404 (tested, including a run with the user scope removed).
 
-## Tauri permissions (`src-tauri/capabilities/default.json`)
+## The apps
 
-| Permission                                                                                                                                              | Why                                                                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `core:default`, `core:window:allow-set-title`                                                                                                           | window basics                                                                                                  |
-| `opener:allow-open-url` scoped to `accounts.google.com`, `aistudio.google.com`, `console.cloud.google.com`, `dash.cloudflare.com`, `github.com/tropi83` | OAuth consent, "get an API key", the Cloudflare dashboard and the Worker template open in the system browser   |
-| `dialog:allow-open`, `dialog:allow-save`                                                                                                                | import picker, export save dialog                                                                              |
-| `fs:*` listed + `fs:scope` = `$APPDATA`, `$APPDATA/**`                                                                                                  | project storage; paths picked through dialogs are added to the scope by the dialog plugin                      |
-| `http:default` scoped to the four Google hosts, `api.cloudflare.com` and `*.workers.dev`                                                                | Gemini API, token/revoke/userinfo, project listing; Cloudflare Workers AI direct API and the user's own Worker |
+- **Session.** The web app never sees its session (httpOnly cookie). The desktop app keeps the bearer token returned at sign-in in the OS keychain (`keyring` crate → Windows Credential Manager / macOS Keychain / Secret Service); the Rust commands `secret_get/set/delete` accept only `session_token` (`ALLOWED_KEYS` in `secrets.rs`). Phones keep it in memory until the keystore integration lands (sign in again after a restart). Signing out deletes it.
+- **Credentials of the bring-your-own-key releases.** At startup the app deletes what those releases may have left on the device: `aiv.secret.*` entries in browser storage and, on desktop, the keychain entries `gemini_api_key`, `google_oauth`, `cloudflare_api_token`, `cloudflare_worker_secret` (command `secret_purge_legacy`, which can only delete those keys; `secret_get/set` refuse them).
+- **Network.** `ApiClient` is the only way out: one origin fixed at build time (`VITE_API_ORIGIN`), `/api/` paths only, responses parsed with the shared zod contracts, error bodies turned into codes (never shown raw). Images leave the device only as uploads of the user's own photos to their account.
+- **Device storage.** The device keeps its settings (theme, language — also synced with the account) and, read-only, the listings of a local-first release for the one-time import. Ids are validated by `assertSafeId` before any path is built; the Tauri fs scope is `$APPDATA/**`; settings writes are atomic (`.tmp` → rename).
+- **Logging.** All app logging goes through `lib/logger.ts`, which redacts (with the server, `@aiv/domain/lib/redact`) API keys, `Bearer` headers, Better Auth session cookies and `session_token` / `set-auth-token` / `authorization` values. Images and prompts are never logged. Diagnostics (Settings → Diagnostics) contain version, platform, API origin, job counts and redacted events only.
 
-**API builds only** (`VITE_API_ORIGIN`, backend phase 3): `src-tauri/capabilities/api.json`, generated by `scripts/tauri-api-config.mjs` (`pnpm tauri:api:dev` / `tauri:api:build`) and git-ignored, adds `http:default` scoped to `<origin>/api/*` — accounts, listings, photos, runs and the event stream of the platform's API, nothing else on that host. The origin must be `https` (`http` only for `localhost`, the dev stack). Without `VITE_API_ORIGIN` the file is removed and the build is the local app's. The `ApiClient` itself only builds URLs under `/api/` on that one origin; the session token it sends lives in the OS keychain (`session_token`, memory only on phones until the keystore lands) and the web build uses httpOnly cookies instead.
+## Tauri permissions (`src-tauri/capabilities/`)
 
-No shell, no process, no notification, no clipboard plugin. `dragDropEnabled: false` on the window so HTML5 drag-and-drop delivers `File` objects to the webview without a native file-path bridge.
+| Permission                                                        | Why                                                                                                                                  |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `core:default`, `core:window:allow-set-title`                     | window basics                                                                                                                        |
+| `dialog:allow-open`, `dialog:allow-save`                          | photo picker, export save dialog                                                                                                     |
+| `fs:*` listed + `fs:scope` = `$APPDATA`, `$APPDATA/**`            | the device's settings, and reading the listings of a local-first release for the import; picked paths are added by the dialog plugin |
+| `http:default` scoped to `<origin>/api/*` (`api.json`, generated) | the account's API: sign-in, listings, photos, runs, the event stream — nothing else on that host                                     |
+| `vinted-webview:default` (`mobile.json`, phones only)             | the native Vinted screen (see below)                                                                                                 |
+
+`api.json` is generated by `scripts/tauri-api-config.mjs`, which `pnpm tauri dev|build` runs first (`scripts/tauri.mjs`) and which refuses to run without `VITE_API_ORIGIN`: the origin must be `https` (`http` only for `localhost`, the dev stack). It is git-ignored. No shell, no process, no notification, no clipboard, no opener plugin. `dragDropEnabled: false` on the window so HTML5 drag-and-drop delivers `File` objects to the webview without a native file-path bridge.
 
 ### Vinted window (`vinted_*` commands)
 
@@ -79,51 +92,13 @@ Phones cannot drive a second window from the app's JavaScript (the app's WebView
 - The native WebView / WKWebView has **no bridge object**: vinted.com cannot call into the app. The only channel is one-way — `evaluateJavascript` injects the script and reads its status back.
 - The request (script + payload) never touches an Intent or a file: it lives in process memory for the lifetime of the screen and is dropped when the screen returns (Binder would reject it anyway — the payload can weigh tens of MB).
 - The screen never clicks "Add"; closing it returns the last status report to the app, nothing else.
-- **Older Android WebViews without the Profile API** share one cookie jar per process: `clear_session` then removes all cookies, storage and cache of the app process — harmless here (the app's own WebView keeps no session: local-first, OAuth runs in the system browser), and documented. **iOS < 17** uses the default `WKWebsiteDataStore` for the same reason as macOS < 14.
+- **Older Android WebViews without the Profile API** share one cookie jar per process: `clear_session` then removes all cookies, storage and cache of the app process — harmless here (the app's own WebView keeps no cookie session: the API session is a bearer token held by the app), and documented. **iOS < 17** uses the default `WKWebsiteDataStore` for the same reason as macOS < 14.
 - The iOS half was written without a Mac and is marked untested until built (BUILDING.md).
 
-## Content Security Policy (`src-tauri/tauri.conf.json`)
+## Content Security Policy
 
-`default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (inline `style` attributes for dynamic sizes); `img-src 'self' blob: data:`; `connect-src` restricted to `ipc:`, `http://ipc.localhost`, the Google hosts (`generativelanguage`, `oauth2`, `www`, `cloudresourcemanager` `.googleapis.com`), `api.cloudflare.com` and `*.workers.dev`; `object-src 'none'`; `frame-ancestors 'none'`; `form-action 'none'`. API builds add the API origin to `connect-src` (`src-tauri/tauri.api.conf.json`, merged with `tauri --config`, generated with the capability above).
-
-## Files
-
-- Listing writes are atomic (`listing.json.tmp` → rename).
-- Temporary payloads (prepared provider images, base64 bodies) live in memory only and are dropped after the burst of jobs.
-- Cancelled jobs never write a result. `Settings → Storage → Remove orphaned files` deletes any image file not referenced by a project document.
-
-## Planned: server (ADR 0001)
-
-Not implemented yet — design §7 in [`docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md`](docs/superpowers/specs/2026-10-11-backend-queue-accounts-design.md). This section becomes the main threat model when phase 3 ships.
-
-**Implemented in phase 2** (same status):
-
-- Provider keys: Docker secrets mounted in the `worker` service only; the api's configuration has no provider variable (tested), and `scripts/check-compose.mjs` fails CI if any other service receives one. The worker reaches providers through the shared host allowlist.
-- Jobs: BullMQ data is the job id only — prompts stay in Postgres, images in the private bucket, emails never leave the account tables. Credits are reserved in the transaction that creates the jobs (402 writes nothing), refunded once per failed or cancelled job (idempotency keys, row lock; concurrency-tested), and a nightly check reports any balance that differs from its ledger.
-- Cancellation never persists a result; a duplicate delivery stores one result; a cancelled or failed job frees the user's slot. Per-user cap on active jobs (fairness) and a daily Cloudflare neuron budget (503 before anything is reserved).
-- SSE: session checked before the stream opens, the user's own Redis stream only (tested), at most 3 streams per user, events carry ids and statuses — never a prompt or an image.
-- Maintenance: orphaned image objects older than a day are deleted nightly; keys outside the storage layout are only reported.
-
-**Implemented in phase 1** (in the repository and tested; not yet used by the shipped clients):
-
-- Accounts: Better Auth 1.7, password hashing by its default scrypt, sign-in refused until the email is verified, rate limits stored in Redis (sign-in 5/min, sign-up 5/h, reset and verification 3/h, per client IP resolved by Fastify behind Caddy; a client-supplied IP header is always overwritten). Telemetry is off in the config and the api refuses to start when `BETTER_AUTH_TELEMETRY` is truthy (it enables telemetry on its own). Stored Google tokens are encrypted; `/get-access-token` and `/refresh-token` are disabled.
-- Sessions: httpOnly, `SameSite=Lax` cookies (`Secure` and `__Secure-` on https) or bearer tokens; the session guard runs before the request body is read; a cookie-authenticated mutation from another `Origin` is refused.
-- Account deletion only from a link emailed to the account and opened in the signed-in session (Better Auth would otherwise accept any session younger than a day); the user's rows cascade and their objects are deleted.
-- Data: every query filters on the session user; another user's listing, image or recipe is a 404 on every route (tested route by route).
-- Uploads: session checked before the body is read, magic-byte sniffing, 40 MB cap (45 MB at Caddy), 50 MP decode limit, sharp re-encode without EXIF/GPS/XMP/IPTC/ICC, object keys built from checked ids only. Images are streamed from a private bucket (no public or presigned storage URL) with `nosniff`.
-- Logs: pino JSON, requests as method + path + IP (query strings dropped — verification links carry tokens), shared redaction of keys, tokens, cookies and passwords, masked email addresses.
-- Containers: only Caddy publishes ports; Postgres, Redis (password) and SeaweedFS on an internal network without a route out; secrets as Docker secret files (`./secrets`, git-ignored; the directory is `0700` for its owner and the files `0644`, because Compose mounts `file:` secrets with the host permissions and several container users read them); read-only root filesystems, `no-new-privileges`, dropped capabilities for the api; the api runs as a non-root user. Caddy sets HSTS, CSP, `nosniff`, `no-referrer`.
-
-| Asset                                       | Threats considered                                                  | Planned mitigations                                                                                                                                                            |
-| ------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Platform provider keys (Cloudflare, Gemini) | theft from the database, env dumps, images, logs, a compromised api | Docker secrets mounted in the **worker only**; the api never calls a provider; egress allowlist; rotation by replacing the secret file                                         |
-| Accounts and sessions                       | credential stuffing, session theft, CSRF                            | Better Auth hashing (scrypt), rate limits, email verification (Resend); httpOnly `Secure` `SameSite=Lax` cookies + Origin check (web); bearer token in the OS keychain (Tauri) |
-| Listings, photos, generations               | cross-user access, leaking location metadata, public buckets        | every query scoped by the session user (404 otherwise); private bucket, bytes streamed by the api (no public or presigned storage URL); EXIF/GPS stripped at upload            |
-| Credits / provider budget                   | double spending, refund replay, free-credit abuse                   | ledger with idempotency keys and `CHECK (balance >= 0)`; reservation in the enqueue transaction; per-user caps; provider budget guard                                          |
-| Infrastructure                              | exposed databases, container escape, data loss                      | only Caddy publishes ports; non-root, read-only containers; no Docker socket; nightly off-site backups with restore drills                                                     |
-
-Logging moves to pino with the same redaction rules as `src/lib/logger.ts`; prompts, images, full emails, tokens and verification links are never logged. Phase 3 (done, API builds): the Tauri apps reach the API through the generated `api` capability and CSP entry (see above), with a bearer token in the OS keychain; the web app uses httpOnly cookies, and the api accepts cookie-authenticated writes from its own origin only. The Google/Cloudflare scopes, `ALLOWED_HOSTS`, the OAuth loopback and provider credential storage stay for local builds and leave the client with the removal of the local mode (phase 3 task 10, on the owner's go-ahead).
+Desktop and phones (`src-tauri/tauri.conf.json`): `default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (inline `style` attributes for dynamic sizes); `img-src 'self' blob: data:`; `connect-src 'self' ipc: http://ipc.localhost` plus the API origin (`src-tauri/tauri.api.conf.json`, generated with `api.json` and merged with `tauri --config`); `object-src 'none'`; `frame-ancestors 'none'`; `form-action 'none'`. Web (Caddy): the same with `connect-src 'self'` — the bundle talks to its own origin only — plus HSTS, `nosniff`, `no-referrer`.
 
 ## Reporting
 
-Open an issue with the redacted diagnostics export. Never paste an API key or token. Vulnerabilities: contact the maintainer privately (see `CONTRIBUTING.md`), not in a public issue.
+Open an issue with the redacted diagnostics export. Never paste a token or a password. Vulnerabilities: contact the maintainer privately (see `CONTRIBUTING.md`), not in a public issue.

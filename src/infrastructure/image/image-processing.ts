@@ -1,4 +1,4 @@
-import { AppError, MAX_IMPORT_BYTES, THUMBNAIL_DIMENSION, isSupportedInputMimeType, type ImageMimeType, type SupportedInputMimeType } from "@aiv/domain/models";
+import { AppError, MAX_IMPORT_BYTES, isSupportedInputMimeType, type ImageMimeType, type SupportedInputMimeType } from "@aiv/domain/models";
 import { IMAGE_SNIFF_BYTES, sniffImageMime, type SniffedImageMime } from "@aiv/domain/lib/image-sniff";
 import { computeGeometry, fitWithin, type Geometry } from "@aiv/domain/services/image-geometry";
 
@@ -92,12 +92,6 @@ export async function encodeBitmap(bitmap: ImageBitmap, options: EncodeOptions):
   ctx.drawImage(bitmap, 0, 0, width, height);
   const blob = await canvasToBlob(canvas, options.type, options.quality);
   return { blob, width, height };
-}
-
-/** Gallery thumbnail: WebP, longest side THUMBNAIL_DIMENSION. */
-export async function createThumbnail(bitmap: ImageBitmap): Promise<Blob> {
-  const { blob } = await encodeBitmap(bitmap, { maxDimension: THUMBNAIL_DIMENSION, type: "image/webp", quality: 0.82 });
-  return blob;
 }
 
 export interface PreparedImage {

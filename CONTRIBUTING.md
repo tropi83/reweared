@@ -16,12 +16,12 @@ See [DEVELOPMENT.md](DEVELOPMENT.md), and [BUILDING.md](BUILDING.md) for desktop
 
 ## Ground rules
 
-- No telemetry or third-party analytics, ever. The app is moving to accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)): until phase 3 ships, the client keeps its rules — no backend call, credentials leave the device only to the provider they belong to. Server work follows the backend design and the `backend` skill.
+- No telemetry or third-party analytics, ever. The app runs on accounts and a server ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)): the client talks to our API only and never holds a provider key (those live in the worker). The old bring-your-own-key app is kept on the `byok` branch. Server work follows the backend design and the `backend` skill.
 - Structural decisions get an ADR in `docs/adr/`; larger features a dated design and plan in `docs/superpowers/`.
 - New outbound hosts, permissions or storage locations need a `SECURITY.md` entry.
 - User-facing strings go through `src/i18n`.
 - Update the docs in the same PR when behaviour, permissions, env vars or flows change (README, ARCHITECTURE, SECURITY, PRIVACY, DEVELOPMENT, BUILDING, skills, CHANGELOG).
-- Verify the Google / Cloudflare / Tauri documentation before changing API calls and record the verification date in the code comment or in `DEVELOPMENT.md`.
+- Verify the Google / Cloudflare / Tauri / Better Auth / BullMQ / Resend documentation before changing API calls and record the verification date in the code comment or in `DEVELOPMENT.md`.
 
 ## Reporting security issues
 

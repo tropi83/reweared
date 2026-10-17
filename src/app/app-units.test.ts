@@ -89,30 +89,20 @@ describe("ui store", () => {
 });
 
 describe("composer store", () => {
-  it("applies the saved generation defaults once, at startup, and only for a registered provider", () => {
+  it("takes the saved format as the default", () => {
     const c = useComposerStore.getState();
-    c.setProvider("mock");
     c.setAspectRatio("1:1");
-    c.applyDefaults({ defaultAspectRatio: "3:4", defaultImageSize: "1K", activeProviderId: "cloudflare" }, new Set(["cloudflare", "mock"]));
-    expect(useComposerStore.getState()).toMatchObject({ aspectRatio: "3:4", imageSize: "1K", providerId: "cloudflare" });
-    c.applyDefaults({ defaultAspectRatio: "16:9", defaultImageSize: undefined, activeProviderId: "unknown" }, new Set(["cloudflare"]));
-    // An unregistered provider is ignored; the format still follows the settings.
-    expect(useComposerStore.getState()).toMatchObject({ aspectRatio: "16:9", providerId: "cloudflare" });
+    c.applyDefaults({ defaultAspectRatio: "3:4" });
+    expect(useComposerStore.getState().aspectRatio).toBe("3:4");
   });
 
-  it("clamps variation count and resets per-listing state", () => {
+  it("goes back to the original photo when another listing opens", () => {
     const c = useComposerStore.getState();
-    c.setVariationCount(99);
-    expect(useComposerStore.getState().variationCount).toBe(8);
-    c.setVariationCount(0);
-    expect(useComposerStore.getState().variationCount).toBe(1);
-    c.bindListing("prj_a");
-    c.setPrompt("hello");
+    c.bindListing("lst_a");
     c.setSource("img_1");
-    c.bindListing("prj_a");
-    expect(useComposerStore.getState().prompt).toBe("hello");
-    c.bindListing("prj_b");
-    expect(useComposerStore.getState().prompt).toBe("");
+    c.bindListing("lst_a");
+    expect(useComposerStore.getState().sourceImageId).toBe("img_1");
+    c.bindListing("lst_b");
     expect(useComposerStore.getState().sourceImageId).toBeNull();
   });
 });

@@ -46,16 +46,6 @@ export async function loadImageUrl(listingId: string, bucket: ImageBucket, asset
   return promise;
 }
 
-/** Registers a blob that was just written, avoiding an immediate re-read from storage. */
-export function primeImageUrl(listingId: string, bucket: ImageBucket, assetId: string, blob: Blob): string {
-  const k = key(listingId, bucket, assetId);
-  const existing = cache.get(k);
-  if (existing) URL.revokeObjectURL(existing);
-  const url = URL.createObjectURL(blob);
-  touch(k, url);
-  return url;
-}
-
 export function evictImageUrls(listingId: string, assetId?: string) {
   for (const [k, url] of [...cache.entries()]) {
     if (!k.startsWith(`${listingId}/`)) continue;

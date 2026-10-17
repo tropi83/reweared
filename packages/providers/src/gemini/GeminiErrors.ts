@@ -30,9 +30,6 @@ export interface QuotaInfo {
   freeTier: boolean;
 }
 
-/** Google's own usage/quota dashboard, referenced by its 429 messages and the rate-limits docs. */
-export const GOOGLE_RATE_LIMIT_DASHBOARD = "https://aistudio.google.com/rate-limit";
-
 const QUOTA_LINE = /metric:\s*([\w./-]+),\s*limit:\s*(\d+)(?:,\s*model:\s*([\w.-]+))?/g;
 
 function windowOf(quotaId: string): QuotaWindow {

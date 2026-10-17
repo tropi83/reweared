@@ -1,7 +1,7 @@
 import { Copy } from "lucide-react";
 import { useListingsStore } from "@/app/stores/listings-store";
-import { useSettingsStore } from "@/app/stores/settings-store";
 import { toast } from "@/app/stores/toast-store";
+import { API_ORIGIN } from "@/app/api-origin";
 import { getServices } from "@/app/services";
 import { Button } from "@/components/ui/Button";
 import { getPlatform } from "@/infrastructure/platform/capabilities";
@@ -12,9 +12,8 @@ import { Section } from "./SettingsPrimitives";
 export function DiagnosticsSection() {
   const t = useT();
   const doc = useListingsStore((s) => s.current);
-  const settings = useSettingsStore((s) => s.settings);
   const platform = getPlatform();
-  const { appVersion, queue } = getServices();
+  const { appVersion } = getServices();
   const activeJobs = doc ? Object.values(doc.jobs).filter((j) => j.status === "queued" || j.status === "generating").length : 0;
   const logs = getRecentLogs();
 
@@ -22,9 +21,8 @@ export function DiagnosticsSection() {
     [
       `app: ${appVersion}`,
       `platform: ${platform.kind}`,
-      `provider: ${settings.activeProviderId}`,
-      `model: ${settings.lastModelByProvider[settings.activeProviderId] ?? "-"}`,
-      `active jobs: ${queue.activeCount}`,
+      `api: ${API_ORIGIN}`,
+      `active jobs: ${activeJobs}`,
       "",
       ...logs.slice(-50).map((l) => `${l.ts} [${l.level}] [${l.scope}] ${l.message}`),
     ].join("\n");
@@ -35,8 +33,7 @@ export function DiagnosticsSection() {
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
           <Diag label={t("diagnostics.version")} value={appVersion} />
           <Diag label={t("diagnostics.platform")} value={platform.kind} />
-          <Diag label={t("diagnostics.provider")} value={settings.activeProviderId} />
-          <Diag label={t("diagnostics.model")} value={settings.lastModelByProvider[settings.activeProviderId] ?? "—"} />
+          <Diag label={t("diagnostics.api")} value={API_ORIGIN} />
           <Diag label={t("diagnostics.jobs")} value={String(activeJobs)} />
         </dl>
         <div>

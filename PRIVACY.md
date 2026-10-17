@@ -1,69 +1,56 @@
 # Privacy
 
-> **Planned change ([ADR 0001](docs/adr/0001-backend-accounts-platform-keys.md)):** the app is moving to user accounts and a server that stores listings and runs generations. This page describes the **current, local-first release**; what will change is summarized in [Planned: accounts and server](#planned-accounts-and-server-adr-0001), and this page will be rewritten before that release ships.
+> This page describes the account version of AI Image Variations. The hosting location, the retention periods and the privacy contact are completed before the public launch (backend phase 4). The earlier local-first release, where nothing left your device but provider calls, is kept on the `byok` branch with its own privacy page.
 
-## Where your data lives
+## What we store, and where
 
 ```
+Our server (private to your account)
+   ├── your account: email address, password (hashed, never in clear text), email verification and sessions
+   ├── listings: name, category, brand, mannequin choice, title & description, "to post" marks
+   ├── photos: your originals (location and camera metadata removed at upload), generated photos, thumbnails
+   ├── photo packs and text runs: which shots, their status, errors (prompts stay on the server)
+   ├── credits: balance and every movement (monthly grant, run, refund)
+   ├── settings shared by your devices: language, theme, mannequin, Vinted warning acknowledged, default format
+   └── server logs: requests (method, path, address), errors — never photos, prompts, passwords or tokens
+
 Your device
-   ├── listings (names, category, brand, timestamps, title & description)
-   ├── images (originals, generated results, thumbnails)
-   ├── prompts, recipes and your mannequin settings
-   ├── history (generations, jobs, parameters, errors)
-   ├── local usage counters (requests per provider and model)
-   ├── Vinted session (vinted.com cookies/storage in an isolated profile — desktop window or phone screen)
-   └── settings
+   ├── your session: an httpOnly cookie (web) or a session token in the system keychain (desktop; in memory on phones)
+   ├── the device's copy of its settings (theme, language)
+   ├── the Vinted session (vinted.com cookies/storage in an isolated profile — desktop window or phone screen)
+   └── listings of the local-first release, if you used it: read once to offer the import, never sent without you
 ```
 
-Desktop and mobile: the application data directory of your OS (shown in Settings → Storage). Web: the browser's IndexedDB for this site's origin. There is no AI Image Variations account and no AI Image Variations server in this release.
+Photos are stored in a private bucket and only ever served to your signed-in account — never through a public or shareable link.
 
-## What leaves your device, and when
+## Who your data is sent to, and when
 
-| Data                                                                                      | Sent to                                                                                                | When                                                                                                                                                                   |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The source photo (resized copy, original untouched) and the shot prompts                  | The image provider you configured: Cloudflare Workers AI (`api.cloudflare.com` or **your own** Worker) | Only when you press **Create the listing**, **Generate this photo again** or Retry                                                                                     |
-| The original photo (resized copy), the category and the brand you typed                   | The text provider you configured: Google Gemini (`generativelanguage.googleapis.com`) or Cloudflare    | Only when the listing's title and description are generated (**Create the listing**, **Regenerate text**)                                                              |
-| Your credential (Gemini API key or OAuth bearer token, Cloudflare token or Worker secret) | The provider it belongs to                                                                             | With every request to that provider, and for "Test connection"                                                                                                         |
-| OAuth authorization code / refresh token                                                  | Google's OAuth endpoints                                                                               | During sign-in, token refresh and disconnect (desktop)                                                                                                                 |
-| The photos marked “To post” (JPEG ≤ 2048 px), the title and the description               | Vinted, inside the Vinted window (desktop) or the Vinted screen (phones)                               | Only when you post on Vinted; the photos are attached by the pre-fill, the text only when you tap the paste icons. Nothing is published until you click Vinted's “Add” |
-| Nothing else                                                                              | —                                                                                                      | —                                                                                                                                                                      |
+| Data                                                                                      | Sent to                                                                                    | When                                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Your photo (to your account)                                                              | our server                                                                                 | When you create a listing from a photo                                                                                                                                 |
+| A resized copy of the listing's photo and the shot prompts                                | the platform's image provider (Cloudflare Workers AI), by our server                       | Only when you press **Create the listing**, **Generate this photo again**, **Generate again** or Retry                                                                 |
+| A resized copy of the original photo, the category and the brand you typed                | the platform's text provider (Google Gemini), by our server                                | Only when the title and description are written (**Create the listing**, **Regenerate text**)                                                                          |
+| Your email address and the links we send (verification, password reset, account deletion) | our email service (Resend)                                                                 | When you sign up, ask for a new password or ask to delete the account                                                                                                  |
+| The photos marked "To post" (JPEG ≤ 2048 px), the title and the description               | Vinted, inside the Vinted window (desktop) or the Vinted screen (phones), from your device | Only when you post on Vinted; the photos are attached by the pre-fill, the text only when you tap the paste icons. Nothing is published until you click Vinted's "Add" |
+| Nothing else                                                                              | —                                                                                          | —                                                                                                                                                                      |
 
-Nothing is uploaded automatically. Opening a listing, browsing the gallery, exporting, or editing prompts never sends your images anywhere. The model lists and the connection status of a provider are read from that provider with your credential.
+The providers process these requests under the platform's accounts and their terms (Cloudflare Workers AI, Google Gemini API; Gemini requests are sent with `store: false`). Generated photos come back to our server, are re-encoded without metadata and stored with your listing.
 
-## Providers' role
-
-Generations and listing copy are processed by the provider you chose, under its terms and with your own account: Cloudflare (Workers AI) and/or Google (Gemini API). Gemini requests are sent with `store: false` (the Interactions API option not to retain the interaction for later multi-turn use); each provider's own data-handling policies still apply and depend on your account or plan. Check their documentation.
+**Sub-processors**: the hosting provider (to be named before launch), Cloudflare (image generation), Google (text generation), Resend (email).
 
 ## Analytics, ads, tracking
 
-- No analytics, no crash reporting, no telemetry in this version.
+- No analytics, no crash reporting, no third-party telemetry, in the apps or on the server. Server logs stay on our server.
 - No ad SDK is integrated. If ads are introduced in a future free tier, they will be isolated behind an `AdProvider` abstraction that never receives images, prompts or generation data, and they will never be displayed over images or during generation.
-- No fingerprinting, no identifiers beyond what your browser/OS already provides to the sites you use.
+- No fingerprinting.
 
-## Deleting data
+## Your choices and rights
 
-- Delete a listing: removes its `listing.json` and all of its image files, on this device only (never on Vinted).
-- Settings → Storage → _Delete all local data_: removes every listing, image, recipe, setting and stored credential on this device.
-- Disconnect Google: the token is revoked at Google and removed from the credential store.
-- Settings → Publishing → _Log out of Vinted_: erases the Vinted cookies and storage kept by the app (`vinted-webview/` in the app data folder, a dedicated WebKit data store on macOS 14+ / iOS 17+, the dedicated WebView profile on Android). Your Vinted login itself happens on Vinted's pages; the app never sees your Vinted credentials.
-
-Your data belongs to you. Files are stored in standard formats (JSON, PNG/JPEG/WebP) so they remain usable without this application.
-
-## Accounts and server (ADR 0001)
-
-**Builds made with an account (API mode, phase 3)** work as below; the local-first builds described above are unchanged. Before this release is published, this page is rewritten around the account version and completed with the hosting location, retention periods and the privacy contact.
-
-- **Sign-in**: email and password (stored hashed by the server, never in clear text). The web app keeps the session in an httpOnly cookie; the desktop app keeps a session token in the system keychain (on phones, in memory until the app closes).
-- **Your listings, photos and texts** are stored on the server, private to your account; the app on your device only displays them. Settings shared by your devices (language, theme, mannequin) are stored with the account; provider choices are not (the platform's providers are used).
-- **Importing from this device** is optional and offered once: it copies each listing's original photo, name, category, brand, mannequin choice and texts into the account. Generated photos are not copied. The device keeps its copy.
-- **Signing out** removes the session from the device and empties what the app showed. **Deleting the account** (confirmed by an emailed link) removes its listings, photos and history from the server.
-
-The commitments below were written when this was planned and still apply:
-
-- **What we store** on our server (hosted in the EU — to be confirmed): your account (email, hashed password or Google identity), your listings, photos and generated images, your credit balance and its history, and server logs (without photos, prompts or passwords).
-- **Who processes it for us** (sub-processors): the image and text providers (Cloudflare, Google), the email service (Resend) and the hosting provider. Photos are sent to a provider only for a generation you start.
-- **What changes for you**: no API key to set up; listings follow your account across devices; generation needs the network.
-- **Your rights**: export of your listings, deletion of your account (database records and stored images), retention periods, and the contact for privacy requests.
-- **What the server does with photos**: location (GPS) and camera metadata are removed from every uploaded photo before it is stored; photos are private to their account and never published through a public link; deleting the account requires confirming a link sent by email and removes the photos.
-- **Who the server sends photos to**: for a run you start, the worker sends a resized copy of the listing's photo and the shot's prompt to the platform's image provider (Cloudflare Workers AI by default), and the original photo to the text provider (Google Gemini by default) to write the title and description. Generated photos are stored with your listing, without metadata; nothing is sent for analytics.
-- **What does not change**: no third-party analytics or ad tracking; the Vinted pre-fill still runs on your device and never publishes for you.
+- **Delete a photo or a photo pack**: removed from the server at once (never from Vinted).
+- **Delete a listing**: removes it, its photos and its packs from the server.
+- **Sign out**: removes the session from the device; the app shows nothing of the account afterwards.
+- **Delete your account** (Settings → Account, confirmed by a link sent to your email): removes your account, listings, photos, packs, credits history and settings from the server.
+- **Import from this device**: optional and offered once; it copies each listing of the local-first release (original photo, name, category, brand, mannequin choice, texts) into your account. Generated photos are not copied; the device keeps its copy.
+- **Settings → Publishing → Log out of Vinted**: erases the Vinted cookies and storage kept by the app on this device. Your Vinted login happens on Vinted's pages; the app never sees your Vinted credentials.
+- **Credentials of the local-first release** (provider API keys, Google tokens) left on the device are deleted by the app at startup.
+- **To come before launch**: export of a listing (ZIP with its photos and texts), the retention periods (for example, accounts never verified are deleted after 7 days) and the contact for privacy requests.

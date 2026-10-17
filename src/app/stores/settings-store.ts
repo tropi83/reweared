@@ -6,13 +6,14 @@ import { createLogger } from "@/lib/logger";
 import { setLocale } from "@/i18n";
 import { getServices } from "../services";
 import { applyTheme } from "../theme";
+import { useComposerStore } from "./composer-store";
 
 interface SettingsState {
   settings: AppSettings;
   loaded: boolean;
   load(): Promise<void>;
   update(patch: Partial<AppSettings>): Promise<void>;
-  /** API mode, at sign-in: the account's settings (shared by its devices) replace the device's copy of them. */
+  /** At sign-in: the account's settings (shared by its devices) replace the device's copy of them. */
   pullAccountSettings(): Promise<void>;
 }
 
@@ -36,8 +37,6 @@ function accountPart(settings: AppSettings): AccountSettings {
 function applySideEffects(settings: AppSettings) {
   setLocale(settings.locale);
   applyTheme(settings.theme);
-  const { queue } = getServices();
-  queue.configure({ concurrency: settings.maxConcurrentJobs, maxAttempts: settings.maxAttempts, timeoutMs: settings.jobTimeoutMs });
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -56,23 +55,21 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ settings });
     applySideEffects(settings);
     await getServices().storage.saveSettings(settings);
-    const api = getServices().api;
-    if (api && ACCOUNT_KEYS.some((key) => key in patch)) {
+    if (ACCOUNT_KEYS.some((key) => key in patch)) {
       // The device keeps working with its copy when the server cannot be reached; the next change sends it again.
-      await api.client
-        .request("PUT", "/api/v1/me/settings", { json: accountPart(settings), schema: userSettingsDto })
+      await getServices()
+        .api.client.request("PUT", "/api/v1/me/settings", { json: accountPart(settings), schema: userSettingsDto })
         .catch((error: unknown) => log.warn("account settings not saved", error));
     }
   },
 
   async pullAccountSettings() {
-    const api = getServices().api;
-    if (!api) return;
-    const remote = await api.client.get("/api/v1/me/settings", userSettingsDto);
+    const remote = await getServices().api.client.get("/api/v1/me/settings", userSettingsDto);
     const settings: AppSettings = { ...get().settings, ...remote };
     if (!remote.mannequin) delete settings.mannequin;
     set({ settings });
     applySideEffects(settings);
+    useComposerStore.getState().applyDefaults(settings);
     await getServices().storage.saveSettings(settings);
   },
 }));

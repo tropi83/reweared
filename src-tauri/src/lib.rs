@@ -1,4 +1,3 @@
-mod oauth;
 mod secrets;
 mod vinted;
 
@@ -8,9 +7,7 @@ use tauri::Manager;
 pub fn run() {
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
-        .manage(oauth::LoopbackState::default())
         .manage(vinted::BarText::default())
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init());
@@ -31,9 +28,7 @@ pub fn run() {
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_delete,
-            oauth::oauth_loopback_start,
-            oauth::oauth_loopback_wait,
-            oauth::oauth_loopback_cancel,
+            secrets::secret_purge_legacy,
             vinted::vinted_open,
             vinted::vinted_navigate,
             vinted::vinted_prefill,

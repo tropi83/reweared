@@ -1,31 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: local project storage under the app data directory, file dialogs, and HTTPS access limited to Google endpoints. Every permission here has a justification in SECURITY.md.",
+  "description": "Main window: the device storage under the app data directory (settings, and the previous local listings read for the one-time import) and file dialogs. HTTP to the API comes from the generated api capability. Every permission here has a justification in SECURITY.md.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-set-title",
-    {
-      "identifier": "opener:allow-open-url",
-      "allow": [
-        {
-          "url": "https://accounts.google.com/*"
-        },
-        {
-          "url": "https://aistudio.google.com/*"
-        },
-        {
-          "url": "https://console.cloud.google.com/*"
-        },
-        {
-          "url": "https://dash.cloudflare.com/*"
-        },
-        {
-          "url": "https://github.com/tropi83/*"
-        }
-      ]
-    },
     "dialog:allow-open",
     "dialog:allow-save",
     "fs:allow-appdata-read-recursive",
@@ -49,29 +29,6 @@
         },
         {
           "path": "$APPDATA/**"
-        }
-      ]
-    },
-    {
-      "identifier": "http:default",
-      "allow": [
-        {
-          "url": "https://generativelanguage.googleapis.com/*"
-        },
-        {
-          "url": "https://oauth2.googleapis.com/*"
-        },
-        {
-          "url": "https://www.googleapis.com/oauth2/*"
-        },
-        {
-          "url": "https://cloudresourcemanager.googleapis.com/*"
-        },
-        {
-          "url": "https://api.cloudflare.com/*"
-        },
-        {
-          "url": "https://*.workers.dev/*"
         }
       ]
     }

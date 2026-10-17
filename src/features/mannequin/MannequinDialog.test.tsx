@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { __setServices, createServices } from "@/app/services";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
+import { createFakeApi } from "@/test/fake-api";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { MannequinDialog } from "./MannequinDialog";
@@ -11,7 +11,7 @@ describe("MannequinDialog", () => {
   const storage = new IndexedDbStorage("mannequin-dialog-test");
   beforeAll(async () => {
     __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
+    createServices({ storage, api: createFakeApi().api });
     await storage.init();
   });
   beforeEach(() => useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, mannequin: undefined } }));

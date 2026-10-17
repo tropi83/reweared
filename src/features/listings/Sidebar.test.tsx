@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 let platform = { isMobile: false, nativeDialogs: false };
@@ -9,10 +9,14 @@ vi.mock("../workspace/useImageImport", () => ({ pickImageFile: () => pickImageFi
 
 import { navigate } from "@/app/router";
 import { useUiStore } from "@/app/stores/ui-store";
+import { useFakeServices } from "@/test/fake-api";
+import { renderWithQuery, resetQueryClient } from "@/test/render";
 import { Sidebar } from "./Sidebar";
 
 describe("Sidebar › New listing", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    resetQueryClient();
+    await useFakeServices();
     navigate({ name: "settings" });
     useUiStore.setState({ sidebarOpen: true });
     pickImageFile.mockClear();
@@ -23,14 +27,14 @@ describe("Sidebar › New listing", () => {
   });
 
   it("opens the file picker on desktop", async () => {
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     await userEvent.setup().click(screen.getByRole("button", { name: "New listing" }));
     expect(pickImageFile).toHaveBeenCalledTimes(1);
   });
 
   it("on a phone goes to the import screen (gallery / camera choice) instead of opening the gallery", async () => {
     platform = { isMobile: true, nativeDialogs: true };
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     await userEvent.setup().click(screen.getByRole("button", { name: "New listing" }));
     expect(pickImageFile).not.toHaveBeenCalled();
     expect(window.location.hash).toBe("#/");

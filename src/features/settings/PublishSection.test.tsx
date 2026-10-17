@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { __setServices, createServices, getServices } from "@/app/services";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
+import { createFakeApi } from "@/test/fake-api";
 import { useSettingsStore } from "@/app/stores/settings-store";
 import { useToastStore } from "@/app/stores/toast-store";
 import { AppError } from "@aiv/domain/models";
@@ -30,7 +30,7 @@ describe("PublishSection", () => {
 
   beforeAll(async () => {
     __setServices(null);
-    base = createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
+    base = createServices({ storage, api: createFakeApi().api });
     await storage.init();
   });
 

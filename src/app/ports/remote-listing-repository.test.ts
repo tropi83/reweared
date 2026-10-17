@@ -115,9 +115,4 @@ describe("RemoteListingRepository", () => {
     ]);
     expect(await repo.get(LST)).toBeNull();
   });
-
-  it("refuses to store generated images: the server writes them", async () => {
-    const { repo } = fakeServer(() => undefined);
-    await expect(repo.storeGeneratedImage()).rejects.toMatchObject({ code: "PLATFORM_UNSUPPORTED" });
-  });
 });

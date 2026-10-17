@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/Misc";
 import { useT } from "@/i18n";
-import { RecipesView } from "@/features/recipes/RecipesView";
 import { SettingsView } from "@/features/settings/SettingsView";
 import { Sidebar } from "@/features/listings/Sidebar";
 import { HomeView } from "@/features/workspace/HomeView";
@@ -11,7 +10,6 @@ import { useGlobalImport } from "@/features/workspace/useImageImport";
 import { AuthScreens } from "@/features/account/AuthScreens";
 import { ImportLocalOffer } from "@/features/account/ImportLocalDialog";
 import { accountErrorMessage } from "@/features/account/account-errors";
-import { API_MODE } from "./api-mode";
 import { bootstrap } from "./bootstrap";
 import { takeResetPasswordLink, useAccountStore } from "./stores/account-store";
 import { getQueryClient } from "./query/query-client";
@@ -40,11 +38,15 @@ export function App() {
     );
   }
   if (!ready) return <Spinner />;
-  return <QueryClientProvider client={getQueryClient()}>{API_MODE ? <AuthGate /> : <Shell />}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={getQueryClient()}>
+      <AuthGate />
+    </QueryClientProvider>
+  );
 }
 
 // Read once at load: a password-reset link opens the reset screen, whatever the session.
-const resetLink = API_MODE && typeof location !== "undefined" ? takeResetPasswordLink() : null;
+const resetLink = typeof location !== "undefined" ? takeResetPasswordLink() : null;
 
 /** API mode: the workspace needs an account; without a session the sign-in screens take the whole window. */
 function AuthGate() {
@@ -129,12 +131,11 @@ function Shell() {
       </aside>
       <main id="main" className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
         {route.name === "settings" && <SettingsView section={route.section} />}
-        {route.name === "recipes" && <RecipesView />}
         {route.name === "listing" && <WorkspaceView listingId={route.id} />}
         {route.name === "home" && <HomeView />}
       </main>
       <ImportingOverlay />
-      {API_MODE && <ImportLocalOffer />}
+      <ImportLocalOffer />
       <Toaster />
     </div>
   );

@@ -1,7 +1,7 @@
-// Tauri builds in API mode (VITE_API_ORIGIN): the API origin is build-time configuration, so the http scope and the
-// CSP that let the webview reach it are generated here instead of being hard-coded.
-//   node scripts/tauri-api-config.mjs   → writes src-tauri/capabilities/api.json and src-tauri/tauri.api.conf.json
-// Without VITE_API_ORIGIN both files are removed and the local-first app builds unchanged.
+// The desktop and phone apps reach the API at an origin chosen at build time (VITE_API_ORIGIN), so the http scope and
+// the CSP that let the webview reach it are generated here instead of being hard-coded:
+//   src-tauri/capabilities/api.json and src-tauri/tauri.api.conf.json (both git-ignored).
+// `pnpm tauri dev|build` (scripts/tauri.mjs) runs it first and passes the CSP patch with --config.
 // Only https origins are accepted, plus http://localhost / 127.0.0.1 for `pnpm tauri dev` against the dev stack.
 import fs from "node:fs";
 import path from "node:path";
@@ -45,23 +45,22 @@ export function configPatch(baseConfig, origin) {
   return { app: { security: { csp } } };
 }
 
-function main() {
-  const origin = apiOrigin(process.env.VITE_API_ORIGIN);
+/** Writes the API capability and the CSP patch; returns the path of the patch for `tauri --config`. */
+export function writeApiConfig(raw = process.env.VITE_API_ORIGIN) {
+  const origin = apiOrigin(raw);
   if (!origin) {
-    fs.rmSync(capabilityFile, { force: true });
-    fs.rmSync(configFile, { force: true });
-    console.log("tauri-api-config: local app (VITE_API_ORIGIN unset), no API scope");
-    return;
+    throw new Error("VITE_API_ORIGIN is required: the public https origin of the API, or http://localhost:8080 for the dev stack.");
   }
   const base = JSON.parse(fs.readFileSync(path.join(root, "src-tauri/tauri.conf.json"), "utf8"));
   fs.writeFileSync(capabilityFile, `${JSON.stringify(capability(origin), null, 2)}\n`);
   fs.writeFileSync(configFile, `${JSON.stringify(configPatch(base, origin), null, 2)}\n`);
   console.log(`tauri-api-config: API scope and CSP for ${origin}`);
+  return configFile;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    main();
+    writeApiConfig();
   } catch (error) {
     console.error(`tauri-api-config: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);

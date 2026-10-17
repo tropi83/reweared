@@ -15,7 +15,7 @@ vi.mock("@/infrastructure/image/image-processing", async (importOriginal) => {
 
 import { currentRoute, navigate } from "@/app/router";
 import { __setServices, createServices } from "@/app/services";
-import { applyJobUpdate, buildRequestForJob, persistJobResult } from "@/app/stores/generation-store";
+import { createFakeApi } from "@/test/fake-api";
 import { useListingsStore } from "@/app/stores/listings-store";
 import { IndexedDbStorage } from "@/infrastructure/storage/IndexedDbStorage";
 import { ListingActionsMenu } from "./ListingActionsMenu";
@@ -24,9 +24,10 @@ const PNG = new Blob([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a,
 
 describe("ListingActionsMenu", () => {
   const storage = new IndexedDbStorage("listing-actions-menu-test");
+  const fake = createFakeApi();
   beforeAll(async () => {
     __setServices(null);
-    createServices({ buildRequest: buildRequestForJob, persistResult: persistJobResult, onJobUpdate: applyJobUpdate, storage });
+    createServices({ storage, api: fake.api });
     await storage.init();
   });
   beforeEach(() => navigate({ name: "home" }));
@@ -38,14 +39,14 @@ describe("ListingActionsMenu", () => {
     render(<ListingActionsMenu listing={{ id: doc.listing.id, name: "Chemise" }} />);
     await user.click(screen.getByRole("button", { name: "Listing actions" }));
     await user.click(screen.getByRole("menuitem", { name: "Delete" }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("“Chemise” and all of its images will be removed from this device");
+    expect(screen.getByRole("dialog")).toHaveTextContent("“Chemise” and all of its images will be deleted from your account");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(await storage.getListing(doc.listing.id)).not.toBeNull();
+    expect(fake.server.docs.has(doc.listing.id)).toBe(true);
 
     await user.click(screen.getByRole("button", { name: "Listing actions" }));
     await user.click(screen.getByRole("menuitem", { name: "Delete" }));
     await user.click(screen.getAllByRole("button", { name: "Delete" }).at(-1)!);
-    await vi.waitFor(async () => expect(await storage.getListing(doc.listing.id)).toBeNull());
+    await vi.waitFor(() => expect(fake.server.docs.has(doc.listing.id)).toBe(false));
     expect(useListingsStore.getState().summaries.find((s) => s.id === doc.listing.id)).toBeUndefined();
   });
 
